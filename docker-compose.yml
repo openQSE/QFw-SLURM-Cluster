@@ -50,6 +50,23 @@ services:
     networks:
       - slurm-network
 
+  slurmrestd:
+    image: slurm-docker-cluster:${IMAGE_TAG}
+    command: ["slurmrestd"]
+    #command: ["TJNXXX"]
+    container_name: slurmrestd
+    hostname: slurmrestd
+    volumes:
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - var_log_slurm:/var/log/slurm
+    expose:
+      - "6820"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
   c1:
     image: slurm-docker-cluster:${IMAGE_TAG}
     command: ["slurmd"]

@@ -91,4 +91,29 @@ then
     exec /usr/sbin/slurmd -Dvvv
 fi
 
+if [ "$1" = "slurmrestd" ]
+then
+    echo "---> Starting the MUNGE Authentication service (munged) ..."
+    gosu munge /usr/sbin/munged
+
+    echo "---> Waiting for slurmctld to become active before starting slurmrestd..."
+
+    until 2>/dev/null >/dev/tcp/slurmctld/6817
+    do
+        echo "-- slurmctld is not available.  Sleeping ..."
+        sleep 2
+    done
+    echo "-- slurmctld is now active ..."
+
+    #export SLURM_JWT=daemon
+    #export SLURM_JWT=''
+    export SLURMRESTD_DEBUG=debug
+
+    # XXX: Disable lots of security checks b/c running in devel container
+    export SLURMRESTD_SECURITY=disable_unshare_sysv,disable_unshare_files,disable_user_check
+
+    echo "---> Starting the Slurm REST Daemon (slurmrestd) ..."
+    exec /usr/sbin/slurmrestd -vvvvv 0.0.0.0:6820
+fi
+
 exec "$@"

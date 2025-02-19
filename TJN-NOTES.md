@@ -2,6 +2,48 @@
 
 2025.02.18
 ----------
+ - slurmrestd setup
+    - Added new docker-compose.yml entry and block in docker-entrypoint.sh
+    - Hacks for starting the slurmrestd in container without various namespaces
+      stuff `export SLURMRESTD_SECURITY=disable_unshare_sysv,disable_unshare_files,disable_user_check`
+      (See: `/usr/local/bin/docker-entrypoint.sh`)
+
+    - Got the basic `slurmrestd` to startup but not able to get the
+      authentication working so I can do curl requests.
+
+    - Example command at stop point for today
+      ```
+        beaker: (tjn-main)$ docker exec -ti slurmrestd bash
+
+          ...<snip>...
+
+        [root@slurmrestd /]# env | grep SLURM
+        SLURMRESTD_DEBUG=debug
+        SLURMRESTD_SECURITY=disable_unshare_sysv,disable_unshare_files,disable_user_check
+        [root@slurmrestd /]# slurmrestd -s list
+        slurmrestd: debug:  slurm_conf_init: using config_file=/etc/slurm/slurm.conf
+        slurmrestd: debug:  Reading slurm.conf file: /etc/slurm/slurm.conf
+        slurmrestd: debug:  NodeNames=c[1-2] setting Sockets=Boards(1)
+        slurmrestd: debug:  auth/munge: init: loaded
+        slurmrestd: debug:  hash/k12: init: init: KangarooTwelve hash plugin loaded
+        slurmrestd: debug:  tls/none: init: tls/none loaded
+        slurmrestd: accounting_storage/slurmdbd: init: Accounting storage SLURMDBD plugin loaded
+        slurmrestd: cred/munge: init: Munge credential signature plugin loaded
+        slurmrestd: debug:  _plugrack_foreach: serializer plugin type:serializer/json path:/usr/lib64/slurm/serializer_json.so
+        slurmrestd: debug:  _plugrack_foreach: serializer plugin type:serializer/url-encoded path:/usr/lib64/slurm/serializer_url_encoded.so
+        slurmrestd: debug:  _plugrack_foreach: serializer plugin type serializer/json already loaded
+        slurmrestd: debug:  _plugrack_foreach: data_parser plugin type:data_parser/v0.0.40 path:/usr/lib64/slurm/data_parser_v0_0_40.so
+        slurmrestd: debug:  _plugrack_foreach: data_parser plugin type:data_parser/v0.0.39 path:/usr/lib64/slurm/data_parser_v0_0_39.so
+        slurmrestd: debug:  _plugrack_foreach: data_parser plugin type:data_parser/v0.0.41 path:/usr/lib64/slurm/data_parser_v0_0_41.so
+        Possible OpenAPI plugins:
+        slurmrestd: debug:  _plugrack_foreach: serializer plugin type serializer/json already loaded
+        openapi/v0.0.39
+        openapi/dbv0.0.39
+        openapi/slurmctld
+        openapi/slurmdbd
+        [root@slurmrestd /]#
+      ```
+
  - Add `LaunchParameters=use_interactive_step` to slurm.conf to land
    on first node in allocation when using `salloc` w/ interactive shell.
 
@@ -27,6 +69,14 @@
     ```
 
  - Added 'cgroup.conf' to `update_slurmfiles.sh` script
+
+    - **NOTE:** May want to also try this slightly simpler version (**untested**)
+      ```
+      CgroupAutomount=yes
+      CgroupPlugin=cgroup/v1
+      ConstrainCores=no
+      ConstrainRAMSpace=no
+      ```
 
  - At this point, I can now startup the cluster and things work.
    I left the hack in docker-entrypoint.sh in case i need it
