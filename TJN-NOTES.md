@@ -10,6 +10,11 @@
     ```
     echo 'sslverify=false' >> /etc/yum.conf \
     ```
+ - fix Docker build error on my macOS laptop, failing 'docker compose build'
+   related to `gpg` within the `gosu` step.  Replace with curl instead.
+   ```
+    curl --insecure -fsSL "https://keys.openpgp.org/pks/lookup?op=get&search=0xB42F6819007F00F88E364FD4036A9C25BF357DD4" | gpg --import \
+   ```
 
 2025.02.18
 ----------
