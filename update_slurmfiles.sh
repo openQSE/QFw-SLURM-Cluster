@@ -13,4 +13,5 @@ do
         restart=true
     fi
 done
-if $restart; then docker-compose restart; fi
+#if $restart; then docker-compose restart; fi
+if $restart; then docker compose restart; fi
