@@ -2,6 +2,9 @@
 
 2025.02.18
 ----------
+ - Add `LaunchParameters=use_interactive_step` to slurm.conf to land
+   on first node in allocation when using `salloc` w/ interactive shell.
+
  - Figured out that nodes c1 and c2 failing b/c of cgroup settings
    missing and assumed `TaskPlugin=task/none` was not sufficient
    to ignore this need.  Fix was to add a `/etc/slurm/cgroup.conf`
