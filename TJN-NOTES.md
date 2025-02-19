@@ -2,6 +2,9 @@
 
 2025.02.19
 ----------
+ - add cgroup.conf COPY to Dockerfile so it is there by default
+   (appears to be needed with 24.05.03)
+
  - fix Docker build error on my macOS laptop, failing 'docker compose build'
  - Brief: Getting curl certificate errors with rockylinux
    when try to get the mirror list during 'yum makecache'
