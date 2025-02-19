@@ -3,6 +3,8 @@
 2025.02.18
 ----------
  - slurmrestd setup
+    - TODO: next https://slurm.schedmd.com/jwt.html#setup
+
     - Added new docker-compose.yml entry and block in docker-entrypoint.sh
     - Hacks for starting the slurmrestd in container without various namespaces
       stuff `export SLURMRESTD_SECURITY=disable_unshare_sysv,disable_unshare_files,disable_user_check`
