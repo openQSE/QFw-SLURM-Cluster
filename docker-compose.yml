@@ -53,6 +53,7 @@ services:
   c1:
     image: slurm-docker-cluster:${IMAGE_TAG}
     command: ["slurmd"]
+    #command: ["TJNXXX"]
     hostname: c1
     container_name: c1
     volumes:

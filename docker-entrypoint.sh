@@ -1,6 +1,36 @@
 #!/bin/bash
 set -e
 
+
+if [ "$1" = "TJNXXX" ]
+then
+    echo "TJNXXX DBG"
+    echo "---> Starting the MUNGE Authentication service (munged) ..."
+    gosu munge /usr/sbin/munged
+
+    echo "TJNXXX DBG"
+    echo "---> Waiting for slurmctld to become active before starting slurmd..."
+
+    until 2>/dev/null >/dev/tcp/slurmctld/6817
+    do
+        echo "-- slurmctld is not available.  Sleeping ..."
+        sleep 2
+    done
+    echo "TJNXXX DBG"
+    echo "-- slurmctld is now active ..."
+
+    echo "DBGXXX"
+    echo "---> Starting the Slurm Node Daemon (slurmd) ..."
+#    exec /usr/sbin/slurmd -Dvvv
+    echo "TJN: HACK to avoid starting slurmd and just start - DONE"
+
+    echo "TJN: RUN SLEEP INFINITY"
+    exec /usr/bin/sleep infinity
+    echo "TJNXXX DBG"
+
+fi
+
+
 if [ "$1" = "slurmdbd" ]
 then
     echo "---> Starting the MUNGE Authentication service (munged) ..."

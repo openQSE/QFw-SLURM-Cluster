@@ -1,5 +1,43 @@
 # TJN NOTES
 
+2025.02.18
+----------
+ - Figured out that nodes c1 and c2 failing b/c of cgroup settings
+   missing and assumed `TaskPlugin=task/none` was not sufficient
+   to ignore this need.  Fix was to add a `/etc/slurm/cgroup.conf`
+   and then the `slurmd` will start. (see `docker logs c1`)
+
+    ```
+    ---> Starting the MUNGE Authentication service (munged) ...
+    ---> Waiting for slurmctld to become active before starting slurmd...
+    -- slurmctld is now active ...
+    ---> Starting the Slurm Node Daemon (slurmd) ...
+    slurmd: _read_slurm_cgroup_conf: No cgroup.conf file (/etc/slurm/cgroup.conf), using defaults
+    slurmd: debug:  Log file re-opened
+    slurmd: debug:  CPUs has been set to match sockets per node instead of threads CPUs=1:12(hw)
+    slurmd: error: Node configuration differs from hardware: CPUs=1:12(hw) Boards=1:1(hw) SocketsPerBoard=1:1(hw) CoresPerSocket=1:6(hw) ThreadsPerCore=1:2(hw)
+    slurmd: error: Couldn't find the specified plugin name for cgroup/v2 looking at all files
+    slurmd: error: cannot find cgroup plugin for cgroup/v2
+    slurmd: error: cannot create cgroup context for cgroup/v2
+    slurmd: error: Unable to initialize cgroup plugin
+    slurmd: error: slurmd initialization failed
+    ```
+
+ - Added 'cgroup.conf' to `update_slurmfiles.sh` script
+
+ - At this point, I can now startup the cluster and things work.
+   I left the hack in docker-entrypoint.sh in case i need it
+   in future for debug hacks.
+    - Example: edit "c1:" docker-compose.yml w/ `command: ["TJNXXX"]`
+      and then you can `docker compose restart c1`)
+
+ - Use `docker compose xxxx` (not `docker-compose xxxx`)
+   (updated all the scripts accordingly)
+
+ - Remember that SLURM tag/version is in `.env` file!!!
+
+Old
+---
  - Inspect failed container logs (e.g., `slurmctld` early exit)
 
    ```
