@@ -11,6 +11,8 @@
     - Got the basic `slurmrestd` to startup but not able to get the
       authentication working so I can do curl requests.
 
+    - See also: https://slurm.schedmd.com/rest_quickstart.html
+
     - Example command at stop point for today
       ```
         beaker: (tjn-main)$ docker exec -ti slurmrestd bash
