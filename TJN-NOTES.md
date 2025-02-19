@@ -1,5 +1,16 @@
 # TJN NOTES
 
+2025.02.19
+----------
+ - fix Docker build error on my macOS laptop, failing 'docker compose build'
+ - Brief: Getting curl certificate errors with rockylinux
+   when try to get the mirror list during 'yum makecache'
+   My HACK is to just disable SSL cert validation in a very
+   heavy handed way.  Adding this to the initial RUN line of dockerfile:
+    ```
+    echo 'sslverify=false' >> /etc/yum.conf \
+    ```
+
 2025.02.18
 ----------
  - slurmrestd setup
