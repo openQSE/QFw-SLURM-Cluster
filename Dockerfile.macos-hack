@@ -97,6 +97,9 @@ RUN set -x \
     && chown -R slurm:slurm /var/*/slurm* \
     && /sbin/create-munge-key
 
+# TJN: Add a basic cgroup.conf b/c appears to be needed now
+COPY cgroup.conf /etc/slurm/cgroup.conf
+
 COPY slurm.conf /etc/slurm/slurm.conf
 COPY slurmdbd.conf /etc/slurm/slurmdbd.conf
 RUN set -x \
