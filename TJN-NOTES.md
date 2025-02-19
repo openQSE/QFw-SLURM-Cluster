@@ -2,6 +2,10 @@
 
 2025.02.19
 ----------
+ - adjust slurm.conf to have more CPUs per node.  Not seeing full
+   set of cores (just 2 per node), but configured to have 8 CPUs.
+   (see: slurm.conf and check with `scontrol show node c1`)
+
  - add cgroup.conf COPY to Dockerfile so it is there by default
    (appears to be needed with 24.05.03)
 
