@@ -1,5 +1,10 @@
 # TJN NOTES
 
+2025.02.21
+----------
+ - RockyLinux using coreutils-single (multi-binary), missing /bin/ps,
+   FIX: `yum install procps-ng` to get `ps`
+
 2025.02.19
 ----------
  - adjust slurm.conf to have more CPUs per node.  Not seeing full
