@@ -6,6 +6,9 @@
  - Add `test_scripts/` dir with couple commands
    to speed up reservation testing. Include an aliases file
    for easy access to docker based slurm commands.
+ - Add rest.conf and include in updatefiles script
+ - create myjwt.py tiny script for encode/decode JWT tokens
+ - add curltest2.sh script for testing the slurmrestd endpoint (still busted)
 
 2025.03.12
 ----------
