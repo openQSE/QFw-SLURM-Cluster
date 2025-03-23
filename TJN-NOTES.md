@@ -3,6 +3,9 @@
 2025.03.23
 ----------
  - Add a dummy user "sgrundy" for testing
+ - Add `test_scripts/` dir with couple commands
+   to speed up reservation testing. Include an aliases file
+   for easy access to docker based slurm commands.
 
 2025.03.12
 ----------
