@@ -1,5 +1,36 @@
 # TJN NOTES
 
+2025.03.23
+----------
+ - Add a dummy user "sgrundy" for testing
+
+2025.03.12
+----------
+ - If goof a SLURM config file (e.g., slurmctld service will not startup),
+   you can update slurm.conf manually in container like this:
+   ```
+     docker cp slurm.conf slurmctld:/etc/slurm/slurm.conf
+   ```
+
+ - Add `libjwt-devel` to Dockerfile(s) and `--with-jwt` to slurm configure
+   so we get `auth_jwt` built for use with slurmrestd.
+   Also, add `rest.conf` and add to `update_slurmfiles.sh`
+
+ - Need to generate JWT token, for now create outside and copy into containers.
+   ```
+      openssl rand -hex 32 > /etc/slurm/jwt.key
+      chmod 600 /etc/slurm/jwt.key
+      docker cp jwt.key slurmctld:/etc/slurm/jwt.key
+      docker cp jwt.key slurmrestd:/etc/slurm/jwt.key
+      docker exec slurmctld  chown slurm:slurm /etc/slurm/jwt.key
+      docker exec slurmrestd chown slurm:slurm /etc/slurm/jwt.key
+   ```
+
+ - Test command
+   ```
+    curl -k -H "X-SLURM-USER-TOKEN: $(cat /etc/slurm/jwt.key)" http://localhost:6820/slurm/v0.0.42/nodes
+   ```
+
 2025.02.21
 ----------
  - RockyLinux using coreutils-single (multi-binary), missing /bin/ps,

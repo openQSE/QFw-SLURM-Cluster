@@ -8,10 +8,18 @@ LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docke
 
 #      org.label-schema.docker.cmd="docker-compose up -d" \
 
+####
+# XXX: Getting curl certificate errors with rockylinux
+#      when try to get the mirror list during 'yum makecache'
+#      My HACK is to just disable SSL cert validation in a very
+#      heavy handed way.
+####
 RUN set -ex \
+  && echo 'sslverify=false' >> /etc/yum.conf \
     && yum makecache \
     && yum -y update \
     && yum -y install dnf-plugins-core \
+    && yum -y install  epel-release \
     && yum config-manager --set-enabled powertools \
     && yum -y install \
        wget \
@@ -34,6 +42,7 @@ RUN set -ex \
        vim-enhanced \
        http-parser-devel \
        json-c-devel \
+       libjwt-devel \
     && yum clean all \
     && rm -rf /var/cache/yum
 
@@ -43,11 +52,13 @@ RUN pip3 install Cython pytest
 
 ARG GOSU_VERSION=1.17
 
+#    && gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
+
 RUN set -ex \
     && wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-amd64" \
     && wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-amd64.asc" \
     && export GNUPGHOME="$(mktemp -d)" \
-    && gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
+    && curl --insecure -fsSL "https://keys.openpgp.org/pks/lookup?op=get&search=0xB42F6819007F00F88E364FD4036A9C25BF357DD4" | gpg --import \
     && gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
     && rm -rf "${GNUPGHOME}" /usr/local/bin/gosu.asc \
     && chmod +x /usr/local/bin/gosu \
@@ -60,6 +71,7 @@ RUN set -x \
     && pushd slurm \
     && ./configure --enable-debug --prefix=/usr --sysconfdir=/etc/slurm \
         --with-mysql_config=/usr/bin  --libdir=/usr/lib64 \
+        --with-jwt=/usr \
     && make install \
     && install -D -m644 etc/cgroup.conf.example /etc/slurm/cgroup.conf.example \
     && install -D -m644 etc/slurm.conf.example /etc/slurm/slurm.conf.example \
@@ -97,6 +109,8 @@ RUN set -x \
     && chown slurm:slurm /etc/slurm/slurmdbd.conf \
     && chmod 600 /etc/slurm/slurmdbd.conf
 
+RUN set -x \
+    &&  useradd -r -g users --uid=1010 -m -c "Solomon Grundy" sgrundy
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
