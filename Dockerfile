@@ -43,6 +43,7 @@ RUN set -ex \
        http-parser-devel \
        json-c-devel \
        libjwt-devel \
+       libyaml-devel \
     && yum clean all \
     && rm -rf /var/cache/yum
 
@@ -71,7 +72,7 @@ RUN set -x \
     && pushd slurm \
     && ./configure --enable-debug --prefix=/usr --sysconfdir=/etc/slurm \
         --with-mysql_config=/usr/bin  --libdir=/usr/lib64 \
-        --with-jwt=/usr \
+        --with-http-parser=/usr --with-yaml=/usr --with-jwt=/usr \
     && make install \
     && install -D -m644 etc/cgroup.conf.example /etc/slurm/cgroup.conf.example \
     && install -D -m644 etc/slurm.conf.example /etc/slurm/slurm.conf.example \

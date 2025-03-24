@@ -2,6 +2,16 @@
 
 2025.03.23
 ----------
+ - Add few more slurmrestd related configure options to Dockerfile
+   "--with-http-parser=/usr --with-yaml=/usr ",
+   and libyaml-devel to packages
+ - Note, discovered that slurmrestd does not want to be run as root,
+   but as slurm user.   With latest changes, can now run the 'scontrol
+   token' to get a token on slurmctld container.
+   (Still need to diagnose problems with using slurmrestd endpoint.)
+
+2025.03.23
+----------
  - Add a dummy user "sgrundy" for testing
  - Add `test_scripts/` dir with couple commands
    to speed up reservation testing. Include an aliases file
