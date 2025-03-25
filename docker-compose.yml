@@ -62,7 +62,7 @@ services:
       - var_log_slurm:/var/log/slurm
       - slurm_jobdir:/data
     expose:
-      - "6820"
+      - "6820:6820"
     depends_on:
       - "slurmctld"
     networks:

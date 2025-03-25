@@ -2,5 +2,5 @@
 
 set -xe
 
-docker compose start
+docker compose restart
 
