@@ -1,5 +1,11 @@
 # TJN NOTES
 
+2025.03.25
+----------
+ - Finally got full slurmrestd GET (nodes) and POST (job/submit) to work!
+   Was a few minor (dumb) mistakes and finally found issues.
+   See: rest-testing/curl-post.sh, rest-testing/curl-get.sh, rest-testing/tiny-submit.py
+
 2025.03.23
 ----------
  - Add few more slurmrestd related configure options to Dockerfile
