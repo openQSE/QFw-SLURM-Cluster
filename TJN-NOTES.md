@@ -23,6 +23,12 @@
      [sgrundy@slurmctld /]$ curl -H "Authorization: Bearer $SLURM_JWT" \
           http://slurmrestd:6820/slurm/v0.0.41/nodes
    ```
+ - The curl based GET commands are working.  However, the POST actions
+   are failing to work.  I verified this with both curl.  It also
+   seems like the GET based actions may have problems when I use the Python
+   approach, even if the header seems to be setup just like curl case.
+    - TODO: Why POST not work.
+    - TODO: Why GET/POST not work for python request example
 
 2025.03.23
 ----------
