@@ -9,6 +9,20 @@
    but as slurm user.   With latest changes, can now run the 'scontrol
    token' to get a token on slurmctld container.
    (Still need to diagnose problems with using slurmrestd endpoint.)
+ - Finally got things working for slurmrestd.  Needed to startup
+   as slurm user (like slurmctld, etc.) in entrypoint script.
+   I also added `slurm_jobdir:/data` in docker-compose.  The key
+   is that `scontrol show config` or the like must be able to run
+   from slurmrestd container.  If not, then nothing will work.
+ - Add a 'scurl' alias to run the curl command inside slurmrestd container
+ - Can also run from the 'slurmctld' container like the following:
+   ```
+     (venv) fozzie:$ ./do_dropin.sh
+     [root@slurmctld /]# su sgrundy
+     [sgrundy@slurmctld /]$ export $(scontrol token)
+     [sgrundy@slurmctld /]$ curl -H "Authorization: Bearer $SLURM_JWT" \
+          http://slurmrestd:6820/slurm/v0.0.41/nodes
+   ```
 
 2025.03.23
 ----------

@@ -1,4 +1,5 @@
 #!/bin/bash
+# VERSION: 3
 set -e
 
 
@@ -105,15 +106,21 @@ then
     done
     echo "-- slurmctld is now active ..."
 
-    #export SLURM_JWT=daemon
     #export SLURM_JWT=''
+    export SLURM_JWT=daemon
     export SLURMRESTD_DEBUG=debug
+
+    #export SLURM_REST_API_AUTH=jwt
+    #export SLURM_REST_API_AUTH_JWT_SECRET="/etc/slurm/jwt.key"
 
     # XXX: Disable lots of security checks b/c running in devel container
     export SLURMRESTD_SECURITY=disable_unshare_sysv,disable_unshare_files,disable_user_check
 
+#    openssl rand -hex 32 > /etc/slurm/jwt.key
+#    chmod 600 /etc/slurm/jwt.key
+
     echo "---> Starting the Slurm REST Daemon (slurmrestd) ..."
-    exec /usr/sbin/slurmrestd -vvvvv 0.0.0.0:6820
+    exec gosu slurm /usr/sbin/slurmrestd -vvvvv 0.0.0.0:6820
 fi
 
 exec "$@"

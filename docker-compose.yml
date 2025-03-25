@@ -60,6 +60,7 @@ services:
       - etc_munge:/etc/munge
       - etc_slurm:/etc/slurm
       - var_log_slurm:/var/log/slurm
+      - slurm_jobdir:/data
     expose:
       - "6820"
     depends_on:
