@@ -6,6 +6,17 @@
    Was a few minor (dumb) mistakes and finally found issues.
    See: rest-testing/curl-post.sh, rest-testing/curl-get.sh, rest-testing/tiny-submit.py
  - Update Dockerfile to include configs and related by default
+ - Fix port exposure problem, use 'ports' to expose to host.
+   The 'expose' is just so can see between containers.
+ - Add a script to update all the rest/config bits on fresh build.
+   To just list status of key files:
+   ```
+     ./update_rest_stuff.sh
+   ```
+   To list status of key files and copy/update/restart containers:
+   ```
+    ./update_rest_stuff.sh copy
+   ```
 
 2025.03.23
 ----------

@@ -24,6 +24,7 @@ done
 # If pass 'copy' arg to script, we will do following.
 #
 if [ "$1" == "copy" ] ; then
+    restart=true
     for img in $images ; do
         echo "=== Image: $img ==="
         for file in $files ; do
@@ -43,3 +44,5 @@ if [ "$1" == "copy" ] ; then
 
     done
 fi
+
+if $restart; then docker compose restart; fi
