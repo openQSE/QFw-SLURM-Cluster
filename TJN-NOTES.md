@@ -17,6 +17,12 @@
    ```
     ./update_rest_stuff.sh copy
    ```
+ - To disable silly macOS docker extra text hints,
+   `export DOCKER_CLI_HINTS=false`
+
+ - Added the "tiny-compute" pieces to cosched/compute_mgr_service and client2
+   see: https://code.ornl.gov/intersect/coscheduling/cosched
+
 
 2025.03.23
 ----------
