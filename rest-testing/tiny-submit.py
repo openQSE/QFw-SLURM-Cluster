@@ -24,7 +24,11 @@ def poll_job_status(url, headers, jobid, verbose=False):
 
             if state in ["COMPLETED", "FAILED", "CANCELLED", "TIMEOUT"]:
                 if verbose:
-                    print(f"Job {jobid} has finished with state: {state}")
+                    print(json.dumps(job_info, indent=4, sort_keys=False))
+                    print(f"Job {jobid} finished with state: {state}")
+                    #nodename = job_info['job_resources']['allocated_nodes'][0]['nodename']
+                    nodes = job_info['job_resources']['nodes']
+                    print(f"Job {jobid} used nodes: {nodes}")
                 break
         else:
             print(f"Error: {response.status_code}, {response.text}")
@@ -94,10 +98,10 @@ if response.status_code == 200:
 
     print(f"INFO: Job_ID: {jid}  Error_code: {jstat}  Response_Code: {response.status_code}")
 
-    url_jobinfo = SLURM_API_BASE_URL + f"/job/{jid}"
-
-    state = poll_job_status(url_jobinfo, HEADERS, jid, verbose=args.verbose)
-    print(f"Job_ID: {jid} FinishStatus: {state}")
+    if args.wait:
+        url_jobinfo = SLURM_API_BASE_URL + f"/job/{jid}"
+        state = poll_job_status(url_jobinfo, HEADERS, jid, verbose=args.verbose)
+        print(f"Job_ID: {jid} FinishStatus: {state}")
 
 else:
     print(f"Failed to submit job: {response.status_code} {response.text}")

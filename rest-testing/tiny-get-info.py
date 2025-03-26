@@ -53,8 +53,10 @@ if response.status_code == 200:
     jstate = data['jobs'][0]['job_state']
     job_stderr_file = data['jobs'][0]['standard_error']
     job_stdout_file = data['jobs'][0]['standard_output']
-
+    nodes = data['jobs'][0]['job_resources']['nodes']
+    #nodename = data['jobs'][0]['job_resources']['allocated_nodes'][0]['nodename']
     print(f"DBG: Job_ID: {jid} Job_State: {jstate}  Response-Code: {response.status_code}")
+    print(f"DBG:      nodes: {nodes}")
     print(f"DBG: job_stdout: {job_stdout_file}")
     print(f"DBG: job_stderr: {job_stderr_file}")
 else:
