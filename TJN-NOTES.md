@@ -1,5 +1,29 @@
 # TJN NOTES
 
+2025.05.22
+----------
+ - Updated slurm.conf to have more cores per node.
+ - Also figured out some usage/syntax issues
+   ```
+       # Gets allocation where we can run 8 tasks
+       # otherwise was only getting 1-2 core from node
+     salloc -N 1 -n 8
+   ```
+ - Adding gres.conf and slurm.conf pieces for testing QPU configs.
+ - Added a bind-mount of the 'shared-dir' to '/mnt' in slurmctld,
+   compute containers (c1, c2), i.e., bind mount is `./shared-dir:/mnt`
+ - Example command for doing sbatch (showing full docker command usually
+   hidden by bash aliases) *NOTE USE OF `-w /mnt` to shift working dir.*
+
+    ```
+      $ cp simple.sbatch shared-dir/
+      $ docker exec -ti -w /mnt slurmctld ls
+      simple.sbatch
+      $ docker exec -ti -w /mnt slurmctld sbatch simple.sbatch
+      $ docker exec -ti -w /mnt slurmctld ls
+      job-hellosleep.1.out  simple.sbatch
+    ```
+
 2025.03.25
 ----------
  - Finally got full slurmrestd GET (nodes) and POST (job/submit) to work!

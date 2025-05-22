@@ -14,6 +14,14 @@ docker exec $CONTAINER_NAME \
        duration=${DURATION} \
        nodecnt=${NUM_NODES}
 
+#docker exec $CONTAINER_NAME \
+#    scontrol create reservation \
+#       --json \
+#       user=${THE_USER} \
+#       starttime=${STARTTIME} \
+#       duration=${DURATION} \
+#       nodecnt=${NUM_NODES}
+
 # scontrol create reservation user=alan,brenda \
 #     starttime=noon duration=60 flags=daily nodecnt=10
 

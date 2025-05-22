@@ -43,6 +43,7 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt
     expose:
       - "6817"
     depends_on:
@@ -81,12 +82,14 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt
     expose:
       - "6818"
     depends_on:
       - "slurmctld"
     networks:
       - slurm-network
+    cpus: 4        # <--- Add this line to restrict to 4 virtual CPUs
 
   c2:
     image: slurm-docker-cluster:${IMAGE_TAG}
@@ -98,12 +101,14 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt
     expose:
       - "6818"
     depends_on:
       - "slurmctld"
     networks:
       - slurm-network
+    cpus: 4        # <--- Add this line to restrict to 4 virtual CPUs
 
 volumes:
   etc_munge:
