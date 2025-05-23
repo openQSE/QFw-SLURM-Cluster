@@ -107,11 +107,13 @@ COPY cgroup.conf /etc/slurm/cgroup.conf
 COPY slurm.conf /etc/slurm/slurm.conf
 COPY slurmdbd.conf /etc/slurm/slurmdbd.conf
 COPY rest.conf /etc/slurm/rest.conf
+COPY gres.conf /etc/slurm/gres.conf
 RUN set -x \
     && openssl rand -hex 32 > /etc/slurm/jwt.key \
     && chown slurm:slurm /etc/slurm/slurm.conf \
     && chown slurm:slurm /etc/slurm/jwt.key \
     && chown slurm:slurm /etc/slurm/rest.conf \
+    && chown slurm:slurm /etc/slurm/gres.conf \
     && chown slurm:slurm /etc/slurm/slurmdbd.conf \
     && chmod 600 /etc/slurm/jwt.key \
     && chmod 600 /etc/slurm/slurmdbd.conf
