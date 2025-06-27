@@ -2,9 +2,11 @@ import requests
 import json
 import os
 import argparse
+import pprint
 
 VERBOSE=False
-SLURM_API_URL = "http://localhost:6820/slurm/v0.0.39/job"
+#SLURM_API_URL = "http://localhost:6820/slurm/v0.0.39/job"
+SLURM_API_URL = "http://localhost:6820/slurm/v0.0.43/job"
 
 p = argparse.ArgumentParser(description="tiny rest tool")
 p.add_argument("-j", "--jobid",
@@ -21,7 +23,8 @@ if 'SLURM_JWT' in os.environ:
     if args.verbose:
         print(f"FOUND TOKEN IN ENV:\n {MY_TOKEN}")
 else:
-    MY_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDI5MzYzOTMsImlhdCI6MTc0MjkzNDU5Mywic3VuIjoic2dydW5keSJ9.HFZd56WeYMvX4jrx3D9OADo2TV24EOdIBFzZYNkXe2w"
+    MY_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTEwNjg5MTYsImlhdCI6MTc1MTA2NzExNiwic3VuIjoicm9vdCJ9.u6SG176t9FEkon7ArtWTqDBT2ROYhglvnkvoYQvoZPw"
+
     if args.verbose:
         print(f"TRY A DEFAULT TOKEN:\n {MY_TOKEN}")
 
@@ -48,17 +51,23 @@ if response.status_code == 200:
     print(json.dumps(response.json(), indent=4))
     #data = json.loads(response.json())  # Convert JSON string to a dictionary
     data = response.json()
+
     jid = data['jobs'][0]['job_id']
+    print(f"DBG: jid={jid}")
 
     jstate = data['jobs'][0]['job_state']
     job_stderr_file = data['jobs'][0]['standard_error']
     job_stdout_file = data['jobs'][0]['standard_output']
-    nodes = data['jobs'][0]['job_resources']['nodes']
-    #nodename = data['jobs'][0]['job_resources']['allocated_nodes'][0]['nodename']
     print(f"DBG: Job_ID: {jid} Job_State: {jstate}  Response-Code: {response.status_code}")
-    print(f"DBG:      nodes: {nodes}")
     print(f"DBG: job_stdout: {job_stdout_file}")
     print(f"DBG: job_stderr: {job_stderr_file}")
+
+    if data['jobs'][0]['job_resources']:
+        #nodename = data['jobs'][0]['job_resources']['allocated_nodes'][0]['nodename']
+        nodes = data['jobs'][0]['job_resources']['nodes']
+        print(f"DBG: Nodes info:")
+        pprint.pprint(nodes)
+
 else:
     print(f"Failed to submit job: {response.status_code} {response.text}")
 
