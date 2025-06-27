@@ -1,5 +1,30 @@
 # TJN NOTES
 
+2025.06.27
+----------
+ - Testing with slurm 25.05.01, needed some massaging
+    - Need to run 'slurmrestd' as user 'nobody'
+      and remove 'disable_user_check' from `SLURMRESTD_SECURITY`
+    - Adjust grep string for `do_startup.sh` for SlurmDBD ready,
+      now just check if we see 'slurmdbd version' (less good, but ok)
+    - Files updated:
+        - `.env`
+        - `docker-entrypoint.sh`
+        - `do_startup.sh`
+
+ - Slurm 25.05.1 has following REST API versions (slurmrestd)
+    ```
+       Possible data_parser plugins:
+       data_parser/v0.0.42
+       data_parser/v0.0.40
+       data_parser/v0.0.41
+       data_parser/v0.0.43
+    ```
+
+ - Slurm 25.05 now has new REST endpoint for reservations
+    - https://slurm.schedmd.com/rest_api.html#slurmV0043PostReservation
+    - This include create, update and get
+
 2025.05.22
 ----------
  - Updated slurm.conf to have more cores per node.

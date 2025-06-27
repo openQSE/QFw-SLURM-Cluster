@@ -1,7 +1,8 @@
 #!/bin/bash
 
 wait_for_slurmdbd_ready() {
-   str="slurmdbd: slurmdbd version"
+   #str="slurmdbd: slurmdbd version"
+   str="slurmdbd version"
 
    while true; do
     if docker compose logs | grep -q "$str" ; then
