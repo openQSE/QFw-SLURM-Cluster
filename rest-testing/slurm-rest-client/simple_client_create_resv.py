@@ -20,6 +20,12 @@ def wrap_uint64(val: int) -> V0043Uint64NoValStruct:
 
 
 def main():
+    #
+    # Reminder:
+    #   laptop:$ scontrol token
+    #   SLURM_JWT=xxxxxx...
+    #   laptop:$ export SLURM_JWT=xxxxxx...
+    #
     TOKEN = os.getenv("SLURM_JWT")
     if not TOKEN:
         raise ValueError("ERROR: SLURM_JWT is not set in environment variables")
