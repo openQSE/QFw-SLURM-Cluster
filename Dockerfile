@@ -103,6 +103,8 @@ RUN set -ex \
 
 ARG SLURM_TAG
 ARG GCC13_ROOT=/usr
+ARG LIBFABRIC_REF=v2.3.1
+ARG LIBFABRIC_PREFIX=/opt/qfw/libfabric
 
 RUN set -x \
     && git clone -b ${SLURM_TAG} --single-branch --depth=1 https://github.com/SchedMD/slurm.git \
@@ -145,6 +147,21 @@ RUN set -ex \
     && dnf -y install environment-modules \
     && dnf clean all \
     && rm -rf /var/cache/yum
+
+RUN set -ex \
+    && export PATH="${GCC13_ROOT}/bin:${PATH}" \
+    && export LD_LIBRARY_PATH="${GCC13_ROOT}/lib64:${LD_LIBRARY_PATH}" \
+    && export CC="${GCC13_ROOT}/bin/gcc" \
+    && export CXX="${GCC13_ROOT}/bin/g++" \
+    && export FC="${GCC13_ROOT}/bin/gfortran" \
+    && git clone https://github.com/ofiwg/libfabric.git /tmp/libfabric \
+    && cd /tmp/libfabric \
+    && git checkout "${LIBFABRIC_REF}" \
+    && ./autogen.sh \
+    && ./configure --prefix="${LIBFABRIC_PREFIX}" CC="${CC}" CXX="${CXX}" FC="${FC}" \
+    && make -j"$(nproc)" all \
+    && make install \
+    && rm -rf /tmp/libfabric
 
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf
