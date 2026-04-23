@@ -107,6 +107,8 @@ ARG LIBFABRIC_REF=v2.3.1
 ARG LIBFABRIC_PREFIX=/opt/qfw/libfabric
 ARG OMPI_REF=v5.0.9
 ARG OMPI_PREFIX=/opt/qfw/openmpi
+ARG OSU_OMB_VERSION=7.5.2
+ARG OSU_OMB_PREFIX=/opt/qfw/osu-micro-benchmarks
 
 RUN set -x \
     && git clone -b ${SLURM_TAG} --single-branch --depth=1 https://github.com/SchedMD/slurm.git \
@@ -181,6 +183,19 @@ RUN set -ex \
     && make -j"$(nproc)" all \
     && make install \
     && rm -rf /tmp/ompi
+
+RUN set -ex \
+    && export PATH="${OMPI_PREFIX}/bin:${PATH}" \
+    && export LD_LIBRARY_PATH="${OMPI_PREFIX}/lib:${LIBFABRIC_PREFIX}/lib:${LD_LIBRARY_PATH}" \
+    && cd /tmp \
+    && curl -L -o osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz \
+        https://mvapich.cse.ohio-state.edu/download/mvapich/osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz \
+    && tar -xzf osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz \
+    && cd osu-micro-benchmarks-${OSU_OMB_VERSION} \
+    && ./configure CC=mpicc CXX=mpicxx --prefix="${OSU_OMB_PREFIX}" \
+    && make -j"$(nproc)" all \
+    && make install \
+    && rm -rf /tmp/osu-micro-benchmarks-${OSU_OMB_VERSION} /tmp/osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz
 
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf
