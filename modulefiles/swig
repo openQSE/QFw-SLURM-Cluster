@@ -1,0 +1,16 @@
+#%Module1.0
+##
+## SWIG from the base Rocky image.
+##
+
+proc ModulesHelp { } {
+    puts stderr "Adds the system SWIG installation to the environment."
+}
+
+module-whatis "System SWIG"
+
+set root /usr
+
+prepend-path PATH            $root/bin
+prepend-path MANPATH         $root/share/man
+setenv SWIG_ROOT             $root

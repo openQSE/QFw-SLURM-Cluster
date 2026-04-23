@@ -207,6 +207,8 @@ RUN set -ex \
     && rm -rf /var/cache/yum \
     && pip3 install scons
 
+COPY modulefiles /etc/modulefiles
+
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf
 

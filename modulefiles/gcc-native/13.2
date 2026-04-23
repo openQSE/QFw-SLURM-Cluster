@@ -1,0 +1,31 @@
+#%Module1.0
+##
+## Compatibility module for the system GCC on Rocky 10.
+##
+
+proc ModulesHelp { } {
+    puts stderr "Adds the system GCC toolchain from the Rocky 10 base image to the environment."
+}
+
+module-whatis "System GCC toolchain from Rocky 10 (GCC 13 or newer)"
+
+set root /usr
+
+if { ! [file isdirectory $root] } {
+    module-error "System GCC root '$root' does not exist."
+}
+
+prepend-path PATH              $root/bin
+prepend-path LD_LIBRARY_PATH   $root/lib64
+prepend-path LIBRARY_PATH      $root/lib64
+prepend-path MANPATH           $root/share/man
+prepend-path INFOPATH          $root/share/info
+prepend-path PKG_CONFIG_PATH   $root/lib64/pkgconfig
+prepend-path CPATH             $root/include
+prepend-path C_INCLUDE_PATH    $root/include
+prepend-path CPLUS_INCLUDE_PATH $root/include
+prepend-path CMAKE_PREFIX_PATH $root
+setenv CC                      $root/bin/gcc
+setenv CXX                     $root/bin/g++
+setenv FC                      $root/bin/gfortran
+setenv GCC_ROOT                $root

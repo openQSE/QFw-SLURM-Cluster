@@ -1,0 +1,20 @@
+#%Module1.0
+##
+## OpenBLAS from the base Rocky image.
+##
+
+proc ModulesHelp { } {
+    puts stderr "Adds the system OpenBLAS development files to the environment."
+}
+
+module-whatis "System OpenBLAS development package"
+
+set root /usr
+
+prepend-path LD_LIBRARY_PATH      $root/lib64
+prepend-path LIBRARY_PATH         $root/lib64
+prepend-path CPATH                $root/include/openblas
+prepend-path C_INCLUDE_PATH       $root/include/openblas
+prepend-path CPLUS_INCLUDE_PATH   $root/include/openblas
+prepend-path PKG_CONFIG_PATH      $root/lib64/pkgconfig
+setenv OPENBLAS_ROOT              $root

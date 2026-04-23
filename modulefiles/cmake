@@ -1,0 +1,17 @@
+#%Module1.0
+##
+## CMake from the base Rocky image.
+##
+
+proc ModulesHelp { } {
+    puts stderr "Adds the system CMake installation to the environment."
+}
+
+module-whatis "System CMake 3.26.5"
+
+set root /usr
+
+prepend-path PATH              $root/bin
+prepend-path MANPATH           $root/share/man
+prepend-path CMAKE_PREFIX_PATH $root
+setenv CMAKE_ROOT              $root
