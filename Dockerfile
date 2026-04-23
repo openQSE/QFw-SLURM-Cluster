@@ -102,6 +102,7 @@ RUN set -ex \
     && gosu nobody true
 
 ARG SLURM_TAG
+ARG GCC13_ROOT=/usr
 
 RUN set -x \
     && git clone -b ${SLURM_TAG} --single-branch --depth=1 https://github.com/SchedMD/slurm.git \
@@ -139,6 +140,11 @@ RUN set -x \
     && dd if=/dev/urandom bs=1 count=1024 of=/etc/munge/munge.key status=none \
     && chown -R munge:munge /etc/munge \
     && chmod 0400 /etc/munge/munge.key
+
+RUN set -ex \
+    && dnf -y install environment-modules \
+    && dnf clean all \
+    && rm -rf /var/cache/yum
 
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf
