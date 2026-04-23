@@ -36,6 +36,24 @@ This setup consists of the following containers:
 - `var_lib_mysql`: Mounted to `/var/lib/mysql`
 - `var_log_slurm`: Mounted to `/var/log/slurm`
 
+### Host-mounted QFw workspace
+
+For QFw development, the Slurm services also bind-mount:
+
+- `../qfw-container-base` to `/workspace/qfw-container-base`
+
+This keeps the QFw checkout, persistent Python virtual environment, build
+artifacts, and benchmark trees on the host while still making them available in
+the controller and compute-node containers. The intended layout is:
+
+- `/workspace/qfw-container-base/QFw`: host-managed QFw checkout
+- `/workspace/qfw-container-base/venv`: persistent container-created Python venv
+- `/workspace/qfw-container-base/build`: host-persisted build tree
+- `/workspace/qfw-container-base/install`: host-persisted install tree
+
+With this layout, you can edit QFw on the host and rerun commands in the
+containers without rebuilding the image.
+
 ## 🛠️  Building the Docker Image
 
 The version of the Slurm project and the Docker build process can be simplified
