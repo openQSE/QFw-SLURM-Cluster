@@ -105,6 +105,8 @@ ARG SLURM_TAG
 ARG GCC13_ROOT=/usr
 ARG LIBFABRIC_REF=v2.3.1
 ARG LIBFABRIC_PREFIX=/opt/qfw/libfabric
+ARG OMPI_REF=v5.0.9
+ARG OMPI_PREFIX=/opt/qfw/openmpi
 
 RUN set -x \
     && git clone -b ${SLURM_TAG} --single-branch --depth=1 https://github.com/SchedMD/slurm.git \
@@ -162,6 +164,23 @@ RUN set -ex \
     && make -j"$(nproc)" all \
     && make install \
     && rm -rf /tmp/libfabric
+
+RUN set -ex \
+    && export PATH="${GCC13_ROOT}/bin:${PATH}" \
+    && export LD_LIBRARY_PATH="${GCC13_ROOT}/lib64:${LD_LIBRARY_PATH}" \
+    && export CC="${GCC13_ROOT}/bin/gcc" \
+    && export CXX="${GCC13_ROOT}/bin/g++" \
+    && export FC="${GCC13_ROOT}/bin/gfortran" \
+    && export PKG_CONFIG_PATH="${LIBFABRIC_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
+    && export CPPFLAGS="-I${LIBFABRIC_PREFIX}/include ${CPPFLAGS}" \
+    && export LDFLAGS="-L${LIBFABRIC_PREFIX}/lib ${LDFLAGS}" \
+    && git clone --recursive --branch "${OMPI_REF}" https://github.com/open-mpi/ompi.git /tmp/ompi \
+    && cd /tmp/ompi \
+    && ./autogen.pl \
+    && ./configure --prefix="${OMPI_PREFIX}" --with-libfabric="${LIBFABRIC_PREFIX}" CC="${CC}" CXX="${CXX}" FC="${FC}" \
+    && make -j"$(nproc)" all \
+    && make install \
+    && rm -rf /tmp/ompi
 
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf
