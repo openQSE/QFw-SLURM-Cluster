@@ -197,6 +197,16 @@ RUN set -ex \
     && make install \
     && rm -rf /tmp/osu-micro-benchmarks-${OSU_OMB_VERSION} /tmp/osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz
 
+RUN set -ex \
+    && yum -y install \
+       cmake \
+       gcc-gfortran \
+       openblas-devel \
+       swig \
+    && yum clean all \
+    && rm -rf /var/cache/yum \
+    && pip3 install scons
+
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf
 
