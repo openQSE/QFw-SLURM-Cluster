@@ -14,7 +14,7 @@ services:
       - slurm-network
 
   slurmdbd:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     build:
       context: .
       args:
@@ -35,7 +35,7 @@ services:
       - slurm-network
 
   slurmctld:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmctld"]
     container_name: slurmctld
     hostname: slurmctld
@@ -54,7 +54,7 @@ services:
       - slurm-network
 
   slurmrestd:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmrestd"]
     #command: ["TJNXXX"]
     container_name: slurmrestd
@@ -75,7 +75,7 @@ services:
       - slurm-network
 
   c1:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmd"]
     #command: ["TJNXXX"]
     hostname: c1
@@ -96,7 +96,7 @@ services:
     cpus: 4        # <--- Add this line to restrict to 4 virtual CPUs
 
   c2:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmd"]
     hostname: c2
     container_name: c2
@@ -116,7 +116,7 @@ services:
     cpus: 4        # <--- Add this line to restrict to 4 virtual CPUs
 
   c3:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmd"]
     hostname: c3
     container_name: c3
@@ -136,7 +136,7 @@ services:
     cpus: 4
 
   c4:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmd"]
     hostname: c4
     container_name: c4
@@ -156,7 +156,7 @@ services:
     cpus: 4
 
   c5:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmd"]
     hostname: c5
     container_name: c5
@@ -176,7 +176,7 @@ services:
     cpus: 4
 
   c6:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmd"]
     hostname: c6
     container_name: c6
@@ -196,7 +196,7 @@ services:
     cpus: 4
 
   c7:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmd"]
     hostname: c7
     container_name: c7
@@ -216,7 +216,7 @@ services:
     cpus: 4
 
   c8:
-    image: slurm-docker-cluster:${IMAGE_TAG}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     command: ["slurmd"]
     hostname: c8
     container_name: c8

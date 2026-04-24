@@ -156,7 +156,10 @@ This turns the `Dockerfile` into a reusable local image:
 
 ```bash
 ./do_install.sh
-docker build -t slurm-docker-cluster:25.05.0 --build-arg SLURM_TAG=slurm-25-05-2-1 .
+set -a
+source .env
+set +a
+docker build -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
 ```
 
 Think of this as "compile the container image from the recipe in this
@@ -168,7 +171,10 @@ This ignores Docker cache and rebuilds every layer:
 
 ```bash
 ./do_install.sh
-docker build --no-cache -t slurm-docker-cluster:qfw-full --build-arg SLURM_TAG=slurm-25-05-2-1 .
+set -a
+source .env
+set +a
+docker build --no-cache -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
 ```
 
 Use this when:
@@ -310,7 +316,7 @@ cluster and restarts the services.
 If you want to delete a built image from your machine:
 
 ```bash
-docker rmi slurm-docker-cluster:25.05.0
+docker rmi ${IMAGE_NAME}:${IMAGE_TAG}
 ```
 
 Do this only when you really want to free space or force a rebuild path.
@@ -333,6 +339,15 @@ For the practical build, start, stop, reset, and log commands, use the
 
 One additional image-specific note is useful here:
 
+If you want shell commands like `docker build -t ${IMAGE_NAME}:${IMAGE_TAG}` to
+use the same values as Compose, export the `.env` file into your shell first:
+
+```bash
+set -a
+source .env
+set +a
+```
+
 ### Compose-driven build
 
 If you prefer using compose and the `.env` file instead of an explicit
@@ -345,10 +360,11 @@ docker compose build
 Compose uses:
 
 - `SLURM_TAG` for the Slurm source tag
+- `IMAGE_NAME` for the runtime image repository name
 - `IMAGE_TAG` for the runtime image tag
 
-If you want compose to use the image built by hand, keep the tag aligned with
-`IMAGE_TAG`.
+If you want compose to use the image built by hand, keep both `IMAGE_NAME` and
+`IMAGE_TAG` aligned with the image you built.
 
 ## Accessing the Cluster Interactively
 
@@ -688,7 +704,10 @@ interacting with the REST API.
 Build:
 
 ```bash
-docker build -t slurm-docker-cluster:25.05.0 --build-arg SLURM_TAG=slurm-25-05-2-1 .
+set -a
+source .env
+set +a
+docker build -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
 ```
 
 Start and register:
