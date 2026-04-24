@@ -122,6 +122,29 @@ All commands below assume you are in:
 cd slurm-docker-cluster
 ```
 
+## Prepare The Host Workspace
+
+Before building or starting the containers, create the host-mounted workspace
+layout:
+
+```bash
+./do_install.sh
+```
+
+That script creates `../qfw-container-base` and the persistent directories the
+containers expect:
+
+- `QFw/`
+- `venv/`
+- `build/`
+- `install/`
+- `benchmarks/`
+- `rocm/`
+
+It also checks whether `../qfw-container-base/QFw` already contains a QFw
+checkout. The venv is not created here because it should be created later from
+inside the container so it matches the container Python version.
+
 ## Docker For Beginners
 
 This section uses this Slurm cluster as the example and focuses on the Docker
@@ -132,6 +155,7 @@ commands you are most likely to need day to day.
 This turns the `Dockerfile` into a reusable local image:
 
 ```bash
+./do_install.sh
 docker build -t slurm-docker-cluster:25.05.0 --build-arg SLURM_TAG=slurm-25-05-2-1 .
 ```
 
@@ -143,6 +167,7 @@ directory."
 This ignores Docker cache and rebuilds every layer:
 
 ```bash
+./do_install.sh
 docker build --no-cache -t slurm-docker-cluster:qfw-full --build-arg SLURM_TAG=slurm-25-05-2-1 .
 ```
 
