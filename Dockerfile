@@ -1,8 +1,8 @@
-FROM rockylinux:8
+FROM rockylinux/rockylinux:10.1.20251123
 
 LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docker-cluster" \
       org.opencontainers.image.title="slurm-docker-cluster" \
-      org.opencontainers.image.description="Slurm Docker cluster on Rocky Linux 8" \
+      org.opencontainers.image.description="Slurm Docker cluster on Rocky Linux 10.1" \
       org.label-schema.docker.cmd="docker compose up -d" \
       maintainer="Giovanni Torres"
 
@@ -16,17 +16,41 @@ LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docke
 ####
 RUN set -ex \
   && echo 'sslverify=false' >> /etc/yum.conf \
-    && yum makecache \
-    && yum -y update \
-    && yum -y install dnf-plugins-core \
-    && yum -y install  epel-release \
-    && yum config-manager --set-enabled powertools \
-    && yum -y install \
+    && dnf makecache \
+    && dnf -y update \
+    && dnf -y install dnf-plugins-core \
+    && dnf -y install epel-release \
+    && dnf config-manager --set-enabled crb \
+    && dnf -y install \
+       autoconf \
+       automake \
+       bison \
+       bzip2-devel \
+       diffutils \
+       expat-devel \
+       file \
+       flex \
        wget \
        bzip2 \
+       curl \
+       findutils \
+       gdbm-devel \
+       gzip \
+       libffi-devel \
+       libtool \
+       m4 \
+       ncurses-devel \
+       openssl \
+       openssl-devel \
        perl \
+       patch \
+       readline-devel \
+       sqlite-devel \
+       tar \
+       tk-devel \
        gcc \
-       gcc-c++\
+       gcc-c++ \
+       gcc-gfortran \
        git \
        gnupg \
        make \
@@ -39,17 +63,29 @@ RUN set -ex \
        mariadb-devel \
        psmisc \
        bash-completion \
+       xz-devel \
        vim-enhanced \
-       http-parser-devel \
        json-c-devel \
        libjwt-devel \
        libyaml-devel \
-    && yum clean all \
+       zlib-devel \
+    && dnf clean all \
     && rm -rf /var/cache/yum
 
-RUN alternatives --set python /usr/bin/python3
-
 RUN pip3 install Cython pytest
+
+ARG HTTP_PARSER_VERSION=v2.9.4
+ARG HTTP_PARSER_PREFIX=/opt/qfw/http-parser
+
+RUN set -ex \
+    && git clone --branch "${HTTP_PARSER_VERSION}" --depth=1 https://github.com/nodejs/http-parser.git /tmp/http-parser \
+    && cd /tmp/http-parser \
+    && make -j"$(nproc)" package library \
+    && mkdir -p "${HTTP_PARSER_PREFIX}/include" "${HTTP_PARSER_PREFIX}/lib" \
+    && cp http_parser.h "${HTTP_PARSER_PREFIX}/include/" \
+    && cp libhttp_parser.a "${HTTP_PARSER_PREFIX}/lib/" \
+    && cp libhttp_parser.so* "${HTTP_PARSER_PREFIX}/lib/" \
+    && rm -rf /tmp/http-parser
 
 ARG GOSU_VERSION=1.17
 
@@ -72,7 +108,7 @@ RUN set -x \
     && pushd slurm \
     && ./configure --enable-debug --prefix=/usr --sysconfdir=/etc/slurm \
         --with-mysql_config=/usr/bin  --libdir=/usr/lib64 \
-        --with-http-parser=/usr --with-yaml=/usr --with-jwt=/usr \
+        --with-http-parser="${HTTP_PARSER_PREFIX}" --with-yaml=/usr --with-jwt=/usr \
     && make install \
     && install -D -m644 etc/cgroup.conf.example /etc/slurm/cgroup.conf.example \
     && install -D -m644 etc/slurm.conf.example /etc/slurm/slurm.conf.example \
@@ -99,7 +135,10 @@ RUN set -x \
         /var/lib/slurmd/qos_usage \
         /var/lib/slurmd/fed_mgr_state \
     && chown -R slurm:slurm /var/*/slurm* \
-    && /sbin/create-munge-key
+    && install -d -m 0700 /etc/munge \
+    && dd if=/dev/urandom bs=1 count=1024 of=/etc/munge/munge.key status=none \
+    && chown -R munge:munge /etc/munge \
+    && chmod 0400 /etc/munge/munge.key
 
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf

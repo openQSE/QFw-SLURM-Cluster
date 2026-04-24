@@ -2,10 +2,25 @@
 # VERSION: 3
 set -e
 
+ensure_munge_key() {
+    install -d -m 0700 /etc/munge
+    install -d -o munge -g munge -m 0755 /run/munge
+    install -d -o munge -g munge -m 0700 /var/log/munge
+
+    if [ ! -f /etc/munge/munge.key ]; then
+        dd if=/dev/urandom bs=1 count=1024 of=/etc/munge/munge.key status=none
+    fi
+
+    chown -R munge:munge /etc/munge
+    chmod 0700 /etc/munge
+    chmod 0400 /etc/munge/munge.key
+}
+
 
 if [ "$1" = "TJNXXX" ]
 then
     echo "TJNXXX DBG"
+    ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
 
@@ -34,6 +49,7 @@ fi
 
 if [ "$1" = "slurmdbd" ]
 then
+    ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
 
@@ -54,6 +70,7 @@ fi
 
 if [ "$1" = "slurmctld" ]
 then
+    ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
 
@@ -76,6 +93,7 @@ fi
 
 if [ "$1" = "slurmd" ]
 then
+    ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
 
@@ -94,6 +112,7 @@ fi
 
 if [ "$1" = "slurmrestd" ]
 then
+    ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
 
