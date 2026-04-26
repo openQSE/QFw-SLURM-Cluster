@@ -8,6 +8,7 @@ DEFAULT_IMAGE_NAME="qfw-slurm-cluster"
 DEFAULT_IMAGE_TAG="rocky10.1"
 DEFAULT_SLURM_TAG="slurm-25-05-0-1"
 ENV_FILE="${SCRIPT_DIR}/qfw-install.env"
+COMPOSE_ENV_FILE="${SCRIPT_DIR}/.env"
 
 usage() {
     cat <<EOF
@@ -115,6 +116,7 @@ EOF
 print_settings() {
     echo "Resolved install settings:"
     echo "  ENV_FILE=${ENV_FILE}"
+    echo "  COMPOSE_ENV_FILE=${COMPOSE_ENV_FILE}"
     echo "  IMAGE_NAME=${IMAGE_NAME}"
     echo "  IMAGE_TAG=${IMAGE_TAG}"
     echo "  SLURM_TAG=${SLURM_TAG}"
@@ -153,8 +155,11 @@ IMAGE_TAG=${IMAGE_TAG}
 QFW_CONTAINER_BASE=${BASE_DIR}
 EOF
 
+cp "${ENV_FILE}" "${COMPOSE_ENV_FILE}"
+
 echo "Prepared host workspace at: ${BASE_DIR}"
-echo "Wrote compose defaults to: ${ENV_FILE}"
+echo "Wrote helper defaults to: ${ENV_FILE}"
+echo "Wrote compose defaults to: ${COMPOSE_ENV_FILE}"
 echo "  IMAGE_NAME=${IMAGE_NAME}"
 echo "  IMAGE_TAG=${IMAGE_TAG}"
 echo "  SLURM_TAG=${SLURM_TAG}"
