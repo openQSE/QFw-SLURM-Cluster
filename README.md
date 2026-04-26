@@ -64,7 +64,7 @@ The image build copies these repository files into `/etc/slurm`:
 - `rest.conf`
 - `cgroup.conf`
 
-Those copies happen in [Dockerfile](/home/a2e/ORNL/Quantum/openQSE/slurm-docker-cluster/Dockerfile) during `docker build`.
+Those copies happen in [Dockerfile](Dockerfile) during `docker build`.
 
 There is an important runtime detail:
 
@@ -73,7 +73,7 @@ There is an important runtime detail:
 
 That means:
 
-- changing `slurm-docker-cluster/slurm.conf` updates the repository source
+- changing `slurm.conf` in this repository updates the repository source
 - rebuilding the image updates the image contents
 - but an existing running cluster still uses the persistent `etc_slurm` volume until you refresh or recreate it
 
@@ -81,13 +81,20 @@ This is why the repo copy of `slurm.conf` can differ from the file you see insid
 
 ## Host Workspace Layout
 
-The cluster bind-mounts `../qfw-container-base` into the containers at:
+The cluster bind-mounts the host workspace configured in `qfw-install.env`
+through `QFW_CONTAINER_BASE` into the containers at:
 
 ```text
 /workspace/qfw-container-base
 ```
 
-The intended host layout is:
+By default, `./do_configure.sh` creates:
+
+```text
+../qfw-container-base
+```
+
+The intended host layout under that directory is:
 
 ```text
 qfw-container-base/
@@ -98,13 +105,12 @@ qfw-container-base/
   rocm/         # optional mounted ROCm tree for module load rocm
 ```
 
-This mount is present in:
+This mount is present in all Slurm service containers:
 
 - `slurmdbd`
 - `slurmctld`
 - `slurmrestd`
-- `c1`
-- `c2`
+- `c1` through `c8`
 
 That means you can edit QFw on the host and immediately see the changes inside
 the containers without rebuilding the image.
@@ -119,20 +125,39 @@ You need:
 All commands below assume you are in:
 
 ```bash
-cd slurm-docker-cluster
+cd QFw-SLURM-Cluster
+```
+
+## Quick Start
+
+If you want the shortest exact sequence to install, build, and run:
+
+```bash
+cd QFw-SLURM-Cluster
+./do_configure.sh
+./do_build.sh
+./do_startup.sh
+./do_ssh.sh
+```
+
+Inside `slurmctld`, verify the cluster:
+
+```bash
+sinfo
+scontrol show nodes
 ```
 
 ## Prepare The Host Workspace
 
 Before building or starting the containers, create the host-mounted workspace
-layout:
+layout and write the install settings file:
 
 ```bash
 ./do_configure.sh
 ```
 
-That script creates `../qfw-container-base` and the persistent directories the
-containers expect:
+That script creates the configured `QFW_CONTAINER_BASE` directory and the
+persistent directories the containers expect:
 
 - `QFw/`
 - `venv/`
@@ -141,9 +166,27 @@ containers expect:
 - `benchmarks/`
 - `rocm/`
 
-It also checks whether `../qfw-container-base/QFw` already contains a QFw
+It also checks whether `QFW_CONTAINER_BASE/QFw` already contains a QFw
 checkout. The venv is not created here because it should be created later from
 inside the container so it matches the container Python version.
+
+## Build The Image With The Helper
+
+To build the configured image without typing the raw `docker build` command:
+
+```bash
+./do_build.sh
+```
+
+If `qfw-install.env` does not exist yet, this helper runs `./do_configure.sh`
+with its default settings first and then builds the image.
+
+If you want a clean rebuild from scratch and want the current compose stack
+removed first:
+
+```bash
+./do_build.sh --force
+```
 
 ## Docker For Beginners
 
@@ -152,14 +195,12 @@ commands you are most likely to need day to day.
 
 ### Build the image
 
-This turns the `Dockerfile` into a reusable local image:
+This turns the `Dockerfile` into a reusable local image using the values from
+`qfw-install.env`:
 
 ```bash
-./do_install.sh
-set -a
-source qfw-install.env
-set +a
-docker build -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
+./do_configure.sh
+./do_build.sh
 ```
 
 Think of this as "compile the container image from the recipe in this
@@ -170,11 +211,8 @@ directory."
 This ignores Docker cache and rebuilds every layer:
 
 ```bash
-./do_install.sh
-set -a
-source qfw-install.env
-set +a
-docker build --no-cache -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
+./do_configure.sh
+./do_build.sh --force
 ```
 
 Use this when:
@@ -185,7 +223,8 @@ Use this when:
 
 ### Start the cluster
 
-This creates and starts all services from `docker-compose.yml`:
+This creates and starts all services from `docker-compose.yml` using the values
+from `qfw-install.env`:
 
 ```bash
 docker compose --env-file qfw-install.env up -d
@@ -241,8 +280,8 @@ docker compose --env-file qfw-install.env logs -f c5
 Open an interactive shell inside a container:
 
 ```bash
-docker exec -it slurmctld bash
-docker exec -it c1 bash
+./do_ssh.sh
+./do_ssh.sh c1
 ```
 
 Use this when you want to run `sinfo`, `salloc`, `module load`, or inspect files
@@ -325,9 +364,9 @@ Do this only when you really want to free space or force a rebuild path.
 
 The common workflow is:
 
-1. `docker build ...`
+1. `./do_build.sh`
 2. `docker compose --env-file qfw-install.env up -d` or `./do_startup.sh`
-3. `docker exec -it slurmctld bash`
+3. `./do_ssh.sh`
 4. work inside the running cluster
 5. `./update_slurmfiles.sh ...` for config-only changes
 6. `docker compose --env-file qfw-install.env down -v` when you want to fully reset the cluster state
@@ -371,14 +410,14 @@ If you want compose to use the image built by hand, keep both `IMAGE_NAME` and
 Open a shell in the Slurm controller:
 
 ```bash
-docker exec -it slurmctld bash
+./do_ssh.sh
 ```
 
 Open a shell in a compute node:
 
 ```bash
-docker exec -it c1 bash
-docker exec -it c2 bash
+./do_ssh.sh c1
+./do_ssh.sh c2
 ```
 
 Once inside `slurmctld`, basic Slurm inspection looks like:
@@ -393,7 +432,8 @@ Expected `sinfo` shape:
 
 ```text
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
-normal*      up 5-00:00:00      2   idle c[1-2]
+normal*      up 5-00:00:00      4   idle c[1-4]
+quantum      up   infinite      4   idle c[5-8]
 ```
 
 ## Using the Module Utility
@@ -550,7 +590,7 @@ scontrol show job <jobid>
 
 ## Running Across Multiple Nodes
 
-This cluster starts with `c1` and `c2`, so multi-node tests are straightforward.
+This cluster starts with eight compute nodes: `c1` through `c8`.
 
 Example:
 
@@ -589,7 +629,8 @@ Adding nodes requires updating both the compose topology and the Slurm config.
 
 ### 1. Add a new service in `docker-compose.yml`
 
-Use `c1` or `c2` as a template and add `c3`, `c4`, and so on.
+Use any of the existing `c1` through `c8` services as a template and add `c9`,
+`c10`, and so on.
 
 Each new node should:
 
@@ -704,10 +745,7 @@ interacting with the REST API.
 Build:
 
 ```bash
-set -a
-source qfw-install.env
-set +a
-docker build -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
+./do_build.sh
 ```
 
 Start and register:
@@ -719,7 +757,7 @@ Start and register:
 Enter the controller:
 
 ```bash
-docker exec -it slurmctld bash
+./do_ssh.sh
 ```
 
 Prepare environment:
