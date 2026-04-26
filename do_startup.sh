@@ -38,11 +38,8 @@ if [ ! -f "${ENV_FILE}" ]; then
 fi
 
 wait_for_slurmdbd_ready() {
-   #str="slurmdbd: slurmdbd version"
-   str="slurmdbd version"
-
    while true; do
-    if "${COMPOSE[@]}" logs | grep -q "$str" ; then
+    if docker exec slurmdbd /usr/bin/sacctmgr --immediate list cluster >/dev/null 2>&1 ; then
         echo "SlurmDBD ready!"
         break
     else
@@ -56,7 +53,7 @@ if ${DRY_RUN}; then
     echo "Would run startup sequence:"
     printf '  %q' "${COMPOSE[@]}"
     printf ' %q %q\n' up -d
-    echo "  wait for logs to contain: slurmdbd version"
+    echo "  wait for: sacctmgr --immediate list cluster to succeed in slurmdbd"
     echo "  sleep 5"
     echo "  ./register_cluster.sh"
     exit 0
