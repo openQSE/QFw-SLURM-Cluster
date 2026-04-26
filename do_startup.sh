@@ -1,11 +1,20 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/qfw-install.env"
+COMPOSE=(docker compose --env-file "${ENV_FILE}")
+
+if [ ! -f "${ENV_FILE}" ]; then
+    echo "Missing ${ENV_FILE}. Run ./do_configure.sh first." >&2
+    exit 1
+fi
+
 wait_for_slurmdbd_ready() {
    #str="slurmdbd: slurmdbd version"
    str="slurmdbd version"
 
    while true; do
-    if docker compose logs | grep -q "$str" ; then
+    if "${COMPOSE[@]}" logs | grep -q "$str" ; then
         echo "SlurmDBD ready!"
         break
     else
@@ -17,7 +26,7 @@ wait_for_slurmdbd_ready() {
 
 set -xe
 
-docker compose up -d
+"${COMPOSE[@]}" up -d
 
 wait_for_slurmdbd_ready
 

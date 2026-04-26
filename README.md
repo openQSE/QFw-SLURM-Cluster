@@ -128,7 +128,7 @@ Before building or starting the containers, create the host-mounted workspace
 layout:
 
 ```bash
-./do_install.sh
+./do_configure.sh
 ```
 
 That script creates `../qfw-container-base` and the persistent directories the
@@ -157,7 +157,7 @@ This turns the `Dockerfile` into a reusable local image:
 ```bash
 ./do_install.sh
 set -a
-source .env
+source qfw-install.env
 set +a
 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
 ```
@@ -172,7 +172,7 @@ This ignores Docker cache and rebuilds every layer:
 ```bash
 ./do_install.sh
 set -a
-source .env
+source qfw-install.env
 set +a
 docker build --no-cache -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
 ```
@@ -188,7 +188,7 @@ Use this when:
 This creates and starts all services from `docker-compose.yml`:
 
 ```bash
-docker compose up -d
+docker compose --env-file qfw-install.env up -d
 ```
 
 Use `-d` for detached mode so the cluster keeps running in the background.
@@ -212,7 +212,7 @@ It:
 See which containers are up:
 
 ```bash
-docker compose ps
+docker compose --env-file qfw-install.env ps
 ```
 
 See local images:
@@ -226,14 +226,14 @@ docker images
 Follow all compose service logs:
 
 ```bash
-docker compose logs -f
+docker compose --env-file qfw-install.env logs -f
 ```
 
 View logs for one service:
 
 ```bash
-docker compose logs -f slurmctld
-docker compose logs -f c5
+docker compose --env-file qfw-install.env logs -f slurmctld
+docker compose --env-file qfw-install.env logs -f c5
 ```
 
 ### Enter a running container
@@ -253,13 +253,13 @@ inside the container.
 Stop running containers without deleting them:
 
 ```bash
-docker compose stop
+docker compose --env-file qfw-install.env stop
 ```
 
 Bring them back later:
 
 ```bash
-docker compose start
+docker compose --env-file qfw-install.env start
 ```
 
 ### Restart the cluster
@@ -267,7 +267,7 @@ docker compose start
 Restart all compose services:
 
 ```bash
-docker compose restart
+docker compose --env-file qfw-install.env restart
 ```
 
 This is useful after config refreshes.
@@ -278,7 +278,7 @@ Remove the running containers and network, but keep named volumes unless you add
 `-v`:
 
 ```bash
-docker compose down
+docker compose --env-file qfw-install.env down
 ```
 
 ### Factory reset the cluster
@@ -286,7 +286,7 @@ docker compose down
 Remove containers and named volumes:
 
 ```bash
-docker compose down -v
+docker compose --env-file qfw-install.env down -v
 ```
 
 This is the closest thing to a factory reset for this setup. It wipes the
@@ -326,11 +326,11 @@ Do this only when you really want to free space or force a rebuild path.
 The common workflow is:
 
 1. `docker build ...`
-2. `docker compose up -d` or `./do_startup.sh`
+2. `docker compose --env-file qfw-install.env up -d` or `./do_startup.sh`
 3. `docker exec -it slurmctld bash`
 4. work inside the running cluster
 5. `./update_slurmfiles.sh ...` for config-only changes
-6. `docker compose down -v` when you want to fully reset the cluster state
+6. `docker compose --env-file qfw-install.env down -v` when you want to fully reset the cluster state
 
 ## Image Build Notes
 
@@ -340,21 +340,21 @@ For the practical build, start, stop, reset, and log commands, use the
 One additional image-specific note is useful here:
 
 If you want shell commands like `docker build -t ${IMAGE_NAME}:${IMAGE_TAG}` to
-use the same values as Compose, export the `.env` file into your shell first:
+use the same values as the helper scripts, export `qfw-install.env` into your shell first:
 
 ```bash
 set -a
-source .env
+source qfw-install.env
 set +a
 ```
 
 ### Compose-driven build
 
-If you prefer using compose and the `.env` file instead of an explicit
+If you prefer using compose and `qfw-install.env` instead of an explicit
 `docker build` command:
 
 ```bash
-docker compose build
+docker compose --env-file qfw-install.env build
 ```
 
 Compose uses:
@@ -611,7 +611,7 @@ PartitionName=normal Nodes=c[1-3] Default=YES MaxTime=5-00:00:00 State=UP
 
 ```bash
 ./update_slurmfiles.sh slurm.conf
-docker compose restart
+docker compose --env-file qfw-install.env restart
 ```
 
 If the cluster metadata also needs to be refreshed, rerun:
@@ -645,7 +645,7 @@ You can pass more than one file:
 `update_slurmfiles.sh` does two things:
 
 1. copies the selected repo files into `/etc/slurm` inside `slurmctld`
-2. runs `docker compose restart`
+2. runs `docker compose --env-file qfw-install.env restart`
 
 That is the normal way to refresh config in a running cluster without rebuilding
 the image.
@@ -705,7 +705,7 @@ Build:
 
 ```bash
 set -a
-source .env
+source qfw-install.env
 set +a
 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} .
 ```

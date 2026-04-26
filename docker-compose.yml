@@ -26,7 +26,7 @@ services:
       - etc_munge:/etc/munge
       - etc_slurm:/etc/slurm
       - var_log_slurm:/var/log/slurm
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6819"
     depends_on:
@@ -45,7 +45,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6817"
     depends_on:
@@ -64,7 +64,7 @@ services:
       - etc_slurm:/etc/slurm
       - var_log_slurm:/var/log/slurm
       - slurm_jobdir:/data
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6820"
     ports:
@@ -86,7 +86,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6818"
     depends_on:
@@ -106,7 +106,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6818"
     depends_on:
@@ -126,7 +126,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6818"
     depends_on:
@@ -146,7 +146,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6818"
     depends_on:
@@ -166,7 +166,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6818"
     depends_on:
@@ -186,7 +186,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6818"
     depends_on:
@@ -206,7 +206,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6818"
     depends_on:
@@ -226,7 +226,7 @@ services:
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
-      - ../qfw-container-base:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
     expose:
       - "6818"
     depends_on:
