@@ -179,7 +179,7 @@ RUN set -ex \
     && git clone --recursive --branch "${OMPI_REF}" https://github.com/open-mpi/ompi.git /tmp/ompi \
     && cd /tmp/ompi \
     && ./autogen.pl \
-    && ./configure --prefix="${OMPI_PREFIX}" --with-libfabric="${LIBFABRIC_PREFIX}" CC="${CC}" CXX="${CXX}" FC="${FC}" \
+    && ./configure --prefix="${OMPI_PREFIX}" --with-libfabric="${LIBFABRIC_PREFIX}" --with-slurm CC="${CC}" CXX="${CXX}" FC="${FC}" \
     && make -j"$(nproc)" all \
     && make install \
     && rm -rf /tmp/ompi
