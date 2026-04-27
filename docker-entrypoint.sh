@@ -2,6 +2,48 @@
 # VERSION: 3
 set -e
 
+ensure_root_ssh() {
+    install -d -m 0700 /root/.ssh
+
+    if [ ! -f /root/.ssh/id_ed25519 ]; then
+        ssh-keygen -q -t ed25519 -N "" -f /root/.ssh/id_ed25519
+    fi
+
+    cat > /root/.ssh/config <<'EOF'
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+EOF
+
+    cp /root/.ssh/id_ed25519.pub /root/.ssh/authorized_keys
+    chmod 0600 /root/.ssh/id_ed25519 /root/.ssh/authorized_keys /root/.ssh/config
+    chmod 0644 /root/.ssh/id_ed25519.pub
+}
+
+ensure_sshd_host_keys() {
+    if [ ! -f /etc/ssh/ssh_host_ed25519_key ]; then
+        ssh-keygen -A
+    fi
+
+    install -d -m 0755 /run/sshd
+    cat > /etc/ssh/sshd_config.d/qfw-cluster.conf <<'EOF'
+PermitRootLogin yes
+PasswordAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+EOF
+}
+
+start_sshd() {
+    ensure_root_ssh
+    ensure_sshd_host_keys
+
+    if ! pgrep -x sshd >/dev/null 2>&1; then
+        /usr/sbin/sshd
+    fi
+}
+
 ensure_munge_key() {
     install -d -m 0700 /etc/munge
     install -d -o munge -g munge -m 0755 /run/munge
@@ -49,6 +91,7 @@ fi
 
 if [ "$1" = "slurmdbd" ]
 then
+    start_sshd
     ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
@@ -70,6 +113,7 @@ fi
 
 if [ "$1" = "slurmctld" ]
 then
+    start_sshd
     ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
@@ -93,6 +137,7 @@ fi
 
 if [ "$1" = "slurmd" ]
 then
+    start_sshd
     ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
@@ -112,6 +157,7 @@ fi
 
 if [ "$1" = "slurmrestd" ]
 then
+    start_sshd
     ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
@@ -143,4 +189,5 @@ then
     exec gosu nobody /usr/sbin/slurmrestd -vvvvv 0.0.0.0:6820
 fi
 
+start_sshd
 exec "$@"

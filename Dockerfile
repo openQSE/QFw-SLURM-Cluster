@@ -42,6 +42,8 @@ RUN set -ex \
        ncurses-devel \
        openssl \
        openssl-devel \
+       openssh-clients \
+       openssh-server \
        perl \
        patch \
        readline-devel \
