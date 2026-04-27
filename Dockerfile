@@ -46,6 +46,7 @@ RUN set -ex \
        openssh-server \
        perl \
        patch \
+       libuuid-devel \
        readline-devel \
        sqlite-devel \
        tar \
@@ -58,6 +59,7 @@ RUN set -ex \
        make \
        munge \
        munge-devel \
+       python3.12-devel \
        python3-devel \
        python3-pip \
        python3 \
