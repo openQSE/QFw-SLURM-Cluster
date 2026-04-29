@@ -54,6 +54,9 @@ environment variables in the Dockerfile.
 
 By default, this gives you an eight-node Slurm cluster.
 
+Each Slurm service runs with Docker `init: true` so exited child processes are
+reaped correctly inside the containers.
+
 ## Repository Files That Feed The Containers
 
 The image build copies these repository files into `/etc/slurm`:
@@ -188,6 +191,17 @@ removed first:
 ./do_build.sh --force
 ```
 
+This stops and removes the current compose stack through `./do_stop.sh delete`
+and then runs `docker build --no-cache`. It does not automatically start the
+cluster again.
+
+If containers already exist for the same image tag after a rebuild, recreate
+them so Docker does not keep using the old containers:
+
+```bash
+./do_restart.sh --force-recreate
+```
+
 ## Docker For Beginners
 
 This section uses this Slurm cluster as the example and focuses on the Docker
@@ -310,6 +324,25 @@ docker compose --env-file qfw-install.env restart
 ```
 
 This is useful after config refreshes.
+
+Use the helper when you want the same behavior:
+
+```bash
+./do_restart.sh
+```
+
+If you rebuilt the image and need existing containers recreated from the new
+image, use:
+
+```bash
+./do_restart.sh --force-recreate
+```
+
+That runs:
+
+```bash
+docker compose --env-file qfw-install.env up -d --force-recreate
+```
 
 ### Remove the cluster but keep images
 
@@ -737,8 +770,11 @@ interacting with the REST API.
 - It is useful for framework debugging, integration testing, and profiling
   software overhead.
 - It will not reproduce real production interconnect behavior.
-- The shell currently prints a `slurm_completion.sh` startup warning in some
-  `bash -lc` paths. It does not block cluster operation or module loading.
+- The image patches Slurm's completion profile script so it exits early in
+  non-interactive shells. This keeps SSH-launched QFw commands from failing
+  before PRTE startup while preserving completion for interactive shells.
+- The compose stack shares `/root/.ssh` across Slurm containers and starts
+  `sshd`, so root-to-root SSH between containers works for QFw launch paths.
 
 ## Typical End-to-End Session
 
