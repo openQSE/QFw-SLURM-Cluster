@@ -15,6 +15,7 @@ services:
 
   slurmdbd:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     build:
       context: .
       args:
@@ -37,6 +38,7 @@ services:
 
   slurmctld:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmctld"]
     container_name: slurmctld
     hostname: slurmctld
@@ -57,6 +59,7 @@ services:
 
   slurmrestd:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmrestd"]
     #command: ["TJNXXX"]
     container_name: slurmrestd
@@ -79,6 +82,7 @@ services:
 
   c1:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmd"]
     #command: ["TJNXXX"]
     hostname: c1
@@ -101,6 +105,7 @@ services:
 
   c2:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmd"]
     hostname: c2
     container_name: c2
@@ -122,6 +127,7 @@ services:
 
   c3:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmd"]
     hostname: c3
     container_name: c3
@@ -143,6 +149,7 @@ services:
 
   c4:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmd"]
     hostname: c4
     container_name: c4
@@ -164,6 +171,7 @@ services:
 
   c5:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmd"]
     hostname: c5
     container_name: c5
@@ -185,6 +193,7 @@ services:
 
   c6:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmd"]
     hostname: c6
     container_name: c6
@@ -206,6 +215,7 @@ services:
 
   c7:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmd"]
     hostname: c7
     container_name: c7
@@ -227,6 +237,7 @@ services:
 
   c8:
     image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
     command: ["slurmd"]
     hostname: c8
     container_name: c8
