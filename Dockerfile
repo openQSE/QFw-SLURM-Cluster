@@ -125,6 +125,8 @@ RUN set -x \
     && install -D -m644 etc/slurm.conf.example /etc/slurm/slurm.conf.example \
     && install -D -m644 etc/slurmdbd.conf.example /etc/slurm/slurmdbd.conf.example \
     && install -D -m644 contribs/slurm_completion_help/slurm_completion.sh /etc/profile.d/slurm_completion.sh \
+    && sed -i '1a case $- in *i*) ;; *) return 0 2>/dev/null || exit 0 ;; esac' \
+        /etc/profile.d/slurm_completion.sh \
     && popd \
     && rm -rf slurm \
     && groupadd -r --gid=990 slurm \
