@@ -37,6 +37,7 @@ RUN set -ex \
        gdbm-devel \
        gzip \
        libffi-devel \
+       libcurl-devel \
        libtool \
        m4 \
        ncurses-devel \
