@@ -214,6 +214,47 @@ RUN set -ex \
     && rm -rf /var/cache/yum \
     && pip3 install scons
 
+ARG QFW_REPO=https://github.com/openQSE/QFw.git
+ARG QFW_BUILD_JOBS=4
+ARG QFW_IMAGE_BASE=/opt/qfw/qhpc
+ARG QFW_IMAGE_BUILD_VERSION=image
+
+RUN set -ex \
+    && mkdir -p "${QFW_IMAGE_BASE}/rocm" \
+    && git -c url.https://github.com/.insteadOf=git@github.com: \
+        clone --recursive "${QFW_REPO}" "${QFW_IMAGE_BASE}/QFw" \
+    && python3 -m venv "${QFW_IMAGE_BASE}/venv" \
+    && "${QFW_IMAGE_BASE}/venv/bin/python" -m pip install --upgrade \
+        pip setuptools wheel \
+    && "${QFW_IMAGE_BASE}/venv/bin/python" -m pip install \
+        -r "${QFW_IMAGE_BASE}/QFw/setup/build-requirements.txt" \
+    && { \
+        echo "runtime-mode: container"; \
+        echo "mpi-transport-mode: auto"; \
+        echo "base-dir: ${QFW_IMAGE_BASE}"; \
+        echo "python-venv-activate: ${QFW_IMAGE_BASE}/venv/bin/activate"; \
+        echo "libfabric-install: ${LIBFABRIC_PREFIX}"; \
+        echo "mpi-install: ${OMPI_PREFIX}"; \
+        echo "dev-install: ${QFW_IMAGE_BASE}/rocm"; \
+        echo "dev-version: 0.0.0"; \
+        echo "build-jobs: ${QFW_BUILD_JOBS}"; \
+        echo "qfw-dep-build-version: ${QFW_IMAGE_BUILD_VERSION}"; \
+    } > "${QFW_IMAGE_BASE}/QFw/setup/qfw_config_image.yaml" \
+    && cd "${QFW_IMAGE_BASE}/QFw/setup" \
+    && "${QFW_IMAGE_BASE}/venv/bin/python" ./qfw_configure \
+        -c qfw_config_image.yaml \
+    && QFW_BUILD_JOBS="${QFW_BUILD_JOBS}" ./qfw_build.sh
+
+ENV QFW_IMAGE_BASE=${QFW_IMAGE_BASE} \
+    QFW_IMAGE_QFW=${QFW_IMAGE_BASE}/QFw \
+    QFW_IMAGE_VENV=${QFW_IMAGE_BASE}/venv \
+    QFW_IMAGE_BUILD_VERSION=${QFW_IMAGE_BUILD_VERSION} \
+    QFW_BUILD_JOBS=${QFW_BUILD_JOBS}
+
+ENV PATH=${OMPI_PREFIX}/bin:${LIBFABRIC_PREFIX}/bin:${QFW_IMAGE_BASE}/QFw/bin:${PATH}
+
+ENV LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${LIBFABRIC_PREFIX}/lib:${QFW_IMAGE_BASE}/QFw/DEFw/src:${QFW_IMAGE_BASE}/install/${QFW_IMAGE_BUILD_VERSION}/TNQVM/exatn/lib:${QFW_IMAGE_BASE}/install/${QFW_IMAGE_BUILD_VERSION}/TNQVM/xacc/lib:${QFW_IMAGE_BASE}/build/${QFW_IMAGE_BUILD_VERSION}/TNQVM/tnqvm/plugins:${QFW_IMAGE_BASE}/install/${QFW_IMAGE_BUILD_VERSION}/NWQSIM/lib
+
 COPY modulefiles /etc/modulefiles
 
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
