@@ -7,6 +7,7 @@ DEFAULT_BASE_DIR="${SCRIPT_DIR}/../qfw-container-base"
 DEFAULT_IMAGE_NAME="qfw-slurm-cluster"
 DEFAULT_IMAGE_TAG="rocky10.1"
 DEFAULT_SLURM_TAG="slurm-25-05-0-1"
+DEFAULT_QFW_BUILD_JOBS="4"
 ENV_FILE="${SCRIPT_DIR}/qfw-install.env"
 COMPOSE_ENV_FILE="${SCRIPT_DIR}/.env"
 
@@ -24,6 +25,8 @@ Options:
                        Default: ${DEFAULT_IMAGE_TAG}
   --slurm-tag TAG      Slurm source tag used at image build time
                        Default: ${DEFAULT_SLURM_TAG}
+  --qfw-build-jobs N   Parallel build jobs for the image-contained QFw build
+                       Default: ${DEFAULT_QFW_BUILD_JOBS}
   --dry-run            Print the resolved settings without creating anything
   -h, --help           Show this help text
 
@@ -37,6 +40,7 @@ BASE_DIR=""
 IMAGE_NAME="${DEFAULT_IMAGE_NAME}"
 IMAGE_TAG="${DEFAULT_IMAGE_TAG}"
 SLURM_TAG="${DEFAULT_SLURM_TAG}"
+QFW_BUILD_JOBS="${DEFAULT_QFW_BUILD_JOBS}"
 DRY_RUN=false
 
 while [ "$#" -gt 0 ]; do
@@ -65,6 +69,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --slurm-tag)
             SLURM_TAG="${2:?missing value for --slurm-tag}"
+            shift 2
+            ;;
+        --qfw-build-jobs)
+            QFW_BUILD_JOBS="${2:?missing value for --qfw-build-jobs}"
             shift 2
             ;;
         --dry-run)
@@ -113,6 +121,13 @@ EOF
     fi
 }
 
+validate_qfw_build_jobs() {
+    if ! [[ "${QFW_BUILD_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+        echo "QFW_BUILD_JOBS must be a positive integer." >&2
+        exit 1
+    fi
+}
+
 print_settings() {
     echo "Resolved install settings:"
     echo "  ENV_FILE=${ENV_FILE}"
@@ -120,6 +135,7 @@ print_settings() {
     echo "  IMAGE_NAME=${IMAGE_NAME}"
     echo "  IMAGE_TAG=${IMAGE_TAG}"
     echo "  SLURM_TAG=${SLURM_TAG}"
+    echo "  QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
     echo "  QFW_CONTAINER_BASE=${BASE_DIR}"
     echo "  QFW_DIR=${QFW_DIR}"
     echo "  VENV_DIR=${BASE_DIR}/venv"
@@ -130,6 +146,7 @@ print_settings() {
 }
 
 validate_image_settings
+validate_qfw_build_jobs
 
 if ${DRY_RUN}; then
     print_settings
@@ -150,6 +167,7 @@ mkdir -p \
 
 cat > "${ENV_FILE}" <<EOF
 SLURM_TAG=${SLURM_TAG}
+QFW_BUILD_JOBS=${QFW_BUILD_JOBS}
 IMAGE_NAME=${IMAGE_NAME}
 IMAGE_TAG=${IMAGE_TAG}
 QFW_CONTAINER_BASE=${BASE_DIR}
@@ -163,6 +181,7 @@ echo "Wrote compose defaults to: ${COMPOSE_ENV_FILE}"
 echo "  IMAGE_NAME=${IMAGE_NAME}"
 echo "  IMAGE_TAG=${IMAGE_TAG}"
 echo "  SLURM_TAG=${SLURM_TAG}"
+echo "  QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
 echo "  QFW_CONTAINER_BASE=${BASE_DIR}"
 
 if [ -d "${QFW_DIR}/.git" ] || [ -f "${QFW_DIR}/README.md" ]; then

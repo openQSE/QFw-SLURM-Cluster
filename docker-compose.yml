@@ -20,6 +20,7 @@ services:
       context: .
       args:
         SLURM_TAG: ${SLURM_TAG}
+        QFW_BUILD_JOBS: ${QFW_BUILD_JOBS:-4}
     command: ["slurmdbd"]
     container_name: slurmdbd
     hostname: slurmdbd

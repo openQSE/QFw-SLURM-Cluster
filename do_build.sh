@@ -67,12 +67,18 @@ if ${DRY_RUN}; then
         set -a
         source "${ENV_FILE}"
         set +a
+        QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
         echo "Would run:"
         if ${FORCE}; then
-            echo "  docker build --no-cache -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} ${SCRIPT_DIR}"
+            echo "  docker build \\"
+            echo "    --no-cache \\"
         else
-            echo "  docker build -t ${IMAGE_NAME}:${IMAGE_TAG} --build-arg SLURM_TAG=${SLURM_TAG} ${SCRIPT_DIR}"
+            echo "  docker build \\"
         fi
+        echo "    -t ${IMAGE_NAME}:${IMAGE_TAG} \\"
+        echo "    --build-arg SLURM_TAG=${SLURM_TAG} \\"
+        echo "    --build-arg QFW_BUILD_JOBS=${QFW_BUILD_JOBS} \\"
+        echo "    ${SCRIPT_DIR}"
     else
         cat <<EOF
 Dry run only. ${ENV_FILE} does not exist yet, so the final image values would
@@ -86,17 +92,22 @@ set -a
 source "${ENV_FILE}"
 set +a
 
+QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
+
 echo "Building ${IMAGE_NAME}:${IMAGE_TAG} with SLURM_TAG=${SLURM_TAG}"
+echo "Building image-contained QFw with QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
 
 if ${FORCE}; then
     docker build \
         --no-cache \
         -t "${IMAGE_NAME}:${IMAGE_TAG}" \
         --build-arg "SLURM_TAG=${SLURM_TAG}" \
+        --build-arg "QFW_BUILD_JOBS=${QFW_BUILD_JOBS}" \
         "${SCRIPT_DIR}"
 else
     docker build \
         -t "${IMAGE_NAME}:${IMAGE_TAG}" \
         --build-arg "SLURM_TAG=${SLURM_TAG}" \
+        --build-arg "QFW_BUILD_JOBS=${QFW_BUILD_JOBS}" \
         "${SCRIPT_DIR}"
 fi
