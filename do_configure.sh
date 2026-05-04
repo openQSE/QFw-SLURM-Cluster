@@ -36,6 +36,48 @@ by the helper scripts and docker compose into:
 EOF
 }
 
+normalize_path() {
+    local path="$1"
+    local -a parts=()
+    local -a normalized=()
+    local part
+    local output=""
+
+    if [[ "${path}" != /* ]]; then
+        path="${PWD}/${path}"
+    fi
+
+    while [[ "${path}" == *//* ]]; do
+        path="${path//\/\///}"
+    done
+
+    IFS='/' read -r -a parts <<< "${path}"
+    for part in "${parts[@]}"; do
+        case "${part}" in
+            ""|".")
+                ;;
+            "..")
+                if [ "${#normalized[@]}" -gt 0 ]; then
+                    unset 'normalized[${#normalized[@]}-1]'
+                fi
+                ;;
+            *)
+                normalized+=("${part}")
+                ;;
+        esac
+    done
+
+    if [ "${#normalized[@]}" -eq 0 ]; then
+        printf '/\n'
+        return
+    fi
+
+    for part in "${normalized[@]}"; do
+        output="${output}/${part}"
+    done
+    printf '%s\n' "${output}"
+}
+
 BASE_DIR=""
 IMAGE_NAME="${DEFAULT_IMAGE_NAME}"
 IMAGE_TAG="${DEFAULT_IMAGE_TAG}"
@@ -95,7 +137,7 @@ if [ -z "${BASE_DIR}" ]; then
     BASE_DIR="${DEFAULT_BASE_DIR}"
 fi
 
-BASE_DIR="$(realpath -m "${BASE_DIR}")"
+BASE_DIR="$(normalize_path "${BASE_DIR}")"
 QFW_DIR="${BASE_DIR}/QFw"
 
 validate_image_settings() {
