@@ -297,11 +297,28 @@ See which containers are up:
 docker compose --env-file qfw-install.env ps
 ```
 
-See local images:
+See local QFw Slurm images:
 
 ```bash
-docker images
+./do_images.sh
 ```
+
+Useful image listing variations:
+
+```bash
+./do_images.sh --configured
+./do_images.sh --all
+./do_images.sh --dangling
+./do_images.sh --repo ghcr.io/openqse/qfw-slurm-cluster
+./do_images.sh --repo ghcr.io/openqse/qfw-slurm-cluster --tag 20260503-v1.0
+./do_images.sh --configured --quiet
+./do_images.sh --configured --history
+```
+
+The helper lists local Docker images only. It does not query GHCR or any other
+remote registry. The `--history` mode shows Docker layer history for one local
+image, which is useful before pushing to GHCR because GHCR has a 10 GB limit
+per layer and an upload timeout.
 
 ### View logs
 
@@ -467,6 +484,49 @@ Compose uses:
 
 If you want compose to use the image built by hand, keep both `IMAGE_NAME` and
 `IMAGE_TAG` aligned with the image you built.
+
+### List local images
+
+Use the helper when you want to inspect local image variants without typing the
+raw `docker image ls` command:
+
+```bash
+./do_images.sh
+```
+
+By default it shows common QFw Slurm repositories, including the configured
+`IMAGE_NAME` from `qfw-install.env`. To show the exact configured image:
+
+```bash
+./do_images.sh --configured
+```
+
+To list a specific local repository or tag:
+
+```bash
+./do_images.sh --repo ghcr.io/openqse/qfw-slurm-cluster
+./do_images.sh --repo ghcr.io/openqse/qfw-slurm-cluster --tag 20260503-v1.0
+```
+
+To inspect other local Docker state:
+
+```bash
+./do_images.sh --all
+./do_images.sh --dangling
+./do_images.sh --digests
+./do_images.sh --include-intermediate
+```
+
+Before pushing a large image to GHCR, inspect its layer sizes:
+
+```bash
+./do_images.sh --configured --history
+./do_images.sh --repo ghcr.io/openqse/qfw-slurm-cluster \
+  --tag 20260503-v1.0 --history
+```
+
+GHCR allows up to 10 GB per layer and has an upload timeout. A total image
+larger than 10 GB can still push if each individual layer is below that limit.
 
 ## Accessing the Cluster Interactively
 
