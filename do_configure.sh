@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_BASE_DIR="${SCRIPT_DIR}/../qfw-container-base"
+DEFAULT_BASE_DIR="./shared-dir"
 DEFAULT_IMAGE_NAME="qfw-slurm-cluster"
 DEFAULT_IMAGE_TAG="rocky10.1"
 DEFAULT_SLURM_TAG="slurm-25-05-0-1"
