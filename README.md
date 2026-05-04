@@ -168,6 +168,64 @@ sinfo
 scontrol show nodes
 ```
 
+## Run A Prebuilt GHCR Image
+
+Use this path when someone has already pushed a QFw Slurm image to GHCR and
+you want to run it locally without rebuilding the image.
+
+For a public image:
+
+```bash
+cd QFw-SLURM-Cluster
+
+docker pull ghcr.io/openqse/qfw-slurm-cluster:20260503-v1.0
+
+./do_configure.sh \
+  --image ghcr.io/openqse/qfw-slurm-cluster:20260503-v1.0
+
+./do_startup.sh
+./do_ssh.sh
+```
+
+For a private image, log in to GHCR first with your GitHub username and a token
+that has `read:packages` access:
+
+```bash
+echo "${GHCR_TOKEN}" | docker login ghcr.io \
+  -u <github-username> \
+  --password-stdin
+```
+
+Then use the same pull and startup flow:
+
+```bash
+docker pull ghcr.io/openqse/qfw-slurm-cluster:20260503-v1.0
+
+./do_configure.sh \
+  --image ghcr.io/openqse/qfw-slurm-cluster:20260503-v1.0
+
+./do_startup.sh
+```
+
+This writes `IMAGE_NAME`, `IMAGE_TAG`, and `QFW_CONTAINER_BASE` into
+`qfw-install.env` and `.env`. Compose then starts containers from the pulled
+image instead of requiring a local build. Do not run `./do_build.sh` in this
+workflow unless you intentionally want to rebuild the image locally.
+
+The mounted workspace is still created on the host. By default it is:
+
+```bash
+../qfw-container-base
+```
+
+Use `--prefix` if you want a different host mount point:
+
+```bash
+./do_configure.sh \
+  --image ghcr.io/openqse/qfw-slurm-cluster:20260503-v1.0 \
+  --prefix /path/to/qfw-container-base
+```
+
 ## Prepare The Host Workspace
 
 Before building or starting the containers, create the host-mounted workspace
