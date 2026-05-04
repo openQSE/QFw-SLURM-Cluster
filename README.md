@@ -8,6 +8,8 @@ active QFw workspace on the host. That gives you:
 
 - a repeatable Slurm test cluster
 - a repeatable MPI/libfabric toolchain
+- an image-contained QFw install that can run without a mounted checkout
+- prebuilt QFw circuit runners for TNQVM and NWQ-Sim
 - disposable containers
 - host-persistent source, virtual environments, and build artifacts
 
@@ -22,6 +24,11 @@ The image builds and installs these layers:
 - `libfabric`
 - OpenMPI with the bundled PRRTE checkout
 - OSU Micro-Benchmarks
+- QFw under `/opt/qfw/qhpc/QFw`
+- a QFw Python virtual environment under `/opt/qfw/qhpc/venv`
+- QFw build and install artifacts under `/opt/qfw/qhpc/build/image` and
+  `/opt/qfw/qhpc/install/image`
+- prebuilt `circuit_runner.tnqvm` and `circuit_runner.nwqsim` on `PATH`
 - QFw-facing convenience packages:
   - `cmake`
   - `gcc-gfortran`
@@ -41,6 +48,11 @@ The image also installs runtime modulefiles for:
 The modulefiles are for interactive use inside the container. They are not used
 to control Docker build correctness. The MPI stack is built with explicit GCC 13
 environment variables in the Dockerfile.
+
+The image-level runtime environment includes OpenMPI, libfabric, and the
+image-contained QFw circuit runner paths in `PATH` and `LD_LIBRARY_PATH`.
+Do not globally source `qfw_activate` from the image entrypoint; activation is
+still an explicit shell action because it rewires the QFw Python environment.
 
 ## Cluster Topology
 
@@ -118,6 +130,12 @@ This mount is present in all Slurm service containers:
 That means you can edit QFw on the host and immediately see the changes inside
 the containers without rebuilding the image.
 
+The mounted QFw checkout is optional for users who only want to run the
+image-contained QFw. It is still the normal development path. If the mounted
+checkout builds its own circuit runners, its `qfw_activate` prepends its paths
+and those runners win. If it does not, the prebuilt image runners remain
+available from `/opt/qfw/qhpc/QFw/bin`.
+
 ## Prerequisites
 
 You need:
@@ -183,6 +201,17 @@ To build the configured image without typing the raw `docker build` command:
 
 If `qfw-install.env` does not exist yet, this helper runs `./do_configure.sh`
 with its default settings first and then builds the image.
+
+The image-contained QFw build uses `QFW_BUILD_JOBS=4` by default. The helper
+writes this value to `qfw-install.env` and passes it to `docker build`.
+
+Set a different value during configuration if your host needs more or fewer
+parallel build jobs:
+
+```bash
+./do_configure.sh --qfw-build-jobs 2
+./do_build.sh
+```
 
 If you want a clean rebuild from scratch and want the current compose stack
 removed first:
@@ -432,6 +461,7 @@ docker compose --env-file qfw-install.env build
 Compose uses:
 
 - `SLURM_TAG` for the Slurm source tag
+- `QFW_BUILD_JOBS` for the image-contained QFw build parallelism
 - `IMAGE_NAME` for the runtime image repository name
 - `IMAGE_TAG` for the runtime image tag
 
@@ -532,6 +562,19 @@ it matches the current container interpreter.
 
 ## QFw Source Workflow
 
+The image already includes a runnable QFw install at:
+
+```text
+/opt/qfw/qhpc/QFw
+```
+
+For a quick image-contained QFw shell:
+
+```bash
+cd /opt/qfw/qhpc/QFw
+source /opt/qfw/qhpc/QFw/setup/qfw_activate
+```
+
 The active QFw checkout should live at:
 
 ```text
@@ -550,6 +593,26 @@ module load gcc-native/13.2 cmake openblas swig
 Then build or run QFw directly from the mounted source tree.
 
 Any file edited on the host is visible immediately in the container.
+
+The mounted development checkout can reuse the image-built circuit runners
+without rebuilding TNQVM or NWQ-Sim. The image exposes the required binary and
+library paths globally:
+
+```text
+/opt/qfw/openmpi/bin
+/opt/qfw/libfabric/bin
+/opt/qfw/qhpc/QFw/bin
+/opt/qfw/openmpi/lib
+/opt/qfw/libfabric/lib
+/opt/qfw/qhpc/install/image/TNQVM/exatn/lib
+/opt/qfw/qhpc/install/image/TNQVM/xacc/lib
+/opt/qfw/qhpc/build/image/TNQVM/tnqvm/plugins
+/opt/qfw/qhpc/install/image/NWQSIM/lib
+```
+
+If the mounted checkout is configured with its own build paths, QFw prepends
+those paths during activation, so development artifacts take precedence over
+the image artifacts.
 
 ## Shared Job Directories
 
