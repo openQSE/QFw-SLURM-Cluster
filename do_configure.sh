@@ -95,7 +95,7 @@ if [ -z "${BASE_DIR}" ]; then
     BASE_DIR="${DEFAULT_BASE_DIR}"
 fi
 
-BASE_DIR="$(realpath -m "${BASE_DIR}")"
+BASE_DIR="$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "${BASE_DIR}")"
 QFW_DIR="${BASE_DIR}/QFw"
 
 validate_image_settings() {
