@@ -176,23 +176,24 @@ image:
 <details open>
 <summary>Build and run the development [QFw]</summary>
 
-This is the normal development path. `do_configure.sh` writes
-`QFW_CONTAINER_BASE` into `qfw-install.env` and `.env`. Docker Compose
-bind-mounts that host directory into every [Slurm] container at:
+Use this path only when you want to build a host-mounted [QFw] checkout.
+`do_configure.sh` writes `QFW_CONTAINER_BASE` into `qfw-install.env` and
+`.env`. Docker Compose bind-mounts that host directory into every [Slurm]
+container at:
 
 ```text
 /workspace/qfw-container-base
 ```
 
-The expected development layout is:
+Create development directories only as needed. A typical layout is:
 
 ```text
 shared-dir/
-  QFw/          # active QFw checkout
-  venv/         # persistent Python venv created inside the container
-  build/        # persistent QFw build tree
-  install/      # persistent QFw install tree
-  benchmarks/   # persistent benchmark outputs
+  QFw/          # optional active QFw checkout
+  venv/         # optional Python venv created inside the container
+  build/        # optional QFw build tree
+  install/      # optional QFw install tree
+  benchmarks/   # optional benchmark outputs
   rocm/         # optional ROCm prefix for ROCm/HIP builds
 ```
 
@@ -292,13 +293,13 @@ circuit-runner paths in `PATH` and `LD_LIBRARY_PATH`.
 
 The environment has three important layers:
 
-- Host workspace: persistent source, build outputs, installs, and venv.
+- Host workspace: scripts and optional mounted QFw development artifacts.
 - Docker image: [Slurm], [OpenMPI], [libfabric], modules, and image-contained [QFw].
 - Compose cluster: [Slurm] services and compute nodes using the image and mount.
 
 ```mermaid
 flowchart TB
-    host["Host workspace\nQFW_CONTAINER_BASE"] -->|bind mount| mount["/workspace/qfw-container-base\nQFw, venv, build, install, rocm"]
+    host["Host workspace\nQFW_CONTAINER_BASE"] -->|bind mount| mount["/workspace/qfw-container-base\noptional QFw, venv, build, install, rocm"]
 
     subgraph img["Docker image"]
         slurm["Slurm runtime"]
@@ -539,7 +540,8 @@ module avail
 module load gcc-native/13.2 cmake openblas swig
 ```
 
-ROCm is treated as an optional mounted prefix. The default path is:
+ROCm can be provided as an optional mounted prefix. If you need it, create and
+use:
 
 ```text
 /workspace/qfw-container-base/rocm

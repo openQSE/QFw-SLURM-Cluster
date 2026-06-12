@@ -96,8 +96,6 @@ if [ -z "${BASE_DIR}" ]; then
 fi
 
 BASE_DIR="$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "${BASE_DIR}")"
-QFW_DIR="${BASE_DIR}/QFw"
-
 validate_image_settings() {
     local image_name_pattern='^[a-z0-9]+([._-][a-z0-9]+)*(\/[a-z0-9]+([._-][a-z0-9]+)*)*$'
 
@@ -137,12 +135,6 @@ print_settings() {
     echo "  SLURM_TAG=${SLURM_TAG}"
     echo "  QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
     echo "  QFW_CONTAINER_BASE=${BASE_DIR}"
-    echo "  QFW_DIR=${QFW_DIR}"
-    echo "  VENV_DIR=${BASE_DIR}/venv"
-    echo "  BUILD_DIR=${BASE_DIR}/build"
-    echo "  INSTALL_DIR=${BASE_DIR}/install"
-    echo "  BENCHMARKS_DIR=${BASE_DIR}/benchmarks"
-    echo "  ROCM_DIR=${BASE_DIR}/rocm"
 }
 
 validate_image_settings
@@ -157,13 +149,7 @@ EOF
     exit 0
 fi
 
-mkdir -p \
-    "${BASE_DIR}" \
-    "${BASE_DIR}/venv" \
-    "${BASE_DIR}/build" \
-    "${BASE_DIR}/install" \
-    "${BASE_DIR}/benchmarks" \
-    "${BASE_DIR}/rocm"
+mkdir -p "${BASE_DIR}"
 
 cat > "${ENV_FILE}" <<EOF
 SLURM_TAG=${SLURM_TAG}
@@ -183,18 +169,4 @@ echo "  IMAGE_TAG=${IMAGE_TAG}"
 echo "  SLURM_TAG=${SLURM_TAG}"
 echo "  QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
 echo "  QFW_CONTAINER_BASE=${BASE_DIR}"
-
-if [ -d "${QFW_DIR}/.git" ] || [ -f "${QFW_DIR}/README.md" ]; then
-    echo "Found QFw checkout at: ${QFW_DIR}"
-else
-    cat <<EOF
-Missing QFw checkout at: ${QFW_DIR}
-
-Clone or place the QFw source tree there before starting the cluster, for example:
-  git clone <QFw-repo-url> "${QFW_DIR}"
-
-The persistent Python venv is intentionally not created here. Create it later from
-inside the built container so it matches the container Python runtime:
-  python3 -m venv /workspace/qfw-container-base/venv
-EOF
-fi
+echo "Optional QFw development directories are created only when needed."
