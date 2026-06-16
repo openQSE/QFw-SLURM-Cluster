@@ -51,6 +51,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6817"
     depends_on:
@@ -96,6 +102,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6818"
     depends_on:
@@ -118,6 +130,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6818"
     depends_on:
@@ -140,6 +158,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6818"
     depends_on:
@@ -162,6 +186,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6818"
     depends_on:
@@ -184,6 +214,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6818"
     depends_on:
@@ -206,6 +242,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6818"
     depends_on:
@@ -228,6 +270,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6818"
     depends_on:
@@ -250,6 +298,12 @@ services:
       - var_log_slurm:/var/log/slurm
       - ./shared-dir:/mnt
       - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      # Shim live-edit overlay: the new parallel bifurcation service plus its
+      # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
+      # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
+      - ./shared-dir/QFw/services/svc_lib_qpm:/opt/qfw/qhpc/QFw/services/svc_lib_qpm
+      - ./shared-dir/QFw/setup/qfw_services.yaml:/opt/qfw/qhpc/QFw/setup/qfw_services.yaml
+      - ./shared-dir/QFw/backends/qfw_qiskit/qfw_lookup_service.py:/opt/qfw/qhpc/QFw/backends/qfw_qiskit/qfw_lookup_service.py
     expose:
       - "6818"
     depends_on:
