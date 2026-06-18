@@ -12,9 +12,11 @@
 # svc_iqm_qpm. Confirms inside a SLURM-launched process that:
 #   - svc_lib_qpm imports (frontend, drivers, descriptor, svc_qrc)
 #   - routing is DESCRIPTOR-DRIVEN and PER-RESOURCE:
-#       * IQM q20 (qrmi+qdmi): introspection -> QDMI, execution -> QRMI,
-#         composable ties broken by the descriptor preference / env override
-#       * a QRMI-only resource: introspection is NOT_IMPLEMENTED (no QDMI)
+#       * IQM q20 (qrmi+qdmi): introspection is composable -- both QRMI (via
+#         target()) and QDMI serve it; the descriptor preference (default QDMI)
+#         / env override breaks the tie. Execution -> QRMI (reservation owner).
+#       * a QRMI-only resource: introspection is served by QRMI; a call no
+#         wired library covers -> NOT_IMPLEMENTED (the gap map)
 #   - svc_qrc.QRC builds the Frontend from the resolved descriptor
 # No real QRMI/QDMI hardware calls are made (drivers lazy-import their libs).
 
@@ -43,39 +45,49 @@ def check(call, expected):
     assert got == expected, f"{call}: routed to {got}, expected {expected}"
     print(f"[shim-smoke] [iqm-q20]  {call:26s} -> {got}")
 
-check("get_device_info", "qdmi")          # introspection -> QDMI
-check("get_coupling_graph", "qdmi")
+check("get_device_info", "qdmi")          # composable (qdmi+qrmi); QDMI preferred
+check("get_coupling_graph", "qdmi")       # composable (qdmi+qrmi); QDMI preferred
 check("get_calibration_snapshot", "qdmi")
 check("run_circuit", "qrmi")              # execution -> QRMI (reservation owner)
 check("get_last_job_metadata", "qrmi")
 check("get_backend_info", "qdmi")         # composable; descriptor preference=qdmi
 
-# env preference overrides the descriptor preference
+# env preference overrides the descriptor preference; introspection is
+# composable, so it flips to QRMI too (confirming QRMI serves introspection)
 os.environ["QFW_QPU_IFACE_PREF"] = "qrmi"
 fe2 = Frontend([QrmiDriver(desc), QdmiDriver(desc)], desc)
 assert fe2.route("get_backend_info").name == "qrmi", "env preference not honored"
-print("[shim-smoke] QFW_QPU_IFACE_PREF=qrmi overrides descriptor -> "
-      "get_backend_info -> qrmi")
+assert fe2.route("get_device_info").name == "qrmi", "introspection not composable"
+print("[shim-smoke] QFW_QPU_IFACE_PREF=qrmi -> get_backend_info + "
+      "get_device_info route to qrmi")
 del os.environ["QFW_QPU_IFACE_PREF"]
 
-# --- Resource B: a QRMI-only deployment -> different capability map ---
+# --- Resource B: a QRMI-only deployment (IBM Heron) ---
+# QRMI serves introspection too (via target()), so device info / coupling
+# resolve to QRMI here. The honest gap-map / NOT_IMPLEMENTED case is a call
+# this deployment wires no capable library for (calibration below).
 heron = {
     "id": "ibm-heron-r2", "provider": "ibm",
     "libraries": ["qrmi"], "preference": "qrmi", "execution_owner": "qrmi",
     "caps": {
+        "get_device_info": ["qrmi"], "get_coupling_graph": ["qrmi"],
         "get_backend_info": ["qrmi"], "run_circuit": ["qrmi"],
         "get_last_job_timing": ["qrmi"], "get_last_job_metadata": ["qrmi"],
-        # no qdmi wired -> introspection calls are NULL for this resource
+        # no calibration-capable library wired -> calibration is a gap here
     },
 }
 fe_h = Frontend([QrmiDriver(heron)], heron)
 assert fe_h.route("run_circuit").name == "qrmi"
+assert fe_h.route("get_device_info").name == "qrmi"
+assert fe_h.route("get_coupling_graph").name == "qrmi"
+print("[shim-smoke] [ibm-heron] introspection (device_info/coupling) -> qrmi "
+      "(QRMI-only resource still introspects)")
 try:
-    fe_h.route("get_device_info")
-    raise SystemExit("expected NOT_IMPLEMENTED for get_device_info (QRMI-only)")
+    fe_h.route("get_calibration_snapshot")
+    raise SystemExit("expected NOT_IMPLEMENTED for get_calibration_snapshot")
 except NotImplementedByLibrary:
-    print("[shim-smoke] [ibm-heron] get_device_info -> NOT_IMPLEMENTED "
-          "(per-resource: no QDMI wired)")
+    print("[shim-smoke] [ibm-heron] get_calibration_snapshot -> NOT_IMPLEMENTED "
+          "(gap map: no calibration-capable library wired)")
 
 # --- QRC builds the Frontend from the resolved descriptor ---
 qrc = QRC(start=False)
