@@ -18,7 +18,13 @@
 #       * a QRMI-only resource: introspection is served by QRMI; a call no
 #         wired library covers -> NOT_IMPLEMENTED (the gap map)
 #   - svc_qrc.QRC builds the Frontend from the resolved descriptor
-# No real QRMI/QDMI hardware calls are made (drivers lazy-import their libs).
+#   - Device Introspection (design doc section 13): the QDMI -> qhw adapter
+#     normalizes a device topology into schema-valid qhw-device-v1 /
+#     qhw-coupling-v1 records (qhw-data runs real jsonschema validation)
+# Routing and normalization run with no credentials. With QPU creds set
+# (QFW_QC_URL + QFW_API_KEY) it also runs real introspection through QDMI AND
+# QRMI and confirms they yield the same qhw shape (the QRMI leg is best-effort:
+# it needs QRMI's resource env, set by the SPANK plugin inside a reservation).
 
 set -e
 
@@ -95,8 +101,108 @@ print("[shim-smoke] QRC constructed from descriptor:          OK")
 print("[shim-smoke] per-resource capability map:")
 for call, libs in qrc.capability_map().items():
     print(f"             {call:26s} {libs}")
+
+# --- Device Introspection (design doc section 13): backend -> qhw normalization
+# Exercise the shared BackendV2 -> qhw adapter (used by both the QDMI and QRMI
+# drivers) with a synthetic device topology (no hardware or credentials).
+# Proves get_device_info / get_coupling_graph yield schema-valid,
+# provider-neutral qhw records in-container (qhw-data runs real jsonschema
+# validation here).
+from svc_lib_qpm.drivers.backend_normalize import (
+    extract_topology, to_coupling_record, to_device_record)
+
+class _FakeCouplingMap:
+    def __init__(self, edges):
+        self._edges = edges
+    def get_edges(self):
+        return list(self._edges)
+
+class _FakeTarget:
+    def __init__(self, loci):
+        self._loci = loci
+    @property
+    def operation_names(self):
+        return list(self._loci)
+    def __getitem__(self, name):
+        return self._loci[name]
+
+class _FakeBackend:
+    # Minimal duck-typed Qiskit BackendV2: a 4-qubit line, r/cz/measure.
+    num_qubits = 4
+    coupling_map = _FakeCouplingMap([(0, 1), (1, 0), (1, 2), (2, 3)])
+    target = _FakeTarget({
+        "r":       {(0,): 1, (1,): 1, (2,): 1, (3,): 1},
+        "cz":      {(0, 1): 1, (1, 2): 1, (2, 3): 1},
+        "measure": {(0,): 1, (1,): 1, (2,): 1, (3,): 1},
+    })
+
+topo = extract_topology(_FakeBackend())
+assert topo["num_qubits"] == 4
+assert topo["edges"] == [["0", "1"], ["1", "2"], ["2", "3"]], topo["edges"]
+
+dev = to_device_record(topo, "iqm", "ornl-iqm-20q")     # validate=True (schema)
+cpl = to_coupling_record(topo, "iqm", "ornl-iqm-20q")   # validate=True (schema)
+assert dev["schema"] == "qhw-device-v1" and len(dev["qubits"]) == 4
+assert cpl["schema"] == "qhw-coupling-v1"
+assert cpl["coupling"]["edges"] == [["0", "1"], ["1", "2"], ["2", "3"]]
+_ops = {o["name"]: o["arity"] for o in cpl["operations"]}
+assert _ops.get("cz") == 2 and _ops.get("r") == 1
+print("[shim-smoke] backend->qhw normalization: device(%d qubits) + "
+      "coupling(%d edges, %d ops), schema-valid"
+      % (len(dev["qubits"]), len(cpl["coupling"]["edges"]),
+         len(cpl["operations"])))
+
+# --- Optional live check: real hardware introspection when creds present ------
+# With QPU credentials, run get_device_info / get_coupling_graph against the real
+# device through EACH library and confirm they produce the same provider-neutral
+# qhw shape -- the whole point of the shim. QDMI uses QFW_QC_URL / QFW_API_KEY;
+# QRMI uses its own resource env (set by the SPANK plugin inside a reservation),
+# so the QRMI leg is best-effort and skips cleanly when that env is absent.
+def _live_introspect(pref):
+    os.environ["QFW_QPU_IFACE_PREF"] = pref
+    try:
+        f = Frontend([QrmiDriver(desc), QdmiDriver(desc)], desc)
+        used = f.route("get_device_info").name
+        dev = f.get_device_info()
+        cpl = f.get_coupling_graph()
+        assert dev["schema"] == "qhw-device-v1", dev.get("schema")
+        assert cpl["schema"] == "qhw-coupling-v1", cpl.get("schema")
+        return used, dev, cpl
+    finally:
+        os.environ.pop("QFW_QPU_IFACE_PREF", None)
+
+if os.environ.get("QFW_QC_URL") and os.environ.get("QFW_API_KEY"):
+    # QDMI leg -- explicit opt-in via QFW_QC_URL/QFW_API_KEY; failures are real.
+    qused, qdev, qcpl = _live_introspect("qdmi")
+    print("[shim-smoke] live %s -> qhw-device-v1 (%d qubits) + qhw-coupling-v1 "
+          "(%d edges)" % (qused, len(qdev["qubits"]),
+                          len(qcpl["coupling"]["edges"])))
+    # QRMI leg -- best-effort; needs QRMI's reservation env.
+    try:
+        rused, rdev, rcpl = _live_introspect("qrmi")
+    except Exception as exc:
+        print("[shim-smoke] live QRMI introspection: unavailable (%s) -- needs "
+              "QRMI resource env (SPANK reservation)" % type(exc).__name__)
+    else:
+        print("[shim-smoke] live %s -> qhw-device-v1 (%d qubits) + qhw-coupling-v1 "
+              "(%d edges)" % (rused, len(rdev["qubits"]),
+                              len(rcpl["coupling"]["edges"])))
+        # Cross-library consistency: one qhw shape regardless of the source.
+        assert qdev["schema"] == rdev["schema"]
+        assert len(qdev["qubits"]) == len(rdev["qubits"]), \
+            "QDMI vs QRMI qubit count differs"
+        assert (len(qcpl["coupling"]["edges"])
+                == len(rcpl["coupling"]["edges"])), \
+            "QDMI vs QRMI edge count differs"
+        print("[shim-smoke] cross-library: QDMI and QRMI agree on qhw shape "
+              "(%d qubits, %d edges)" % (len(qdev["qubits"]),
+                                         len(qcpl["coupling"]["edges"])))
+else:
+    print("[shim-smoke] live introspection: skipped "
+          "(set QFW_QC_URL + QFW_API_KEY to enable)")
+
 print()
-print("SHIM BIFURCATION SMOKE: PASS")
+print("SHIM BIFURCATION + INTROSPECTION SMOKE: PASS")
 PY
 
 echo "[`date`] shim-smoke done on `hostname`"
