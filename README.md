@@ -171,6 +171,8 @@ image:
 
 </details>
 
+To validate the QRMI/QDMI shim (a smoke test — local routing/normalization, and device introspection on IQM hardware), see [TESTING.md](TESTING.md).
+
 ## Build And Run [QFw]
 
 <details open>
