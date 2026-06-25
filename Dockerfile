@@ -321,6 +321,22 @@ RUN set -ex \
         install -m 0755 {} /usr/lib64/slurm/ \; \
     && rm -rf /tmp/qrmi /tmp/spank-plugins
 
+# MQT Core (Munich Quantum Toolkit) — provides the `mqt.core` package, incl. the
+# FoMaC layer and the Qiskit QDMIBackend that iqm-qdmi[qiskit] builds on. It is
+# normally pulled in as a transitive wheel of iqm-qdmi; built from source here,
+# pinned, and BEFORE iqm-qdmi so MQT_CORE_REPO can later carry a FoMaC accessor
+# for QDMI custom device properties (the path that surfaces QDMI-on-IQM's raw IQM
+# data to Python). MQT_CORE_REF pins v3.6.1 = the version the wheel currently
+# resolves to, so installing it first satisfies iqm-qdmi's dependency and pip
+# keeps this source build instead of replacing it with the PyPI wheel. This is a
+# no-functional-change baseline before any patch (scikit-build-core / CMake).
+ARG MQT_CORE_REPO=https://github.com/DougSO/mqt-core.git
+ARG MQT_CORE_REF=v3.6.1
+RUN set -ex \
+    && CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)" \
+       "${QFW_IMAGE_VENV}/bin/pip" install --no-cache-dir \
+        "mqt-core @ git+${MQT_CORE_REPO}@${MQT_CORE_REF}"
+
 # QDMI-on-IQM — IQM's official QDMI implementation, installed into the QFw venv.
 # The 'qiskit' extra wires up the Qiskit backend.
 #
