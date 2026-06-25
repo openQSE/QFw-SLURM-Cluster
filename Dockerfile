@@ -321,10 +321,26 @@ RUN set -ex \
         install -m 0755 {} /usr/lib64/slurm/ \; \
     && rm -rf /tmp/qrmi /tmp/spank-plugins
 
-# QDMI-on-IQM — IQM's official QDMI implementation, installed as a wheel
-# into the QFw venv. The 'qiskit' extra wires up the Qiskit backend.
+# QDMI-on-IQM — IQM's official QDMI implementation, installed into the QFw venv.
+# The 'qiskit' extra wires up the Qiskit backend.
+#
+# Built from source (pinned) instead of the PyPI wheel so IQM_QDMI_REPO can
+# later point at a fork carrying a raw-device-data passthrough — the path that
+# lets the shim feed QDMI's raw IQM data to qhw-iqm directly, the way the QRMI
+# driver already does, instead of translating a Qiskit Target. IQM_QDMI_REF
+# pins the upstream release the wheel currently resolves to (v1.1.1), so this
+# is a no-functional-change baseline before any patch is introduced.
+#
+# The source build needs CMake >= 3.24 (Rocky 10 dnf provides 3.30), ninja, and
+# g++ — all installed above; scikit-build-core (PEP 517) drives the CMake build
+# and FetchContent pulls the QDMI headers at build time. Upstream tags carry a
+# leading "v" (e.g. v1.1.1); a fork would use a branch name while iterating and
+# a commit SHA to pin.
+ARG IQM_QDMI_REPO=https://github.com/iqm-finland/QDMI-on-IQM.git
+ARG IQM_QDMI_REF=v1.1.1
 RUN set -ex \
-    && "${QFW_IMAGE_VENV}/bin/pip" install --no-cache-dir 'iqm-qdmi[qiskit]'
+    && "${QFW_IMAGE_VENV}/bin/pip" install --no-cache-dir \
+        "iqm-qdmi[qiskit] @ git+${IQM_QDMI_REPO}@${IQM_QDMI_REF}"
 
 ENV QRMI_PREFIX=${QRMI_PREFIX} \
     LD_LIBRARY_PATH=${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH}
