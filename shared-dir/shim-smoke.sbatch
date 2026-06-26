@@ -33,6 +33,10 @@ echo "[`date`] shim-smoke on `hostname`"
 source /opt/qfw/qhpc/QFw/setup/qfw_activate
 source "${QFW_IMAGE_VENV}/bin/activate"
 
+# The sourced env scripts disable errexit; re-enable it so a failing assertion in
+# the Python block below fails the job (otherwise SLURM reports COMPLETED 0:0).
+set -e
+
 python - <<'PY'
 import os
 from svc_lib_qpm.frontend import Frontend, NotImplementedByLibrary
@@ -151,6 +155,69 @@ print("[shim-smoke] backend->qhw normalization: device(%d qubits) + "
       "coupling(%d edges, %d ops), schema-valid"
       % (len(dev["qubits"]), len(cpl["coupling"]["edges"]),
          len(cpl["operations"])))
+
+# --- Device Introspection via the RAW passthrough (section 13) ----------------
+# The QDMI driver now prefers QDMI-on-IQM's raw_device_config()
+# (QDMI_DEVICE_PROPERTY_CUSTOM1) and feeds the raw IQM payload to qhw-iqm -- the
+# SAME normalizer the QRMI driver and native path use -- so both libraries yield
+# one identical qhw shape carrying IQM "QB" qubit ids (not 0..n-1). Exercise that
+# path with no hardware/creds by injecting a fake backend whose
+# raw_device_config() returns a synthetic IQM payload; then confirm the guarded
+# fallback to backend_normalize when raw_device_config is absent.
+_RAW_IQM = {
+    "static_quantum_architecture": {
+        "dut_label": "smoke-q3",
+        "qubits": ["QB1", "QB2", "QB3"],
+        "connectivity": [["QB1", "QB2"], ["QB2", "QB3"]],
+    },
+    "dynamic_quantum_architecture": {
+        "calibration_set_id": "smoke-cal",
+        "qubits": ["QB1", "QB2", "QB3"],
+        "gates": {
+            "prx": {"default_implementation": "drag",
+                    "implementations": {"drag": {"loci": [["QB1"], ["QB2"], ["QB3"]]}}},
+            "cz": {"default_implementation": "tgss",
+                   "implementations": {"tgss": {"loci": [["QB1", "QB2"], ["QB2", "QB3"]]}}},
+        },
+    },
+    "quality_metrics": {},
+    "calibration_set_id": "smoke-cal",
+}
+
+class _RawBackend:
+    def raw_device_config(self):
+        return dict(_RAW_IQM)
+
+drv_raw = QdmiDriver(desc)
+drv_raw._backend_obj = _RawBackend()  # inject; bypass live IQMBackend construction
+rdev = drv_raw.get_device_info()
+rcpl = drv_raw.get_coupling_graph()
+assert rdev["schema"] == "qhw-device-v1", rdev.get("schema")
+assert rcpl["schema"] == "qhw-coupling-v1", rcpl.get("schema")
+assert [q["id"] for q in rdev["qubits"]] == ["QB1", "QB2", "QB3"], rdev["qubits"]  # IQM "QB" labels, not 0..n
+assert len(rcpl["coupling"]["edges"]) == 2, rcpl["coupling"]["edges"]
+_rops = {o["name"]: o["arity"] for o in rcpl["operations"]}
+assert _rops.get("cz") == 2 and _rops.get("prx") == 1, _rops
+print("[shim-smoke] QDMI raw passthrough -> qhw-iqm: device(%d qubits %s) + "
+      "coupling(%d edges, %d ops)"
+      % (len(rdev["qubits"]), [q["id"] for q in rdev["qubits"]],
+         len(rcpl["coupling"]["edges"]), len(rcpl["operations"])))
+
+# Guarded fallback: a backend WITHOUT raw_device_config() must fall back to the
+# Qiskit-Target normalizer (backend_normalize), yielding integer qubit ids.
+class _NoRawBackend:
+    num_qubits = 4
+    coupling_map = _FakeCouplingMap([(0, 1), (1, 2), (2, 3)])
+    target = _FakeTarget({
+        "r": {(0,): 1, (1,): 1}, "cz": {(0, 1): 1}, "measure": {(0,): 1}})
+
+drv_fb = QdmiDriver(desc)
+drv_fb._backend_obj = _NoRawBackend()
+assert drv_fb._iqm_raw() is None  # no raw_device_config -> fallback signal
+fdev = drv_fb.get_device_info()
+assert fdev["schema"] == "qhw-device-v1" and \
+    [q["id"] for q in fdev["qubits"]] == ["0", "1", "2", "3"]
+print("[shim-smoke] QDMI fallback (no raw_device_config) -> backend_normalize: OK")
 
 # --- Optional live check: real hardware introspection when creds present ------
 # With QPU credentials, run get_device_info / get_coupling_graph against the real
