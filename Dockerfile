@@ -329,11 +329,13 @@ RUN set -ex \
 # QDMI-on-IQM's raw IQM data to Python. Installing it first means pip keeps this
 # build instead of replacing it with the PyPI wheel when iqm-qdmi is installed.
 #
-# The branch is ahead of the v3.6.1 tag, so setuptools-scm would otherwise stamp
-# a pre-release version (3.6.2.devN); SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MQT_CORE
-# forces 3.6.1 so the build still satisfies iqm-qdmi's mqt-core pin.
+# MQT_CORE_REF is pinned to the fork's qdmi-raw-passthrough commit for
+# reproducible PoC images (bump it when the fork branch advances). That commit is
+# ahead of the v3.6.1 tag, so setuptools-scm would otherwise stamp a pre-release
+# version (3.6.2.devN); SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MQT_CORE forces 3.6.1
+# so the build still satisfies iqm-qdmi's mqt-core pin.
 ARG MQT_CORE_REPO=https://github.com/DougSO/mqt-core.git
-ARG MQT_CORE_REF=qdmi-raw-passthrough
+ARG MQT_CORE_REF=a448a3336b8d99dce34a5d3a77fd5fe34169b026
 RUN set -ex \
     && CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)" \
        SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MQT_CORE=3.6.1 \
@@ -352,10 +354,11 @@ RUN set -ex \
 #
 # The source build needs CMake >= 3.24 (Rocky 10 dnf provides 3.30), ninja, and
 # g++ — all installed above; scikit-build-core (PEP 517) drives the CMake build
-# and FetchContent pulls the QDMI headers at build time. Pin IQM_QDMI_REF to a
-# commit SHA for reproducible images once the branch settles.
+# and FetchContent pulls the QDMI headers at build time. IQM_QDMI_REF is pinned
+# to the fork's qdmi-raw-passthrough commit for reproducible PoC images (bump it
+# when the fork branch advances).
 ARG IQM_QDMI_REPO=https://github.com/DougSO/QDMI-on-IQM.git
-ARG IQM_QDMI_REF=qdmi-raw-passthrough
+ARG IQM_QDMI_REF=1f24bd2f1c11c13b0cc4e5e0c3e3db692385a99b
 RUN set -ex \
     && "${QFW_IMAGE_VENV}/bin/pip" install --no-cache-dir \
         "iqm-qdmi[qiskit] @ git+${IQM_QDMI_REPO}@${IQM_QDMI_REF}"
