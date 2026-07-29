@@ -56,15 +56,17 @@ check("get_coupling_graph", "qdmi")       # composable (qdmi+qrmi); QDMI preferr
 check("get_calibration_snapshot", "qdmi")
 check("run_circuit", "qrmi")              # execution -> QRMI (reservation owner)
 check("get_last_job_metadata", "qrmi")
-check("get_backend_info", "qdmi")         # composable; descriptor preference=qdmi
+check("get_backend_info", "qrmi")         # QRMI-only facet (descriptor a7e50bf)
 
 # env preference overrides the descriptor preference; introspection is
-# composable, so it flips to QRMI too (confirming QRMI serves introspection)
+# composable, so it flips to QRMI too (confirming QRMI serves introspection).
+# Use a genuinely composable call here: get_backend_info is QRMI-only now, so
+# asserting it routes to qrmi under the override would pass vacuously.
 os.environ["QFW_QPU_IFACE_PREF"] = "qrmi"
 fe2 = Frontend([QrmiDriver(desc), QdmiDriver(desc)], desc)
-assert fe2.route("get_backend_info").name == "qrmi", "env preference not honored"
+assert fe2.route("get_coupling_graph").name == "qrmi", "env preference not honored"
 assert fe2.route("get_device_info").name == "qrmi", "introspection not composable"
-print("[shim-smoke] QFW_QPU_IFACE_PREF=qrmi -> get_backend_info + "
+print("[shim-smoke] QFW_QPU_IFACE_PREF=qrmi -> get_coupling_graph + "
       "get_device_info route to qrmi")
 del os.environ["QFW_QPU_IFACE_PREF"]
 
