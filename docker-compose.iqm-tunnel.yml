@@ -1,0 +1,45 @@
+# Compose overlay: reach IQM through an SSH tunnel, for use OFF the ORNL network.
+#
+# Stack this on top of docker-compose.iqm.yml -- it adds only name resolution,
+# not credentials:
+#
+#   docker compose --env-file qfw-install.env -f docker-compose.yml \
+#       -f docker-compose.iqm.yml -f docker-compose.iqm-tunnel.yml up -d
+#
+# DO NOT USE THIS ON THE ORNL NETWORK. It overrides DNS for the IQM host,
+# pointing it at the Docker host gateway. On-site, where the name resolves
+# normally, that breaks a connection that would otherwise just work.
+#
+# How it works: ./iqm-tunnel.sh listens on the host at 0.0.0.0:8443 and forwards
+# to the IQM endpoint via the hub node. The entries below give containers a name
+# to resolve (the IQM host is not in public DNS) and route it to that listener.
+# Connecting by the REAL hostname rather than localhost is what keeps SNI and
+# certificate validation correct -- ssh forwards raw TCP and never terminates
+# TLS, so it stays end to end.
+#
+# The URL in shared-dir/iqm-device-access.yaml must carry the tunnel port
+# (8443), since binding 443 on the host needs root. See IQM-ACCESS.md.
+#
+# If your endpoint is not the ORNL q20, change the hostname in all five entries
+# to match IQM_HOST in iqm-tunnel.env.
+
+services:
+  slurmctld:
+    extra_hosts:
+      - "qccsw.ccs.ornl.gov:host-gateway"
+
+  c5:
+    extra_hosts:
+      - "qccsw.ccs.ornl.gov:host-gateway"
+
+  c6:
+    extra_hosts:
+      - "qccsw.ccs.ornl.gov:host-gateway"
+
+  c7:
+    extra_hosts:
+      - "qccsw.ccs.ornl.gov:host-gateway"
+
+  c8:
+    extra_hosts:
+      - "qccsw.ccs.ornl.gov:host-gateway"

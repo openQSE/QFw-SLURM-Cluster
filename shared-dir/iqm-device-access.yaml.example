@@ -1,0 +1,24 @@
+# Copy to iqm-device-access.yaml (gitignored) and edit. Mounted over the
+# container's services/dev-config/config.yaml by docker-compose.iqm.yml.
+#
+# This file -- not the environment -- is what QFw's QPM service reads when it
+# executes a circuit. See IQM-ACCESS.md for why.
+
+qpus:
+  ornl-iqm-20q:
+    # The alias IQM knows the device by. Confirm with:
+    #   curl -H "Authorization: Bearer $QFW_API_KEY" \
+    #        https://qccsw.ccs.ornl.gov/api/v1/quantum-computers
+    # NOTE: this is NOT the QFw device id above it. If it is missing or wrong,
+    # QFw sends "ornl-iqm-20q" as the alias and IQM rejects it.
+    provider-device-id: default
+
+    # ON the ORNL network, use the endpoint directly:
+    url: https://qccsw.ccs.ornl.gov
+    #
+    # OFF the ORNL network, via ./iqm-tunnel.sh, add the tunnel port:
+    # url: https://qccsw.ccs.ornl.gov:8443
+
+    # Absolute path INSIDE the container. shared-dir is mounted at /mnt, so
+    # /mnt/iqm-creds.json is shared-dir/iqm-creds.json on the host.
+    credential-db: /mnt/iqm-creds.json

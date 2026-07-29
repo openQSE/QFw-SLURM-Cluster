@@ -1,0 +1,43 @@
+# Compose overlay: give the QFw services IQM credentials.
+#
+# Required for ANY run against real IQM hardware, on-site or remote.
+#
+# Why a file mount and not environment variables: QFw's PRTE launcher starts the
+# QPM service with `ssh <node> 'export QFW_RUN_ID=...; export QFW_GROUP_*; ...'`,
+# carrying only its own run variables. QFW_QC_URL / QFW_API_KEY passed to
+# `docker exec -e` therefore reach `sbatch` but NOT the DEFw service, which falls
+# back to services/dev-config/config.yaml. Mounting that path is what actually
+# reaches execution. See IQM-ACCESS.md.
+#
+# Create shared-dir/iqm-device-access.yaml first, from the .example beside it --
+# if the host file is missing, Docker silently creates a DIRECTORY there and the
+# services fail with a confusing config-parse error.
+#
+# Remote users: add docker-compose.iqm-tunnel.yml on top of this one.
+#
+#   docker compose --env-file qfw-install.env \
+#       -f docker-compose.yml -f docker-compose.iqm.yml up -d
+#
+# Only the quantum-partition nodes (c5-c8) talk to the QPU; slurmctld is included
+# so `docker exec slurmctld ...` can verify the configuration.
+
+services:
+  slurmctld:
+    volumes:
+      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+
+  c5:
+    volumes:
+      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+
+  c6:
+    volumes:
+      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+
+  c7:
+    volumes:
+      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+
+  c8:
+    volumes:
+      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
