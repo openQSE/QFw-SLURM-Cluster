@@ -56,15 +56,17 @@ check("get_coupling_graph", "qdmi")       # composable (qdmi+qrmi); QDMI preferr
 check("get_calibration_snapshot", "qdmi")
 check("run_circuit", "qrmi")              # execution -> QRMI (reservation owner)
 check("get_last_job_metadata", "qrmi")
-check("get_backend_info", "qdmi")         # composable; descriptor preference=qdmi
+check("get_backend_info", "qrmi")         # QRMI-only facet (descriptor a7e50bf)
 
 # env preference overrides the descriptor preference; introspection is
-# composable, so it flips to QRMI too (confirming QRMI serves introspection)
+# composable, so it flips to QRMI too (confirming QRMI serves introspection).
+# Use a genuinely composable call here: get_backend_info is QRMI-only now, so
+# asserting it routes to qrmi under the override would pass vacuously.
 os.environ["QFW_QPU_IFACE_PREF"] = "qrmi"
 fe2 = Frontend([QrmiDriver(desc), QdmiDriver(desc)], desc)
-assert fe2.route("get_backend_info").name == "qrmi", "env preference not honored"
+assert fe2.route("get_coupling_graph").name == "qrmi", "env preference not honored"
 assert fe2.route("get_device_info").name == "qrmi", "introspection not composable"
-print("[shim-smoke] QFW_QPU_IFACE_PREF=qrmi -> get_backend_info + "
+print("[shim-smoke] QFW_QPU_IFACE_PREF=qrmi -> get_coupling_graph + "
       "get_device_info route to qrmi")
 del os.environ["QFW_QPU_IFACE_PREF"]
 
@@ -102,55 +104,68 @@ print("[shim-smoke] per-resource capability map:")
 for call, libs in qrc.capability_map().items():
     print(f"             {call:26s} {libs}")
 
-# --- Device Introspection (design doc section 13): backend -> qhw normalization
-# Exercise the shared BackendV2 -> qhw adapter (used by both the QDMI and QRMI
-# drivers) with a synthetic device topology (no hardware or credentials).
-# Proves get_device_info / get_coupling_graph yield schema-valid,
-# provider-neutral qhw records in-container (qhw-data runs real jsonschema
-# validation here).
-from svc_lib_qpm.drivers.backend_normalize import (
-    extract_topology, to_coupling_record, to_device_record)
+# --- Device Introspection (design doc section 13): FoMaC Device -> qhw
+# Exercise the QDMI driver's FoMaC -> qhw adapter with a synthetic FoMaC Device
+# (no hardware or credentials). Proves get_device_info / get_coupling_graph
+# yield schema-valid, provider-neutral qhw records carrying the device's REAL
+# qubit labels (e.g. "QB1") -- qhw-data runs real jsonschema validation here.
+from svc_lib_qpm.drivers import fomac_normalize
 
-class _FakeCouplingMap:
-    def __init__(self, edges):
-        self._edges = edges
-    def get_edges(self):
-        return list(self._edges)
+class _FakeSite:
+    def __init__(self, index, name):
+        self._index, self._name = index, name
+    def index(self):
+        return self._index
+    def name(self):
+        return self._name
 
-class _FakeTarget:
-    def __init__(self, loci):
-        self._loci = loci
-    @property
-    def operation_names(self):
-        return list(self._loci)
-    def __getitem__(self, name):
-        return self._loci[name]
+class _FakeOperation:
+    def __init__(self, name, loci):
+        self._name, self._loci = name, loci
+    def name(self, *args, **kwargs):
+        return self._name
+    def sites(self):
+        if self._loci and len(self._loci[0]) == 1:
+            return [locus[0] for locus in self._loci]
+        return None
+    def site_pairs(self):
+        if self._loci and len(self._loci[0]) == 2:
+            return [(locus[0], locus[1]) for locus in self._loci]
+        return None
 
-class _FakeBackend:
-    # Minimal duck-typed Qiskit BackendV2: a 4-qubit line, r/cz/measure.
-    num_qubits = 4
-    coupling_map = _FakeCouplingMap([(0, 1), (1, 0), (1, 2), (2, 3)])
-    target = _FakeTarget({
-        "r":       {(0,): 1, (1,): 1, (2,): 1, (3,): 1},
-        "cz":      {(0, 1): 1, (1, 2): 1, (2, 3): 1},
-        "measure": {(0,): 1, (1,): 1, (2,): 1, (3,): 1},
-    })
+class _FakeDevice:
+    # Minimal duck-typed FoMaC Device: a 3-qubit line with IQM "QB" labels.
+    def __init__(self):
+        s = [_FakeSite(0, "QB1"), _FakeSite(1, "QB2"), _FakeSite(2, "QB3")]
+        self._sites = s
+        self._ops = [
+            _FakeOperation("prx", [[s[0]], [s[1]], [s[2]]]),
+            _FakeOperation("cz", [[s[0], s[1]], [s[1], s[2]]]),
+        ]
+        self._edges = [(s[0], s[1]), (s[1], s[0]), (s[1], s[2]), (s[2], s[1])]
+    def regular_sites(self):
+        return self._sites
+    def operations(self):
+        return self._ops
+    def coupling_map(self):
+        return self._edges
 
-topo = extract_topology(_FakeBackend())
-assert topo["num_qubits"] == 4
-assert topo["edges"] == [["0", "1"], ["1", "2"], ["2", "3"]], topo["edges"]
+topo = fomac_normalize.extract_topology(_FakeDevice())
+assert topo["qubits"] == ["QB1", "QB2", "QB3"], topo["qubits"]
+assert topo["edges"] == [["QB1", "QB2"], ["QB2", "QB3"]], topo["edges"]
 
-dev = to_device_record(topo, "iqm", "ornl-iqm-20q")     # validate=True (schema)
-cpl = to_coupling_record(topo, "iqm", "ornl-iqm-20q")   # validate=True (schema)
-assert dev["schema"] == "qhw-device-v1" and len(dev["qubits"]) == 4
+dev = fomac_normalize.to_device_record(topo, "iqm", "ornl-iqm-20q")
+cpl = fomac_normalize.to_coupling_record(topo, "iqm", "ornl-iqm-20q")
+assert dev["schema"] == "qhw-device-v1"
+assert [q["id"] for q in dev["qubits"]] == ["QB1", "QB2", "QB3"], dev["qubits"]
 assert cpl["schema"] == "qhw-coupling-v1"
-assert cpl["coupling"]["edges"] == [["0", "1"], ["1", "2"], ["2", "3"]]
+assert cpl["coupling"]["edges"] == [["QB1", "QB2"], ["QB2", "QB3"]]
 _ops = {o["name"]: o["arity"] for o in cpl["operations"]}
-assert _ops.get("cz") == 2 and _ops.get("r") == 1
-print("[shim-smoke] backend->qhw normalization: device(%d qubits) + "
+assert _ops.get("cz") == 2 and _ops.get("prx") == 1
+print("[shim-smoke] FoMaC Device -> qhw normalization: device(%d qubits %s) + "
       "coupling(%d edges, %d ops), schema-valid"
-      % (len(dev["qubits"]), len(cpl["coupling"]["edges"]),
-         len(cpl["operations"])))
+      % (len(dev["qubits"]), [q["id"] for q in dev["qubits"]],
+         len(cpl["coupling"]["edges"]), len(cpl["operations"])))
 
 # --- Optional live check: real hardware introspection when creds present ------
 # With QPU credentials, run get_device_info / get_coupling_graph against the real
