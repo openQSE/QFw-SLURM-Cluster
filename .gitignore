@@ -2,6 +2,17 @@ qfw-install.env
 .env
 *.swp
 
+# IQM access (see IQM-ACCESS.md). Site- and user-specific; the .example
+# templates beside them are tracked. iqm-creds.json holds a live API token --
+# never commit it.
+iqm-tunnel.env
+docker-compose.override.yml
+/shared-dir/iqm-device-access.yaml
+/shared-dir/iqm-creds.json
+
+# Local diagnostic output
+/shared-dir/qrmi_target_dump.json
+
 # Build artifacts written into the bind-mounted shared-dir by the QFw build
 /shared-dir/build/
 /shared-dir/install/

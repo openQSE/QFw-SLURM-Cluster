@@ -70,12 +70,18 @@ Provide the same credentials the native IQM service uses, then re-run the
 smoke. The live section auto-runs **both** the QDMI and QRMI legs and compares
 them.
 
+> For a full walkthrough against the ORNL q20 — token setup, remote access over
+> an SSH tunnel, and circuit **execution** — see [IQM-ACCESS.md](IQM-ACCESS.md).
+> The env vars below work for this sbatch, but they do **not** reach the QPM
+> service that executes circuits; that path reads the device-access file.
+
 Credentials (env vars, or the standard `dev-config` device-access file):
 
 - `QFW_QC_URL` — IQM endpoint (e.g. `https://resonance.iqm.tech`)
 - `QFW_API_KEY` — IQM token
-- `QFW_IQM_QUANTUM_COMPUTER` — device / qc_alias (the q20 device, or
-  `emerald:mock` for a low-risk first run against the real API)
+- `QFW_IQM_QUANTUM_COMPUTER` — device / qc_alias, read only by the native
+  `svc_iqm_qpm` path. The **shim** takes its alias from `provider-device-id` in
+  the device-access config and ignores this variable.
 
 ```bash
 docker exec \
