@@ -219,31 +219,31 @@ ARG QFW_BUILD_JOBS=4
 ARG QFW_IMAGE_BASE=/opt/qfw/qhpc
 ARG QFW_IMAGE_BUILD_VERSION=image
 
+# ----------------------------------------------------------------------
+# Build and install QFw
+# ----------------------------------------------------------------------
+
+# Get the QFw source code
 RUN set -ex \
     && mkdir -p "${QFW_IMAGE_BASE}/rocm" \
     && git -c url.https://github.com/.insteadOf=git@github.com: \
-        clone --recursive "${QFW_REPO}" "${QFW_IMAGE_BASE}/QFw" \
+        clone --recursive "${QFW_REPO}" "${QFW_IMAGE_BASE}/QFw"
+
+# Install virtual environment
+RUN set -ex \
     && python3 -m venv "${QFW_IMAGE_BASE}/venv" \
     && "${QFW_IMAGE_BASE}/venv/bin/python" -m pip install --upgrade \
         pip setuptools wheel \
     && "${QFW_IMAGE_BASE}/venv/bin/python" -m pip install \
         -r "${QFW_IMAGE_BASE}/QFw/setup/build-requirements.txt" \
-    && { \
-        echo "runtime-mode: container"; \
-        echo "mpi-transport-mode: auto"; \
-        echo "base-dir: ${QFW_IMAGE_BASE}"; \
-        echo "python-venv-activate: ${QFW_IMAGE_BASE}/venv/bin/activate"; \
-        echo "libfabric-install: ${LIBFABRIC_PREFIX}"; \
-        echo "mpi-install: ${OMPI_PREFIX}"; \
-        echo "dev-install: ${QFW_IMAGE_BASE}/rocm"; \
-        echo "dev-version: 0.0.0"; \
-        echo "build-jobs: ${QFW_BUILD_JOBS}"; \
-        echo "qfw-dep-build-version: ${QFW_IMAGE_BUILD_VERSION}"; \
-    } > "${QFW_IMAGE_BASE}/QFw/setup/qfw_config_image.yaml" \
-    && cd "${QFW_IMAGE_BASE}/QFw/setup" \
-    && "${QFW_IMAGE_BASE}/venv/bin/python" ./qfw_configure \
-        -c qfw_config_image.yaml \
-    && QFW_BUILD_JOBS="${QFW_BUILD_JOBS}" ./qfw_build.sh
+    && "${QFW_IMAGE_BASE}/venv/bin/python" -m pip install \
+        -r "${QFW_IMAGE_BASE}/QFw/setup/requirements.txt"
+
+# Run build and installation
+RUN set -ex \
+    ${QFW_IMAGE_BASE}/QFw/setup/qfw_install.sh \
+        --prefix "${QFW_IMAGE_BASE}/QFw" \
+        --with-defw
 
 ENV QFW_IMAGE_BASE=${QFW_IMAGE_BASE} \
     QFW_IMAGE_QFW=${QFW_IMAGE_BASE}/QFw \
