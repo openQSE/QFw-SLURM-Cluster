@@ -26,3 +26,8 @@ docker-compose.override.yml
 
 # SLURM job output captured in the shared dir
 /shared-dir/*.out
+
+# In-container QFw build (do_qfw_build.sh) writes these to the shared mount
+/shared-dir/qfw-build/
+/shared-dir/qfw-install/
+/shared-dir/qfw-venv/

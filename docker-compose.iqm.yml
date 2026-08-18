@@ -1,17 +1,32 @@
-# Compose overlay: give the QFw services IQM credentials.
+# Compose overlay: point the QFw services at the IQM device-access config.
 #
 # Required for ANY run against real IQM hardware, on-site or remote.
 #
-# Why a file mount and not environment variables: QFw's PRTE launcher starts the
-# QPM service with `ssh <node> 'export QFW_RUN_ID=...; export QFW_GROUP_*; ...'`,
-# carrying only its own run variables. QFW_QC_URL / QFW_API_KEY passed to
-# `docker exec -e` therefore reach `sbatch` but NOT the DEFw service, which falls
-# back to services/dev-config/config.yaml. Mounting that path is what actually
-# reaches execution. See IQM-ACCESS.md.
+# This used to bind-mount shared-dir/iqm-device-access.yaml over the image's
+# baked services/dev-config/config.yaml. That no longer works, for two reasons:
 #
-# Create shared-dir/iqm-device-access.yaml first, from the .example beside it --
-# if the host file is missing, Docker silently creates a DIRECTORY there and the
-# services fail with a confusing config-parse error.
+#   1. The image no longer bakes QFw at all. It is built from the shared mount
+#      by ./do_qfw_build.sh, so there is no /opt/qfw/qhpc/QFw to mount over.
+#   2. On the v0.1 line, services/dev-config is deliberately excluded from the
+#      install tree (CMakeLists: PATTERN "dev-config" EXCLUDE), so an installed
+#      QFw has no default device-access path to overwrite.
+#
+# The file itself needs no mount now: shared-dir is already visible in every
+# container, as /mnt and as /workspace/qfw-container-base. What is needed is
+# telling QFw where to look, which is what QFW_DEVICE_ACCESS_CFG does.
+#
+# Create shared-dir/iqm-device-access.yaml first, from the .example beside it.
+# It must carry a `provider:` key -- device selection matches on provider, and
+# the old single-QPU fallback is gone.
+#
+# KNOWN LIMITATION, unchanged from before: this reaches anything started inside
+# the container, including sbatch jobs and the in-process shim smoke test. It
+# does NOT reach a DEFw service launched over PRTE, because that launcher
+# carries only its own QFW_RUN_*/QFW_GROUP_* variables across the ssh boundary.
+# Circuit execution through the long-running service plane resolves credentials
+# through the installed site config instead
+# ($QFW_PREFIX/share/qfw/config/site.yaml, key service.device-access-config).
+# That path is not wired up here yet. See IQM-ACCESS.md.
 #
 # Remote users: add docker-compose.iqm-tunnel.yml on top of this one.
 #
@@ -23,21 +38,21 @@
 
 services:
   slurmctld:
-    volumes:
-      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+    environment:
+      QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml
 
   c5:
-    volumes:
-      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+    environment:
+      QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml
 
   c6:
-    volumes:
-      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+    environment:
+      QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml
 
   c7:
-    volumes:
-      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+    environment:
+      QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml
 
   c8:
-    volumes:
-      - ./shared-dir/iqm-device-access.yaml:/opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+    environment:
+      QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml

@@ -84,14 +84,27 @@ ssh <node> 'export QFW_RUN_ID=...; export QFW_ALLOCATION_MODE=...; export QFW_GR
 ```
 
 Only those variables cross that boundary. `QFW_QC_URL` and `QFW_API_KEY` passed
-to `docker exec -e` reach a `sbatch` job but **not** the DEFw service, which
-falls back to `services/dev-config/config.yaml` — the file
-`docker-compose.iqm.yml` mounts over. So:
+to `docker exec -e` reach a `sbatch` job but **not** a DEFw service launched
+over PRTE. So:
 
-- **circuit execution** reads the device-access file; environment variables are ignored
-- **the introspection sbatch** reads the environment variables (see [step 5](#5-introspection-smoke-both-libraries))
+- **the introspection sbatch and anything else running inside the container**
+  read `QFW_DEVICE_ACCESS_CFG`, which `docker-compose.iqm.yml` sets
+- **a long-running service-plane QPM** does not see it, and resolves credentials
+  through the installed site config instead
 
 Set up both and neither case surprises you.
+
+> **Changed on the v0.1 line.** This overlay used to bind-mount the
+> device-access file over the image's baked `services/dev-config/config.yaml`.
+> The image no longer bakes QFw, and `dev-config` is deliberately excluded from
+> the install tree, so that mount is gone and `QFW_DEVICE_ACCESS_CFG` replaces
+> it. The service-plane half, `service.device-access-config` in
+> `$QFW_PREFIX/share/qfw/config/site.yaml`, is **not wired up yet**.
+
+Your device-access file must carry a `provider:` key. Device selection now
+matches on provider first, and the old "just use the single configured QPU"
+fallback is gone, so a file without it fails with *does not define a QPU for
+provider 'iqm'*.
 
 ## 3. Remote only: open the SSH tunnel
 
@@ -129,6 +142,18 @@ look like code or device faults.
 
 ## 4. Start the cluster
 
+> **New on the v0.1 line.** Starting the containers is no longer enough. The
+> image ships build dependencies but not QFw itself, so after the stack is up
+> you must build QFw and DEFw into the shared mount:
+>
+> ```bash
+> ./do_qfw_build.sh
+> ```
+>
+> That installs to `shared-dir/qfw-install`, which every node sees. Re-run it
+> with `--skip-venv` after changing QFw source: the install tree is a copy, so
+> edits under `shared-dir/QFw` do not take effect until you reinstall.
+
 On the ORNL network:
 
 ```bash
@@ -141,11 +166,11 @@ Remote, adding the tunnel overlay:
 docker compose --env-file qfw-install.env -f docker-compose.yml -f docker-compose.iqm.yml -f docker-compose.iqm-tunnel.yml up -d
 ```
 
-Confirm the config reached a compute node — you should see your `url:` and
-`credential-db:`, not the repository defaults:
+Confirm the config reached a compute node — you should see your `url:`,
+`provider:` and `credential-db:`:
 
 ```bash
-docker exec c5 cat /opt/qfw/qhpc/QFw/services/dev-config/config.yaml
+docker exec c5 sh -c 'echo "$QFW_DEVICE_ACCESS_CFG"; cat "$QFW_DEVICE_ACCESS_CFG"'
 ```
 
 Then confirm the endpoint answers and your token works. This is read-only and
@@ -193,6 +218,17 @@ SHIM BIFURCATION + INTROSPECTION SMOKE: PASS
 instead means the environment variables did not arrive.
 
 ## 6. Execution smoke (a real circuit)
+
+> **Not yet revalidated on the v0.1 line.** The commands below source
+> `setup/qfw_activate`, which no longer exists, and `qfw_shim_smoke.sh` now
+> resolves its QPM through the directory service and requires a reservation id
+> and a site service manifest. Replacing `qfw_activate` with
+> `$QFW_PREFIX/bin/qfw-activate` is not sufficient on its own. Treat this
+> section as stale until the service plane is wired up and re-run.
+>
+> Execution itself is fine, and is exercised today by
+> `examples/measure_shim_execution.py`, which drives the drivers in-process and
+> returns `counts {'1': 10}` through QRMI, QDMI and the native client.
 
 Submits a one-qubit circuit — `x q[0]` then measure — through the shim to the
 QPU. No environment variables: this path reads the device-access file.
@@ -256,15 +292,21 @@ credentials reaching `sbatch` but not the service. Re-read
 [step 2](#why-a-file-rather-than-environment-variables).
 
 **Errors referencing code you already fixed** — only `svc_lib_qpm`,
-`qfw_services.yaml` and `qfw_lookup_service.py` are bind-mounted from
-`shared-dir/QFw`. Everything else in the container is the QFw clone made at
-image build time. Compare before theorizing:
+This class of problem is much reduced on the v0.1 line: the container no longer
+carries its own QFw clone, and `./do_qfw_build.sh` builds the checkout in
+`shared-dir/QFw` directly. What can still drift is the **install tree** against
+the source, because the install is a copy. Compare before theorizing:
 
 ```bash
-docker exec c5 cat /opt/qfw/qhpc/QFw/services/util/iqm_transcode.py | head -20
+docker exec c5 sh -c 'diff /workspace/qfw-container-base/QFw/services/util/iqm_transcode.py \
+    "$(ls -d /workspace/qfw-container-base/qfw-install/lib*/qfw/services)"/util/iqm_transcode.py'
 ```
 
-Rebuild with `./do_build.sh --force` to resynchronize.
+No output means source and install agree. Any difference means you edited the
+source and have not reinstalled.
+
+Rebuild the image with `./do_build.sh --force`, then rebuild QFw itself with
+`./do_qfw_build.sh --clean`, to resynchronize.
 
 ## Keeping the token safe
 

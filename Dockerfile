@@ -211,49 +211,48 @@ RUN set -ex \
        openblas-devel \
        swig \
     && yum clean all \
-    && rm -rf /var/cache/yum \
-    && pip3 install scons
+    && rm -rf /var/cache/yum
 
-ARG QFW_REPO=https://github.com/openQSE/QFw.git
 ARG QFW_BUILD_JOBS=4
-ARG QFW_IMAGE_BASE=/opt/qfw/qhpc
-ARG QFW_IMAGE_BUILD_VERSION=image
 
-RUN set -ex \
-    && mkdir -p "${QFW_IMAGE_BASE}/rocm" \
-    && git -c url.https://github.com/.insteadOf=git@github.com: \
-        clone --recursive "${QFW_REPO}" "${QFW_IMAGE_BASE}/QFw" \
-    && python3 -m venv "${QFW_IMAGE_BASE}/venv" \
-    && "${QFW_IMAGE_BASE}/venv/bin/python" -m pip install --upgrade \
-        pip setuptools wheel \
-    && "${QFW_IMAGE_BASE}/venv/bin/python" -m pip install \
-        -r "${QFW_IMAGE_BASE}/QFw/setup/build-requirements.txt" \
-    && { \
-        echo "runtime-mode: container"; \
-        echo "mpi-transport-mode: auto"; \
-        echo "base-dir: ${QFW_IMAGE_BASE}"; \
-        echo "python-venv-activate: ${QFW_IMAGE_BASE}/venv/bin/activate"; \
-        echo "libfabric-install: ${LIBFABRIC_PREFIX}"; \
-        echo "mpi-install: ${OMPI_PREFIX}"; \
-        echo "dev-install: ${QFW_IMAGE_BASE}/rocm"; \
-        echo "dev-version: 0.0.0"; \
-        echo "build-jobs: ${QFW_BUILD_JOBS}"; \
-        echo "qfw-dep-build-version: ${QFW_IMAGE_BUILD_VERSION}"; \
-    } > "${QFW_IMAGE_BASE}/QFw/setup/qfw_config_image.yaml" \
-    && cd "${QFW_IMAGE_BASE}/QFw/setup" \
-    && "${QFW_IMAGE_BASE}/venv/bin/python" ./qfw_configure \
-        -c qfw_config_image.yaml \
-    && QFW_BUILD_JOBS="${QFW_BUILD_JOBS}" ./qfw_build.sh
+# ----------------------------------------------------------------------
+# QFw is NOT baked into the image.
+#
+# As of the v0.1 release line QFw builds with CMake (top-level CMakeLists.txt,
+# driven by setup/qfw_install.sh). The old setup/qfw_configure + qfw_build.sh
+# pair this image used to run no longer exists upstream.
+#
+# QFw and DEFw are now built inside the running container, out of the shared
+# mount, following docs/usage.md "Docker Quick Start":
+#
+#   export QFW_BASE=/workspace/qfw-container-base
+#   cmake -S "$QFW_SRC" -B "$QFW_BUILD" \
+#       -DCMAKE_INSTALL_PREFIX="$QFW_PREFIX" -DQFW_BUILD_BUNDLED_DEFW=ON
+#   cmake --build "$QFW_BUILD" -j && cmake --install "$QFW_BUILD"
+#   source "$QFW_PREFIX/bin/qfw-activate" --venv "$QFW_VENV"
+#
+# The build and install trees live on the shared mount, so every node in the
+# cluster sees the same QFw, and the checkout being built is the developer's
+# own shared-dir/QFw rather than a fresh clone baked at image build time.
+#
+# KNOWN GAP: the old qfw_build.sh also built the TNQVM and NWQ-Sim simulator
+# backends into the image. QFw's CMake build no longer builds them (see
+# docs/usage.md: simulator executables "must be provided by the host, container
+# image, module environment, or Python virtual environment"). Simulator
+# examples therefore need those backends provisioned separately. The hardware
+# path (QRMI / QDMI / the svc_lib_qpm shim) does not use them.
+# ----------------------------------------------------------------------
 
-ENV QFW_IMAGE_BASE=${QFW_IMAGE_BASE} \
-    QFW_IMAGE_QFW=${QFW_IMAGE_BASE}/QFw \
-    QFW_IMAGE_VENV=${QFW_IMAGE_BASE}/venv \
-    QFW_IMAGE_BUILD_VERSION=${QFW_IMAGE_BUILD_VERSION} \
+ENV QFW_BASE=/workspace/qfw-container-base
+ENV QFW_SRC=${QFW_BASE}/QFw \
+    QFW_VENV=${QFW_BASE}/qfw-venv \
+    QFW_BUILD=${QFW_BASE}/qfw-build \
+    QFW_PREFIX=${QFW_BASE}/qfw-install \
     QFW_BUILD_JOBS=${QFW_BUILD_JOBS}
 
-ENV PATH=${OMPI_PREFIX}/bin:${LIBFABRIC_PREFIX}/bin:${QFW_IMAGE_BASE}/QFw/bin:${PATH}
+ENV PATH=${OMPI_PREFIX}/bin:${LIBFABRIC_PREFIX}/bin:${PATH}
 
-ENV LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${LIBFABRIC_PREFIX}/lib:${QFW_IMAGE_BASE}/QFw/DEFw/src:${QFW_IMAGE_BASE}/install/${QFW_IMAGE_BUILD_VERSION}/TNQVM/exatn/lib:${QFW_IMAGE_BASE}/install/${QFW_IMAGE_BUILD_VERSION}/TNQVM/xacc/lib:${QFW_IMAGE_BASE}/build/${QFW_IMAGE_BUILD_VERSION}/TNQVM/tnqvm/plugins:${QFW_IMAGE_BASE}/install/${QFW_IMAGE_BUILD_VERSION}/NWQSIM/lib
+ENV LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${LIBFABRIC_PREFIX}/lib
 
 # ----------------------------------------------------------------------
 # QRMI / QDMI shim dependencies
@@ -308,7 +307,6 @@ RUN set -ex \
     && cp target/release/libqrmi.so "${QRMI_PREFIX}/lib/" \
     && (cp target/release/libqrmi.a "${QRMI_PREFIX}/lib/" 2>/dev/null || true) \
     && cp qrmi.h "${QRMI_PREFIX}/include/" \
-    && "${QFW_IMAGE_VENV}/bin/pip" install --no-cache-dir "qrmi==${QRMI_VERSION}" \
     && git clone --depth=1 --branch "${QRMI_SPANK_REF}" \
         "${QRMI_SPANK_REPO}" /tmp/spank-plugins \
     && cd /tmp/spank-plugins/plugins/spank_qrmi \
@@ -321,12 +319,13 @@ RUN set -ex \
         install -m 0755 {} /usr/lib64/slurm/ \; \
     && rm -rf /tmp/qrmi /tmp/spank-plugins
 
-# QDMI-on-IQM — IQM's official QDMI implementation, installed as a wheel
-# into the QFw venv. The 'qiskit' extra wires up the Qiskit backend.
-RUN set -ex \
-    && "${QFW_IMAGE_VENV}/bin/pip" install --no-cache-dir 'iqm-qdmi[qiskit]'
-
+# The QRMI and QDMI-on-IQM Python bindings are installed into the shared-mount
+# venv by do_qfw_build.sh, not baked here. QRMI_VERSION is exported so that
+# venv gets the exact binding version whose C ABI this image ships in
+# ${QRMI_PREFIX}/lib. QDMI-on-IQM (iqm-qdmi[qiskit]) is pure Python and is
+# installed there too.
 ENV QRMI_PREFIX=${QRMI_PREFIX} \
+    QRMI_VERSION=${QRMI_VERSION} \
     LD_LIBRARY_PATH=${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH}
 
 COPY modulefiles /etc/modulefiles
