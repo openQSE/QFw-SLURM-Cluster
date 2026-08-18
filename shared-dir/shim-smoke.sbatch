@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 #SBATCH --job-name=shim-smoke
 #SBATCH --output=shim-smoke.%J.out
@@ -30,11 +30,26 @@ set -e
 
 echo "[`date`] shim-smoke on `hostname`"
 
-source /opt/qfw/qhpc/QFw/setup/qfw_activate
-source "${QFW_IMAGE_VENV}/bin/activate"
+QFW_BASE="${QFW_BASE:-/workspace/qfw-container-base}"
+QFW_PREFIX="${QFW_PREFIX:-${QFW_BASE}/qfw-install}"
+QFW_VENV="${QFW_VENV:-${QFW_BASE}/qfw-venv}"
+
+if [ ! -f "${QFW_PREFIX}/bin/qfw-activate" ]; then
+    echo "No QFw install at ${QFW_PREFIX}. Run ./do_qfw_build.sh on the host first." >&2
+    exit 1
+fi
+source "${QFW_PREFIX}/bin/qfw-activate" --venv "${QFW_VENV}"
+
+# services/dev-config is deliberately excluded from the install tree, so an
+# installed QFw has no default device-access config. Point at the shared-mount
+# copy unless the caller already chose one.
+if [ -z "${QFW_DEVICE_ACCESS_CFG:-}" ] && [ -f "${QFW_BASE}/iqm-device-access.yaml" ]; then
+    export QFW_DEVICE_ACCESS_CFG="${QFW_BASE}/iqm-device-access.yaml"
+fi
 
 python - <<'PY'
 import os
+import defw  # noqa: F401  -- puts DEFw's service-apis on sys.path
 from svc_lib_qpm.frontend import Frontend, NotImplementedByLibrary
 from svc_lib_qpm.drivers import QrmiDriver, QdmiDriver
 from svc_lib_qpm.descriptor import resolve_descriptor
@@ -55,7 +70,7 @@ check("get_device_info", "qdmi")          # composable (qdmi+qrmi); QDMI preferr
 check("get_coupling_graph", "qdmi")       # composable (qdmi+qrmi); QDMI preferred
 check("get_calibration_snapshot", "qdmi")
 check("run_circuit", "qrmi")              # execution -> QRMI (reservation owner)
-check("get_last_job_metadata", "qrmi")
+check("get_task_metadata", "qrmi")
 check("get_backend_info", "qrmi")         # QRMI-only facet (descriptor a7e50bf)
 
 # env preference overrides the descriptor preference; introspection is
@@ -80,7 +95,7 @@ heron = {
     "caps": {
         "get_device_info": ["qrmi"], "get_coupling_graph": ["qrmi"],
         "get_backend_info": ["qrmi"], "run_circuit": ["qrmi"],
-        "get_last_job_timing": ["qrmi"], "get_last_job_metadata": ["qrmi"],
+        "get_task_timing": ["qrmi"], "get_task_metadata": ["qrmi"],
         # no calibration-capable library wired -> calibration is a gap here
     },
 }

@@ -6,6 +6,11 @@
 
 qpus:
   ornl-iqm-20q:
+    # Required. Selection by provider is how the shim resolves a device when
+    # QFW_QPU_DEVICE_ID is unset. A config without this key matches nothing and
+    # fails with "does not define a QPU for provider 'iqm'".
+    provider: iqm
+
     # The alias IQM knows the device by. Confirm with:
     #   curl -H "Authorization: Bearer $QFW_API_KEY" \
     #        https://qccsw.ccs.ornl.gov/api/v1/quantum-computers
