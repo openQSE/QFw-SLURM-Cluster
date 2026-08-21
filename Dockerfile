@@ -289,16 +289,24 @@ RUN set -ex \
 # NOTE: upstream changed tag convention around the 0.14 release from
 # "vX.Y.Z" to "X.Y.Z" (no leading v). Use the unprefixed form for any
 # release >= 0.14.0; older releases need the "v" prefix.
-# QRMI 0.17.2 (2026-06-18) fixes a vulnerability in PyO3, the dependency
-# behind the Python bindings (the part loaded into the QFw venv); upstream
-# strongly recommends upgrading anyone using the bindings. spank-plugins stays
-# at 0.7.0 -- still the latest SPANK release, it is C and does not use PyO3, and
-# its build links the locally-cloned QRMI (0.17.2) via -DQRMI_ROOT.
+# QRMI 0.23.1 and spank-plugins 0.10.0 are a matched pair: QRMI 0.23.0 renamed
+# the IBM Qiskit Runtime Service resource type to IBM Quantum Compute Service,
+# and spank 0.10.0 is the SPANK side of that same rename. Keeping the two in
+# step matters because the plugin links the locally-cloned QRMI via -DQRMI_ROOT.
+# Neither rename reaches QFw: the shim opens ResourceType.IQMServer and reads
+# the {backend}_QRMI_IQM_ISA_* variables, none of which changed. The legacy IBM
+# names are accepted until 2026-11-21 in any case.
+#
+# The upgrade that DOES reach QFw is 0.22.0 adding the static architecture to
+# target(). That key was previously absent and arrives as a list, so
+# services/svc_lib_qpm/drivers/qrmi_driver.py unwraps it before handing it to
+# qhw-iqm. Also in 0.22.0: Rust log records now bridge to Python's logging, and
+# a GIL deadlock in blocking calls is fixed.
 ARG QRMI_REPO=https://github.com/qiskit-community/qrmi.git
-ARG QRMI_VERSION=0.17.2
+ARG QRMI_VERSION=0.23.1
 ARG QRMI_PREFIX=/opt/qfw/qrmi
 ARG QRMI_SPANK_REPO=https://github.com/qiskit-community/spank-plugins.git
-ARG QRMI_SPANK_REF=0.7.0
+ARG QRMI_SPANK_REF=0.10.0
 RUN set -ex \
     && git clone --depth=1 --branch "${QRMI_VERSION}" "${QRMI_REPO}" /tmp/qrmi \
     && cd /tmp/qrmi \
