@@ -113,13 +113,21 @@ if [ "${QFW_SKIP_VENV}" != "true" ]; then
         echo "No QRMI version pin available; installing unpinned qrmi" >&2
         python -m pip install qrmi
     fi
-    python -m pip install 'iqm-qdmi[qiskit]'
+    # QDMI-on-IQM. The base package is all the shim needs: it carries the IQM
+    # device library plus the stable device ID and prefix the QDMI driver
+    # registers it under. The [qiskit] extra is deliberately NOT installed --
+    # it declares mqt-core~=3.8.0, which caps mqt-core below 3.9, and it only
+    # buys MQT Core's Qiskit adapter (iqm.qdmi.qiskit), which the shim does not
+    # use. Restore the extra once iqm-qdmi lifts that cap. The floor is 1.3:
+    # IQM_QDMI_DEVICE_ID / IQM_QDMI_PREFIX come from that release.
+    python -m pip install 'iqm-qdmi>=1.3'
 
-    # mqt-core 3.8.0 removed fomac.add_dynamic_device_library in favour of
-    # register_device/open_device. The QDMI driver still calls the 3.7 API, so
-    # pin until services/svc_lib_qpm/drivers/qdmi_driver.py is ported. Installed
-    # after iqm-qdmi so this pin wins over whatever that extra resolves to.
-    python -m pip install 'mqt-core==3.7.0'
+    # mqt-core 3.8.0 replaced fomac.add_dynamic_device_library with
+    # register_device/open_device, and 3.9.0 moved the Python module from
+    # mqt.core.fomac to mqt.core.qdmi (the old name still works but warns).
+    # services/svc_lib_qpm/drivers/qdmi_driver.py calls the 3.9 API. Installed
+    # after iqm-qdmi so this pin wins over whatever that resolves to.
+    python -m pip install 'mqt-core==3.9.0'
 
     # The bundled QHW packages (qhw-data, qhw-iqm, qhw-admission, qhw-scheduler)
     # are installed into site-packages by file copy, so pip never resolves the
