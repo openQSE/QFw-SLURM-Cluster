@@ -289,21 +289,41 @@ RUN set -ex \
 # NOTE: upstream changed tag convention around the 0.14 release from
 # "vX.Y.Z" to "X.Y.Z" (no leading v). Use the unprefixed form for any
 # release >= 0.14.0; older releases need the "v" prefix.
-# QRMI 0.23.1 and spank-plugins 0.10.0 are a matched pair: QRMI 0.23.0 renamed
-# the IBM Qiskit Runtime Service resource type to IBM Quantum Compute Service,
-# and spank 0.10.0 is the SPANK side of that same rename. Keeping the two in
-# step matters because the plugin links the locally-cloned QRMI via -DQRMI_ROOT.
-# Neither rename reaches QFw: the shim opens ResourceType.IQMServer and reads
-# the {backend}_QRMI_IQM_ISA_* variables, none of which changed. The legacy IBM
-# names are accepted until 2026-11-21 in any case.
+# QRMI 0.24.0 with spank-plugins 0.10.0, still the newest SPANK release. The
+# plugin links the locally-cloned QRMI via -DQRMI_ROOT, so it must be built
+# against whatever QRMI_VERSION says. Bumping this ARG invalidates the whole RUN
+# layer below, rebuilding the plugin from scratch as the 0.24.0 release notes
+# ask for.
 #
-# The upgrade that DOES reach QFw is 0.22.0 adding the static architecture to
-# target(). That key was previously absent and arrives as a list, so
-# services/svc_lib_qpm/drivers/qrmi_driver.py unwraps it before handing it to
-# qhw-iqm. Also in 0.22.0: Rust log records now bridge to Python's logging, and
-# a GIL deadlock in blocking calls is fixed.
+# 0.24.0 will NOT work against an IQM deployment still serving the old Get
+# Health Status format. It requires {"operational": ..., "health": {...}} and
+# fails to deserialize the old flat {"healthy": ...}. THE ORNL q20 STILL SERVES
+# THE OLD FORMAT, verified 2026-08-26, so is_accessible() raises there:
+#   QrmiError_ error in serde: missing field `operational`
+# QFw is unaffected because it never calls is_accessible(). That call is absent
+# from QrmiDriver.CAPABILITIES and from services/ entirely. Only two of the 69
+# generated IQM client models changed between 0.23.1 and 0.24.0, and both are
+# the health model, so every call QFw does make is untouched. target() was
+# re-verified against the q20 on 0.24.0 and the whole qhw-iqm normalization
+# path still produces schema-valid records.
+#
+# IF is_accessible() IS EVER WIRED INTO THE SHIM, this pin becomes a live
+# problem until ORNL's IQM API is upgraded. That is the trigger to revisit.
+#
+# 0.24.0 also adds typed errors. The new Python exceptions all subclass
+# RuntimeError, which is what the drivers already catch, so that half is purely
+# additive.
+#
+# Earlier context worth keeping: 0.23.0 renamed the IBM Qiskit Runtime Service
+# resource type to IBM Quantum Compute Service (QRMI_IBM_QRS_ -> QRMI_IBM_QCS_,
+# legacy accepted until 2026-11-21), and 0.22.0 added the static architecture to
+# target() plus Rust-to-Python log bridging and a GIL deadlock fix. The renames
+# do not reach QFw, which opens ResourceType.IQMServer and reads
+# {backend}_QRMI_IQM_ISA_*. The static architecture does: it arrives as a list,
+# and services/svc_lib_qpm/drivers/qrmi_driver.py unwraps it before handing it
+# to qhw-iqm.
 ARG QRMI_REPO=https://github.com/qiskit-community/qrmi.git
-ARG QRMI_VERSION=0.23.1
+ARG QRMI_VERSION=0.24.0
 ARG QRMI_PREFIX=/opt/qfw/qrmi
 ARG QRMI_SPANK_REPO=https://github.com/qiskit-community/spank-plugins.git
 ARG QRMI_SPANK_REF=0.10.0
