@@ -8,6 +8,8 @@ DEFAULT_IMAGE_NAME="qfw-slurm-cluster"
 DEFAULT_IMAGE_TAG="rocky10.1"
 DEFAULT_SLURM_TAG="slurm-25-05-0-1"
 DEFAULT_QFW_BUILD_JOBS="4"
+DEFAULT_QFW_REPOSITORY="https://github.com/openQSE/QFw.git"
+DEFAULT_QFW_REF="release/v0.1"
 ENV_FILE="${SCRIPT_DIR}/qfw-install.env"
 COMPOSE_ENV_FILE="${SCRIPT_DIR}/.env"
 
@@ -27,6 +29,10 @@ Options:
                        Default: ${DEFAULT_SLURM_TAG}
   --qfw-build-jobs N   Parallel build jobs for the image-contained QFw build
                        Default: ${DEFAULT_QFW_BUILD_JOBS}
+  --qfw-repository URL QFw repository used for the official image install
+                       Default: ${DEFAULT_QFW_REPOSITORY}
+  --qfw-ref REF        QFw branch, tag, or commit used by the image build
+                       Default: ${DEFAULT_QFW_REF}
   --dry-run            Print the resolved settings without creating anything
   -h, --help           Show this help text
 
@@ -41,6 +47,8 @@ IMAGE_NAME="${DEFAULT_IMAGE_NAME}"
 IMAGE_TAG="${DEFAULT_IMAGE_TAG}"
 SLURM_TAG="${DEFAULT_SLURM_TAG}"
 QFW_BUILD_JOBS="${DEFAULT_QFW_BUILD_JOBS}"
+QFW_REPOSITORY="${DEFAULT_QFW_REPOSITORY}"
+QFW_REF="${DEFAULT_QFW_REF}"
 DRY_RUN=false
 
 while [ "$#" -gt 0 ]; do
@@ -73,6 +81,14 @@ while [ "$#" -gt 0 ]; do
             ;;
         --qfw-build-jobs)
             QFW_BUILD_JOBS="${2:?missing value for --qfw-build-jobs}"
+            shift 2
+            ;;
+        --qfw-repository)
+            QFW_REPOSITORY="${2:?missing value for --qfw-repository}"
+            shift 2
+            ;;
+        --qfw-ref)
+            QFW_REF="${2:?missing value for --qfw-ref}"
             shift 2
             ;;
         --dry-run)
@@ -134,6 +150,8 @@ print_settings() {
     echo "  IMAGE_TAG=${IMAGE_TAG}"
     echo "  SLURM_TAG=${SLURM_TAG}"
     echo "  QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
+    echo "  QFW_REPOSITORY=${QFW_REPOSITORY}"
+    echo "  QFW_REF=${QFW_REF}"
     echo "  QFW_CONTAINER_BASE=${BASE_DIR}"
 }
 
@@ -154,6 +172,8 @@ mkdir -p "${BASE_DIR}"
 cat > "${ENV_FILE}" <<EOF
 SLURM_TAG=${SLURM_TAG}
 QFW_BUILD_JOBS=${QFW_BUILD_JOBS}
+QFW_REPOSITORY=${QFW_REPOSITORY}
+QFW_REF=${QFW_REF}
 IMAGE_NAME=${IMAGE_NAME}
 IMAGE_TAG=${IMAGE_TAG}
 QFW_CONTAINER_BASE=${BASE_DIR}
@@ -168,5 +188,7 @@ echo "  IMAGE_NAME=${IMAGE_NAME}"
 echo "  IMAGE_TAG=${IMAGE_TAG}"
 echo "  SLURM_TAG=${SLURM_TAG}"
 echo "  QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
+echo "  QFW_REPOSITORY=${QFW_REPOSITORY}"
+echo "  QFW_REF=${QFW_REF}"
 echo "  QFW_CONTAINER_BASE=${BASE_DIR}"
 echo "Optional QFw development directories are created only when needed."

@@ -215,39 +215,20 @@ RUN set -ex \
 
 ARG QFW_BUILD_JOBS=4
 
-# ----------------------------------------------------------------------
-# QFw is NOT baked into the image.
-#
-# As of the v0.1 release line QFw builds with CMake (top-level CMakeLists.txt,
-# driven by setup/qfw_install.sh). The old setup/qfw_configure + qfw_build.sh
-# pair this image used to run no longer exists upstream.
-#
-# QFw and DEFw are now built inside the running container, out of the shared
-# mount, following docs/usage.md "Docker Quick Start":
-#
-#   export QFW_BASE=/workspace/qfw-container-base
-#   cmake -S "$QFW_SRC" -B "$QFW_BUILD" \
-#       -DCMAKE_INSTALL_PREFIX="$QFW_PREFIX" -DQFW_BUILD_BUNDLED_DEFW=ON
-#   cmake --build "$QFW_BUILD" -j && cmake --install "$QFW_BUILD"
-#   source "$QFW_PREFIX/bin/qfw-activate" --venv "$QFW_VENV"
-#
-# The build and install trees live on the shared mount, so every node in the
-# cluster sees the same QFw, and the checkout being built is the developer's
-# own shared-dir/QFw rather than a fresh clone baked at image build time.
-#
-# KNOWN GAP: the old qfw_build.sh also built the TNQVM and NWQ-Sim simulator
-# backends into the image. QFw's CMake build no longer builds them (see
-# docs/usage.md: simulator executables "must be provided by the host, container
-# image, module environment, or Python virtual environment"). Simulator
-# examples therefore need those backends provisioned separately. The hardware
-# path (QRMI / QDMI / the svc_lib_qpm shim) does not use them.
-# ----------------------------------------------------------------------
+# The image contains a complete release installation. A checkout mounted under
+# QFW_BASE remains an optional developer override built by do_qfw_build.sh.
+ARG QFW_REPOSITORY=https://github.com/openQSE/QFw.git
+ARG QFW_REF=release/v0.1
+ARG QFW_DEFW_REPOSITORY=
+ARG QFW_IMAGE_SOURCE=/tmp/qfw-source
+ARG QFW_IMAGE_BUILD=/tmp/qfw-build
+ARG QFW_IMAGE_PREFIX=/opt/openqse/qfw
+ARG QFW_IMAGE_VENV=/opt/openqse/qfw-venv
+ARG NWQSIM_PREFIX=/opt/openqse/nwqsim
+ARG TNQVM_PREFIX=/opt/openqse/tnqvm
+ARG SIMULATOR_WORK_ROOT=/tmp/qfw-simulator-build
 
-ENV QFW_BASE=/workspace/qfw-container-base
-ENV QFW_SRC=${QFW_BASE}/QFw \
-    QFW_VENV=${QFW_BASE}/qfw-venv \
-    QFW_BUILD=${QFW_BASE}/qfw-build \
-    QFW_PREFIX=${QFW_BASE}/qfw-install \
+ENV QFW_BASE=/workspace/qfw-container-base \
     QFW_BUILD_JOBS=${QFW_BUILD_JOBS}
 
 ENV PATH=${OMPI_PREFIX}/bin:${LIBFABRIC_PREFIX}/bin:${PATH}
@@ -257,9 +238,7 @@ ENV LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${LIBFABRIC_PREFIX}/lib
 # ----------------------------------------------------------------------
 # QRMI / QDMI shim dependencies
 #
-# Lower-level interface libraries the QFw front-end shim will route to;
-# see shared-dir/QFw/docs/qpu-frontend-contract.md. Placed after the QFw
-# build so iteration here does not invalidate the heavy QFw layer.
+# Lower-level interface libraries the QFw front-end shim will route to.
 # ----------------------------------------------------------------------
 
 ARG RUST_VERSION=1.91.0
@@ -319,13 +298,72 @@ RUN set -ex \
         install -m 0755 {} /usr/lib64/slurm/ \; \
     && rm -rf /tmp/qrmi /tmp/spank-plugins
 
-# The QRMI and QDMI-on-IQM Python bindings are installed into the shared-mount
-# venv by do_qfw_build.sh, not baked here. QRMI_VERSION is exported so that
-# venv gets the exact binding version whose C ABI this image ships in
-# ${QRMI_PREFIX}/lib. QDMI-on-IQM (iqm-qdmi[qiskit]) is pure Python and is
-# installed there too.
-ENV QRMI_PREFIX=${QRMI_PREFIX} \
+# Obtain QFw solely as the versioned source for the independent simulator
+# builders and the official QFw installation. QFw's CMake install does not
+# invoke either simulator builder.
+RUN set -ex \
+    && git -c url.https://github.com/.insteadOf=git@github.com: \
+        clone "${QFW_REPOSITORY}" "${QFW_IMAGE_SOURCE}" \
+    && git -C "${QFW_IMAGE_SOURCE}" checkout --detach "${QFW_REF}" \
+    && if [ -n "${QFW_DEFW_REPOSITORY}" ]; then \
+        git -C "${QFW_IMAGE_SOURCE}" config submodule.DEFw.url \
+            "${QFW_DEFW_REPOSITORY}"; \
+       fi \
+    && git -C "${QFW_IMAGE_SOURCE}" \
+        -c url.https://github.com/.insteadOf=git@github.com: \
+        submodule update --init --recursive
+
+RUN set -ex \
+    && "${QFW_IMAGE_SOURCE}/tools/dependencies/nwqsim/build.sh" \
+        --work-dir "${SIMULATOR_WORK_ROOT}/nwqsim" \
+        --prefix "${NWQSIM_PREFIX}" \
+        --jobs "${QFW_BUILD_JOBS}" \
+        --rocm off \
+    && test -x "${NWQSIM_PREFIX}/bin/circuit_runner.nwqsim"
+
+RUN set -ex \
+    && "${QFW_IMAGE_SOURCE}/tools/dependencies/tnqvm/build.sh" \
+        --work-dir "${SIMULATOR_WORK_ROOT}/tnqvm" \
+        --prefix "${TNQVM_PREFIX}" \
+        --mpi-prefix "${OMPI_PREFIX}" \
+        --jobs "${QFW_BUILD_JOBS}" \
+        --rocm off \
+    && test -x "${TNQVM_PREFIX}/bin/circuit_runner.tnqvm" \
+    && test -f "${TNQVM_PREFIX}/xacc/plugins/libtnqvm.so"
+
+RUN set -ex \
+    && python3 -m venv "${QFW_IMAGE_VENV}" \
+    && "${QFW_IMAGE_VENV}/bin/python" -m pip install --upgrade \
+        pip setuptools wheel \
+    && "${QFW_IMAGE_VENV}/bin/python" -m pip install \
+        -r "${QFW_IMAGE_SOURCE}/setup/build-requirements.txt" \
+        -r "${QFW_IMAGE_SOURCE}/setup/requirements.txt" \
+        "qrmi==${QRMI_VERSION}" \
+        'iqm-qdmi[qiskit]' \
+        'mqt-core==3.7.0' \
+        'jsonschema>=4' \
+    && PATH="${QFW_IMAGE_VENV}/bin:${PATH}" cmake \
+        -S "${QFW_IMAGE_SOURCE}" \
+        -B "${QFW_IMAGE_BUILD}" \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX="${QFW_IMAGE_PREFIX}" \
+        -DQFW_BUILD_BUNDLED_DEFW=ON \
+    && cmake --build "${QFW_IMAGE_BUILD}" \
+        --parallel "${QFW_BUILD_JOBS}" \
+    && cmake --install "${QFW_IMAGE_BUILD}" \
+    && test -x "${QFW_IMAGE_PREFIX}/bin/qfw-activate" \
+    && rm -rf "${QFW_IMAGE_SOURCE}" "${QFW_IMAGE_BUILD}" \
+        "${SIMULATOR_WORK_ROOT}"
+
+ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
+    QFW_IMAGE_VENV=${QFW_IMAGE_VENV} \
+    QFW_PREFIX=${QFW_IMAGE_PREFIX} \
+    QFW_VENV=${QFW_IMAGE_VENV} \
+    NWQSIM_PREFIX=${NWQSIM_PREFIX} \
+    TNQVM_PREFIX=${TNQVM_PREFIX} \
+    QRMI_PREFIX=${QRMI_PREFIX} \
     QRMI_VERSION=${QRMI_VERSION} \
+    MODULEPATH=/etc/modulefiles:/usr/share/Modules/modulefiles:/usr/share/modulefiles \
     LD_LIBRARY_PATH=${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH}
 
 COPY modulefiles /etc/modulefiles

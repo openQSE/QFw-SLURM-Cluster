@@ -21,6 +21,8 @@ services:
       args:
         SLURM_TAG: ${SLURM_TAG}
         QFW_BUILD_JOBS: ${QFW_BUILD_JOBS:-4}
+        QFW_REPOSITORY: ${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}
+        QFW_REF: ${QFW_REF:-release/v0.1}
     command: ["slurmdbd"]
     container_name: slurmdbd
     hostname: slurmdbd

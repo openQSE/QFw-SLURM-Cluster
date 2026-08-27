@@ -8,10 +8,9 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [--jobs N] [--clean] [--skip-venv] [--container NAME]
 
-Build and install QFw + DEFw inside the running cluster, out of the shared
-mount. This replaces the old image-baked QFw build: as of the v0.1 release
-line QFw builds with CMake, and the setup/qfw_configure + qfw_build.sh pair
-the Dockerfile used to run no longer exists upstream.
+Build and install a QFw + DEFw developer override inside the running cluster,
+out of the shared mount. The cluster image's official installation remains
+unchanged.
 
 Everything lands on the shared mount, so every node sees the same install and
 the tree being built is your own shared-dir/QFw checkout:
@@ -74,10 +73,10 @@ docker exec -i \
 set -euo pipefail
 
 QFW_BASE="${QFW_BASE:-/workspace/qfw-container-base}"
-QFW_SRC="${QFW_SRC:-${QFW_BASE}/QFw}"
-QFW_VENV="${QFW_VENV:-${QFW_BASE}/qfw-venv}"
-QFW_BUILD="${QFW_BUILD:-${QFW_BASE}/qfw-build}"
-QFW_PREFIX="${QFW_PREFIX:-${QFW_BASE}/qfw-install}"
+QFW_SRC="${QFW_DEV_SRC:-${QFW_BASE}/QFw}"
+QFW_VENV="${QFW_DEV_VENV:-${QFW_BASE}/qfw-venv}"
+QFW_BUILD="${QFW_DEV_BUILD:-${QFW_BASE}/qfw-build}"
+QFW_PREFIX="${QFW_DEV_PREFIX:-${QFW_BASE}/qfw-install}"
 
 jobs="${QFW_BUILD_JOBS_OVERRIDE:-}"
 [ -n "${jobs}" ] || jobs="$(nproc)"

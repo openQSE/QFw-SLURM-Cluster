@@ -1,13 +1,12 @@
 # [QFw]-SLURM Environment
 
 [QFw]-SLURM Environment is a Docker Compose based [Slurm] cluster for [QFw]
-development, integration testing, and profiling. It packages the heavy runtime
-stack in the image, while keeping the active [QFw] development tree on a host
-mount.
+development, integration testing, and profiling. The image is a complete QFw
+system. A host-mounted development install can override it when needed.
 
 The environment supports two common workflows:
 
-- Run the image-contained [QFw] directly from `/opt/qfw/qhpc/QFw`.
+- Run the image-contained [QFw] installation from `/opt/openqse/qfw`.
 - Mount a development [QFw] checkout at `/workspace/qfw-container-base/QFw` and
   build or run that checkout inside the [Slurm] containers.
 
@@ -64,7 +63,8 @@ Build with an explicit host mount and image name:
   --prefix /path/to/shared-dir \
   --image-name qfw-slurm-cluster \
   --image-tag rocky10.1 \
-  --qfw-build-jobs 4
+  --qfw-build-jobs 4 \
+  --qfw-ref release/v0.1
 
 ./do_build.sh
 ```
@@ -177,7 +177,46 @@ To validate the QRMI/QDMI shim (a smoke test — local routing/normalization, an
 ## Build And Run [QFw]
 
 <details open>
-<summary>Build and run the development [QFw]</summary>
+<summary>Use the official image installation</summary>
+
+Every cluster image contains QFw, DEFw, the QFw Python environment, NWQ-Sim,
+TNQVM, libfabric, and their environment modulefiles. Enter `slurmctld`,
+activate QFw, and run a test without any separate build step:
+
+```bash
+./do_ssh.sh
+salloc --nodes=1 --ntasks=1 --time=00:30:00
+export QFW_SHARED_ROOT=/workspace/qfw-container-base
+export QFW_RUN_BASE_DIR="${QFW_SHARED_ROOT}/qfw-runs"
+source "${QFW_PREFIX}/bin/qfw-activate" --venv "${QFW_VENV}"
+cd "${QFW_SHARE_DIR}/examples"
+./qfw_qiskit_simple.sh 4
+qfw-deactivate
+exit  # relinquish the interactive allocation
+```
+
+`qfw-setup` reads the selected service definition and loads its declared
+modules into the managed PRTE and QPM processes. For example, NWQ-Sim loads
+`libfabric` and `nwqsim`; TNQVM loads `libfabric` and `tnqvm`. The caller does
+not need to load those modules manually.
+
+Inspect the installations directly when diagnosing the image:
+
+```bash
+module avail
+module load libfabric nwqsim
+command -v circuit_runner.nwqsim
+module unload nwqsim libfabric
+
+module load libfabric tnqvm
+command -v circuit_runner.tnqvm
+module unload tnqvm libfabric
+```
+
+</details>
+
+<details>
+<summary>Build and use a development QFw override</summary>
 
 Use this path only when you want to build a host-mounted [QFw] checkout.
 `do_configure.sh` writes `QFW_CONTAINER_BASE` into `qfw-install.env` and
@@ -193,9 +232,9 @@ Create development directories only as needed. A typical layout is:
 ```text
 shared-dir/
   QFw/          # optional active QFw checkout
-  venv/         # optional Python venv created inside the container
-  build/        # optional QFw build tree
-  install/      # optional QFw install tree
+  qfw-venv/     # optional Python venv created inside the container
+  qfw-build/    # optional QFw build tree
+  qfw-install/  # optional QFw install tree
   benchmarks/   # optional benchmark outputs
   rocm/         # optional ROCm prefix for ROCm/HIP builds
 ```
@@ -211,81 +250,27 @@ git clone --recursive git@github.com:openQSE/QFw.git \
   "${QFW_CONTAINER_BASE}/QFw"
 ```
 
-2. Start the cluster and SSH into `slurmctld`:
+2. Start the cluster, then build the shared override from the host:
 
 ```bash
 ./do_startup.sh
+./do_qfw_build.sh --clean
+```
+
+3. Enter `slurmctld`, explicitly select the override, and test it:
+
+```bash
 ./do_ssh.sh
-```
-
-3. Build [QFw] inside `slurmctld`:
-
-```bash
-python3 -m venv /workspace/qfw-container-base/venv
-source /workspace/qfw-container-base/venv/bin/activate
-
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install \
-  -r /workspace/qfw-container-base/QFw/setup/build-requirements.txt
-
-cd /workspace/qfw-container-base/QFw/setup
-./qfw_configure -c config/qfw_config_sample_container.yaml
-./qfw_build.sh --python --defw
-```
-
-4. Activate [QFw]:
-
-```bash
-source /workspace/qfw-container-base/QFw/setup/qfw_activate
-```
-
-5. Run the [QFw] MPI smoke test:
-
-```bash
-cd /workspace/qfw-container-base/QFw/examples
+source /workspace/qfw-container-base/qfw-install/bin/qfw-activate \
+  --venv /workspace/qfw-container-base/qfw-venv
+cd "${QFW_SHARE_DIR}/examples"
 ./qfw_mpi_smoke.sh
+qfw-deactivate
 ```
 
-6. Deactivate [QFw]:
-
-```bash
-qfw_deactivate
-```
-
-TNQVM and NWQ-Sim are already built in the image. The development checkout can
-use those runners without rebuilding them. Rebuild them only when you need
-development versions:
-
-```bash
-cd /workspace/qfw-container-base/QFw/setup
-source /workspace/qfw-container-base/venv/bin/activate
-
-./qfw_build.sh --tnqvm --nwqsim
-```
-
-If the mounted [QFw] checkout has its own build artifacts, `qfw_activate`
-prepends the mounted checkout paths, so development artifacts take precedence
-over the built-in image artifacts.
-
-</details>
-
-<details>
-<summary>Use the built-in image [QFw]</summary>
-
-Use this path when you want to run the image-contained [QFw] without a mounted
-development checkout. The built-in [QFw] lives at:
-
-```text
-/opt/qfw/qhpc/QFw
-```
-
-```bash
-cd /opt/qfw/qhpc/QFw
-source /opt/qfw/qhpc/QFw/setup/qfw_activate
-```
-
-The image exposes [OpenMPI], [libfabric], built-in [QFw], and prebuilt
-circuit-runner paths in `PATH` and `LD_LIBRARY_PATH`.
+The override changes neither the official image installation nor the simulator
+modules. Building development versions of simulator dependencies is a separate,
+explicit operation described by QFw's `tools/dependencies/README.md`.
 
 </details>
 
@@ -307,7 +292,8 @@ flowchart TB
     subgraph img["Docker image"]
         slurm["Slurm runtime"]
         mpi["libfabric + OpenMPI/PRRTE"]
-        image_qfw["/opt/qfw/qhpc/QFw\nprebuilt QFw + circuit runners"]
+        image_qfw["/opt/openqse/qfw\nQFw + DEFw"]
+        modules["libfabric, NWQ-Sim, TNQVM\nenvironment modules"]
     end
 
     subgraph cluster["Docker Compose cluster"]
@@ -327,6 +313,8 @@ flowchart TB
     image_qfw --> ctl
     image_qfw --> c1
     image_qfw --> c5
+    modules --> c1
+    modules --> c5
     mysql --> dbd
     dbd --> ctl
     ctl --> c1
@@ -377,14 +365,14 @@ The image builds and installs:
 - [libfabric]
 - [OpenMPI] with the bundled [PRRTE] checkout
 - OSU Micro-Benchmarks
-- [QFw] under `/opt/qfw/qhpc/QFw`
-- [QFw] Python venv under `/opt/qfw/qhpc/venv`
-- [QFw] build and install artifacts under `/opt/qfw/qhpc/build/image` and
-  `/opt/qfw/qhpc/install/image`
+- [QFw] and [DEFw] under `/opt/openqse/qfw`
+- [QFw] Python venv under `/opt/openqse/qfw-venv`
+- [NWQ-Sim] under `/opt/openqse/nwqsim`
+- [TNQVM], XACC, and ExaTN under `/opt/openqse/tnqvm`
 - prebuilt [TNQVM] and [NWQ-Sim] circuit runners:
   `circuit_runner.tnqvm` and `circuit_runner.nwqsim`
 - [QFw] build dependencies such as `cmake`, `gcc-gfortran`, `openblas-devel`,
-  `swig`, `scons`, `ninja-build`, and a pinned Rust toolchain under
+  `swig`, `ninja-build`, and a pinned Rust toolchain under
   `/opt/qfw/rust`
 - [QRMI] runtime: `libqrmi.so` and `qrmi.h` under `/opt/qfw/qrmi/`, the `qrmi`
   Python wheel installed into the [QFw] venv, and the SLURM SPANK plugin
@@ -397,20 +385,16 @@ The image-level runtime environment includes:
 ```text
 /opt/qfw/openmpi/bin
 /opt/qfw/libfabric/bin
-/opt/qfw/qhpc/QFw/bin
 /opt/qfw/openmpi/lib
 /opt/qfw/libfabric/lib
-/opt/qfw/qhpc/install/image/TNQVM/exatn/lib
-/opt/qfw/qhpc/install/image/TNQVM/xacc/lib
-/opt/qfw/qhpc/build/image/TNQVM/tnqvm/plugins
-/opt/qfw/qhpc/install/image/NWQSIM/lib
 /opt/qfw/qrmi/lib
 ```
 
-`QRMI_PREFIX` is set to `/opt/qfw/qrmi` so consumers can locate the QRMI
-headers and shared library without hard-coding the path.
+QFw activation adds the official QFw paths. Simulator and libfabric paths are
+added only to managed services by the service definition's environment module
+contract, or interactively with `module load`.
 
-`qfw_activate` is still explicit. The image entrypoint does not globally source
+`qfw-activate` is still explicit. The image entrypoint does not globally source
 it because activation rewires the Python environment.
 
 </details>
@@ -431,6 +415,7 @@ Useful options:
 ./do_configure.sh --prefix /path/to/shared-dir
 ./do_configure.sh --image ghcr.io/openqse/qfw-slurm-cluster:20260503-v1.0
 ./do_configure.sh --qfw-build-jobs 4
+./do_configure.sh --qfw-ref release/v0.1
 ```
 
 `./do_build.sh` builds the configured image:
@@ -541,6 +526,8 @@ Typical interactive use:
 module use /etc/modulefiles
 module avail
 module load gcc-native/13.2 cmake openblas swig
+module load libfabric nwqsim
+module load libfabric tnqvm
 ```
 
 ROCm can be provided as an optional mounted prefix. If you need it, create and

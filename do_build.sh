@@ -68,6 +68,8 @@ if ${DRY_RUN}; then
         source "${ENV_FILE}"
         set +a
         QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
+        QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
+        QFW_REF="${QFW_REF:-release/v0.1}"
         echo "Would run:"
         if ${FORCE}; then
             echo "  docker build \\"
@@ -78,6 +80,8 @@ if ${DRY_RUN}; then
         echo "    -t ${IMAGE_NAME}:${IMAGE_TAG} \\"
         echo "    --build-arg SLURM_TAG=${SLURM_TAG} \\"
         echo "    --build-arg QFW_BUILD_JOBS=${QFW_BUILD_JOBS} \\"
+        echo "    --build-arg QFW_REPOSITORY=${QFW_REPOSITORY} \\"
+        echo "    --build-arg QFW_REF=${QFW_REF} \\"
         echo "    ${SCRIPT_DIR}"
     else
         cat <<EOF
@@ -93,9 +97,12 @@ source "${ENV_FILE}"
 set +a
 
 QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
+QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
+QFW_REF="${QFW_REF:-release/v0.1}"
 
 echo "Building ${IMAGE_NAME}:${IMAGE_TAG} with SLURM_TAG=${SLURM_TAG}"
 echo "Building image-contained QFw with QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
+echo "Using QFw ${QFW_REF} from ${QFW_REPOSITORY}"
 
 if ${FORCE}; then
     docker build \
@@ -103,11 +110,15 @@ if ${FORCE}; then
         -t "${IMAGE_NAME}:${IMAGE_TAG}" \
         --build-arg "SLURM_TAG=${SLURM_TAG}" \
         --build-arg "QFW_BUILD_JOBS=${QFW_BUILD_JOBS}" \
+        --build-arg "QFW_REPOSITORY=${QFW_REPOSITORY}" \
+        --build-arg "QFW_REF=${QFW_REF}" \
         "${SCRIPT_DIR}"
 else
     docker build \
         -t "${IMAGE_NAME}:${IMAGE_TAG}" \
         --build-arg "SLURM_TAG=${SLURM_TAG}" \
         --build-arg "QFW_BUILD_JOBS=${QFW_BUILD_JOBS}" \
+        --build-arg "QFW_REPOSITORY=${QFW_REPOSITORY}" \
+        --build-arg "QFW_REF=${QFW_REF}" \
         "${SCRIPT_DIR}"
 fi
