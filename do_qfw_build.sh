@@ -115,19 +115,33 @@ if [ "${QFW_SKIP_VENV}" != "true" ]; then
     fi
     # QDMI-on-IQM. The base package is all the shim needs: it carries the IQM
     # device library plus the stable device ID and prefix the QDMI driver
-    # registers it under. The [qiskit] extra is deliberately NOT installed --
-    # it declares mqt-core~=3.8.0, which caps mqt-core below 3.9, and it only
-    # buys MQT Core's Qiskit adapter (iqm.qdmi.qiskit), which the shim does not
-    # use. Restore the extra once iqm-qdmi lifts that cap. The floor is 1.3:
-    # IQM_QDMI_DEVICE_ID / IQM_QDMI_PREFIX come from that release.
-    python -m pip install 'iqm-qdmi>=1.3'
+    # registers it under. The [qiskit] extra is still deliberately NOT
+    # installed: it only buys MQT Core's Qiskit adapter (iqm.qdmi.qiskit),
+    # which the shim does not import, and Qiskit itself already comes from
+    # QFw's setup/requirements.txt.
+    #
+    # The floor is 1.4, which is where the device library serves the QDMI queue
+    # properties and moves to QDMI 1.3.3. That last part matters more than it
+    # looks: 1.3.0 built against QDMI 1.3.2, one patch release behind the 1.3.3
+    # that mqt-core 3.9 uses, and a property added in 1.3.3 came back from the
+    # older library as INVALIDARGUMENT rather than NOTSUPPORTED. Matching the
+    # two sides removes that whole class of confusion.
+    python -m pip install 'iqm-qdmi>=1.4'
 
     # mqt-core 3.8.0 replaced fomac.add_dynamic_device_library with
     # register_device/open_device, and 3.9.0 moved the Python module from
     # mqt.core.fomac to mqt.core.qdmi (the old name still works but warns).
-    # services/svc_lib_qpm/drivers/qdmi_driver.py calls the 3.9 API. Installed
-    # after iqm-qdmi so this pin wins over whatever that resolves to.
-    python -m pip install 'mqt-core==3.9.0'
+    # services/svc_lib_qpm/drivers/qdmi_driver.py calls the 3.9 API.
+    #
+    # 3.9.2 rather than 3.9.0 keeps this in step with iqm-qdmi 1.4.0. The two
+    # projects handed the IQM JSON conversion across in a matched pair: mqt-core
+    # 3.9.1 removed qiskit_to_iqm_json and iqm-qdmi 1.4.0 took it over. QFw uses
+    # neither side of that converter, so the pairing does not gate us, but
+    # running one half of a handoff against the other half's predecessor is not
+    # a state worth being in. iqm-qdmi 1.4.0's own [qiskit] extra now asks for
+    # mqt-core ~=3.9.1, so this also keeps that extra restorable if it is ever
+    # wanted. Installed after iqm-qdmi so this pin wins over what that resolves.
+    python -m pip install 'mqt-core==3.9.2'
 
     # The bundled QHW packages (qhw-data, qhw-iqm, qhw-admission, qhw-scheduler)
     # are installed into site-packages by file copy, so pip never resolves the
