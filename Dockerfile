@@ -304,7 +304,8 @@ RUN set -ex \
 RUN set -ex \
     && git -c url.https://github.com/.insteadOf=git@github.com: \
         clone "${QFW_REPOSITORY}" "${QFW_IMAGE_SOURCE}" \
-    && git -C "${QFW_IMAGE_SOURCE}" checkout --detach "${QFW_REF}" \
+    && git -C "${QFW_IMAGE_SOURCE}" fetch origin "${QFW_REF}" \
+    && git -C "${QFW_IMAGE_SOURCE}" switch --detach FETCH_HEAD \
     && if [ -n "${QFW_DEFW_REPOSITORY}" ]; then \
         git -C "${QFW_IMAGE_SOURCE}" config submodule.DEFw.url \
             "${QFW_DEFW_REPOSITORY}"; \
