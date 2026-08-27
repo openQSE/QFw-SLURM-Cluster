@@ -46,6 +46,18 @@ docker exec -w /workspace/qfw-container-base slurmctld sbatch shim-smoke.sbatch
 cat shared-dir/shim-smoke.<jobid>.out
 ```
 
+Keeping a baseline to diff against is the usual way to check an upgrade changed
+nothing. Copy it to a name of your own first:
+
+```bash
+cp shared-dir/shim-smoke.<jobid>.out shared-dir/shim-smoke-baseline.out
+```
+
+SLURM job ids restart from 1 whenever the cluster is recreated, so
+`shim-smoke.<jobid>.out` names are reused and a baseline left under a job-id
+name is eventually overwritten by a later run. `shared-dir/*.out` is
+gitignored, so these files are local either way.
+
 Expected (abridged):
 
 ```
