@@ -10,5 +10,13 @@ if [ ! -f "${ENV_FILE}" ]; then
     exit 1
 fi
 
-docker exec slurmctld bash -c "/usr/bin/sacctmgr --immediate add cluster name=linux" && \
+if docker exec slurmctld bash -c \
+        "/usr/bin/sacctmgr --noheader --parsable2 list cluster name=linux format=Cluster" \
+        | grep -qx 'linux'; then
+    echo "Cluster linux is already registered."
+    exit 0
+fi
+
+docker exec slurmctld bash -c \
+    "/usr/bin/sacctmgr --immediate add cluster name=linux"
 "${COMPOSE[@]}" restart slurmdbd slurmctld
