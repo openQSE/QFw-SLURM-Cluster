@@ -298,17 +298,6 @@ RUN set -ex \
         install -m 0755 {} /usr/lib64/slurm/ \; \
     && rm -rf /tmp/qrmi /tmp/spank-plugins
 
-# QFw reservation SPANK integration. The plugin uses the official QFw
-# installation at runtime and remains inactive unless --qfw-qpm is supplied.
-COPY tools/spank_qfw /tmp/spank_qfw
-RUN set -ex \
-    && cmake -S /tmp/spank_qfw -B /tmp/spank_qfw/build -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build /tmp/spank_qfw/build \
-    && install -m 0755 /tmp/spank_qfw/build/spank_qfw.so \
-        /usr/lib64/slurm/spank_qfw.so \
-    && rm -rf /tmp/spank_qfw
-
 # Obtain QFw solely as the versioned source for the independent simulator
 # builders and the official QFw installation. QFw's CMake install does not
 # invoke either simulator builder.
@@ -384,14 +373,12 @@ COPY modulefiles /etc/modulefiles
 COPY cgroup.conf /etc/slurm/cgroup.conf
 
 COPY slurm.conf /etc/slurm/slurm.conf
-COPY plugstack.conf /etc/slurm/plugstack.conf
 COPY slurmdbd.conf /etc/slurm/slurmdbd.conf
 COPY rest.conf /etc/slurm/rest.conf
 COPY gres.conf /etc/slurm/gres.conf
 RUN set -x \
     && openssl rand -hex 32 > /etc/slurm/jwt.key \
     && chown slurm:slurm /etc/slurm/slurm.conf \
-    && chown slurm:slurm /etc/slurm/plugstack.conf \
     && chown slurm:slurm /etc/slurm/jwt.key \
     && chown slurm:slurm /etc/slurm/rest.conf \
     && chown slurm:slurm /etc/slurm/gres.conf \
