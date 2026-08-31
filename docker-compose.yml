@@ -1,3 +1,8 @@
+x-slurmd-resources: &slurmd-resources
+  cpus: 4
+  cpuset: "0-3"
+  mem_limit: 6g
+
 services:
   mysql:
     image: mariadb:10.11
@@ -90,6 +95,7 @@ services:
       - slurm-network
 
   c1:
+    <<: *slurmd-resources
     image: ${IMAGE_NAME}:${IMAGE_TAG}
     init: true
     command: ["slurmd"]
@@ -114,9 +120,9 @@ services:
       - "slurmctld"
     networks:
       - slurm-network
-    cpus: 4        # <--- Add this line to restrict to 4 virtual CPUs
 
   c2:
+    <<: *slurmd-resources
     image: ${IMAGE_NAME}:${IMAGE_TAG}
     init: true
     command: ["slurmd"]
@@ -140,9 +146,9 @@ services:
       - "slurmctld"
     networks:
       - slurm-network
-    cpus: 4        # <--- Add this line to restrict to 4 virtual CPUs
 
   c3:
+    <<: *slurmd-resources
     image: ${IMAGE_NAME}:${IMAGE_TAG}
     init: true
     command: ["slurmd"]
@@ -166,9 +172,9 @@ services:
       - "slurmctld"
     networks:
       - slurm-network
-    cpus: 4
 
   c4:
+    <<: *slurmd-resources
     image: ${IMAGE_NAME}:${IMAGE_TAG}
     init: true
     command: ["slurmd"]
@@ -192,9 +198,9 @@ services:
       - "slurmctld"
     networks:
       - slurm-network
-    cpus: 4
 
   c5:
+    <<: *slurmd-resources
     image: ${IMAGE_NAME}:${IMAGE_TAG}
     init: true
     command: ["slurmd"]
@@ -218,9 +224,9 @@ services:
       - "slurmctld"
     networks:
       - slurm-network
-    cpus: 4
 
   c6:
+    <<: *slurmd-resources
     image: ${IMAGE_NAME}:${IMAGE_TAG}
     init: true
     command: ["slurmd"]
@@ -244,9 +250,9 @@ services:
       - "slurmctld"
     networks:
       - slurm-network
-    cpus: 4
 
   c7:
+    <<: *slurmd-resources
     image: ${IMAGE_NAME}:${IMAGE_TAG}
     init: true
     command: ["slurmd"]
@@ -270,9 +276,9 @@ services:
       - "slurmctld"
     networks:
       - slurm-network
-    cpus: 4
 
   c8:
+    <<: *slurmd-resources
     image: ${IMAGE_NAME}:${IMAGE_TAG}
     init: true
     command: ["slurmd"]
@@ -296,7 +302,6 @@ services:
       - "slurmctld"
     networks:
       - slurm-network
-    cpus: 4
 
 volumes:
   etc_munge:
