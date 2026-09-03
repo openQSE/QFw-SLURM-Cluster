@@ -39,6 +39,8 @@ RUN set -ex \
        libffi-devel \
        libcurl-devel \
        libtool \
+       lua \
+       lua-devel \
        m4 \
        ncurses-devel \
        openssl \
@@ -122,6 +124,8 @@ RUN set -x \
         --with-mysql_config=/usr/bin  --libdir=/usr/lib64 \
         --with-http-parser="${HTTP_PARSER_PREFIX}" --with-yaml=/usr --with-jwt=/usr \
     && make install \
+    && test -x /usr/lib64/slurm/job_submit_lua.so \
+    && test -x /usr/lib64/slurm/burst_buffer_lua.so \
     && install -D -m644 etc/cgroup.conf.example /etc/slurm/cgroup.conf.example \
     && install -D -m644 etc/slurm.conf.example /etc/slurm/slurm.conf.example \
     && install -D -m644 etc/slurmdbd.conf.example /etc/slurm/slurmdbd.conf.example \
@@ -220,10 +224,15 @@ ARG QFW_BUILD_JOBS=4
 ARG QFW_REPOSITORY=https://github.com/openQSE/QFw.git
 ARG QFW_REF=release/v0.1
 ARG QFW_DEFW_REPOSITORY=
+ARG QFW_SLURM_REPOSITORY=https://github.com/openQSE/qfw-slurm.git
+ARG QFW_SLURM_REF=release/v0.1
 ARG QFW_IMAGE_SOURCE=/tmp/qfw-source
 ARG QFW_IMAGE_BUILD=/tmp/qfw-build
 ARG QFW_IMAGE_PREFIX=/opt/openqse/qfw
 ARG QFW_IMAGE_VENV=/opt/openqse/qfw-venv
+ARG QFW_SLURM_SOURCE=/tmp/qfw-slurm-source
+ARG QFW_SLURM_BUILD=/tmp/qfw-slurm-build
+ARG QFW_SLURM_PREFIX=/opt/openqse/qfw-slurm
 ARG NWQSIM_PREFIX=/opt/openqse/nwqsim
 ARG TNQVM_PREFIX=/opt/openqse/tnqvm
 ARG SIMULATOR_WORK_ROOT=/tmp/qfw-simulator-build
@@ -301,11 +310,14 @@ RUN set -ex \
 # Obtain QFw solely as the versioned source for the independent simulator
 # builders and the official QFw installation. QFw's CMake install does not
 # invoke either simulator builder.
+ARG QFW_SOURCE_REVISION
 RUN set -ex \
     && git -c url.https://github.com/.insteadOf=git@github.com: \
         clone "${QFW_REPOSITORY}" "${QFW_IMAGE_SOURCE}" \
     && git -C "${QFW_IMAGE_SOURCE}" fetch origin "${QFW_REF}" \
     && git -C "${QFW_IMAGE_SOURCE}" switch --detach FETCH_HEAD \
+    && test "$(git -C "${QFW_IMAGE_SOURCE}" rev-parse HEAD)" = \
+        "${QFW_SOURCE_REVISION}" \
     && if [ -n "${QFW_DEFW_REPOSITORY}" ]; then \
         git -C "${QFW_IMAGE_SOURCE}" config submodule.DEFw.url \
             "${QFW_DEFW_REPOSITORY}"; \
@@ -356,10 +368,52 @@ RUN set -ex \
     && rm -rf "${QFW_IMAGE_SOURCE}" "${QFW_IMAGE_BUILD}" \
         "${SIMULATOR_WORK_ROOT}"
 
+ARG QFW_SLURM_SOURCE_REVISION
+RUN set -ex \
+    && git clone "${QFW_SLURM_REPOSITORY}" "${QFW_SLURM_SOURCE}" \
+    && git -C "${QFW_SLURM_SOURCE}" fetch origin "${QFW_SLURM_REF}" \
+    && git -C "${QFW_SLURM_SOURCE}" switch --detach FETCH_HEAD \
+    && test "$(git -C "${QFW_SLURM_SOURCE}" rev-parse HEAD)" = \
+        "${QFW_SLURM_SOURCE_REVISION}" \
+    && "${QFW_IMAGE_VENV}/bin/python" -m pip install \
+        --no-build-isolation "${QFW_SLURM_SOURCE}" pytest \
+    && cmake -S "${QFW_SLURM_SOURCE}" -B "${QFW_SLURM_BUILD}" \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX="${QFW_SLURM_PREFIX}" \
+        -DPython3_EXECUTABLE="${QFW_IMAGE_VENV}/bin/python" \
+    && cmake --build "${QFW_SLURM_BUILD}" \
+        --parallel "${QFW_BUILD_JOBS}" \
+    && install -d -o munge -g munge -m 0700 /etc/munge /var/log/munge \
+    && install -d -o munge -g munge -m 0755 /run/munge \
+    && dd if=/dev/urandom of=/etc/munge/munge.key bs=1024 count=1 \
+        status=none \
+    && chown munge:munge /etc/munge/munge.key \
+    && chmod 0400 /etc/munge/munge.key \
+    && gosu munge /usr/sbin/munged \
+    && ctest --test-dir "${QFW_SLURM_BUILD}" --output-on-failure \
+    && pkill -u munge munged \
+    && rm -f /etc/munge/munge.key /run/munge/munge.pid \
+        /run/munge/munge.socket.2 \
+    && cmake --install "${QFW_SLURM_BUILD}" \
+    && install -o root -g root -m 0755 \
+        "${QFW_SLURM_PREFIX}/lib64/slurm/spank_quantum.so" \
+        /usr/lib64/slurm/spank_quantum.so \
+    && test -x "${QFW_SLURM_PREFIX}/bin/qfw-slurm-driver" \
+    && test -x /usr/lib64/slurm/spank_quantum.so \
+    && test -x "${QFW_SLURM_PREFIX}/libexec/qfw-slurm/qfw-slurm-bb" \
+    && test -f "${QFW_SLURM_PREFIX}/share/licenses/qfw-slurm/LICENSE" \
+    && test -f "${QFW_SLURM_PREFIX}/share/man/man7/qfw-slurm.7" \
+    && test -f "${QFW_SLURM_PREFIX}/share/man/man8/qfw-slurm-gateway.8" \
+    && test -f "${QFW_SLURM_PREFIX}/share/qfw-slurm/config/plugin.conf.example" \
+    && "${QFW_IMAGE_VENV}/bin/python" -c \
+        'import qfw_slurm_gateway' \
+    && rm -rf "${QFW_SLURM_SOURCE}" "${QFW_SLURM_BUILD}"
+
 ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
     QFW_IMAGE_VENV=${QFW_IMAGE_VENV} \
     QFW_PREFIX=${QFW_IMAGE_PREFIX} \
     QFW_VENV=${QFW_IMAGE_VENV} \
+    QFW_SLURM_PREFIX=${QFW_SLURM_PREFIX} \
     NWQSIM_PREFIX=${NWQSIM_PREFIX} \
     TNQVM_PREFIX=${TNQVM_PREFIX} \
     QRMI_PREFIX=${QRMI_PREFIX} \
@@ -376,15 +430,47 @@ COPY slurm.conf /etc/slurm/slurm.conf
 COPY slurmdbd.conf /etc/slurm/slurmdbd.conf
 COPY rest.conf /etc/slurm/rest.conf
 COPY gres.conf /etc/slurm/gres.conf
+COPY config/qfw-slurm/burst_buffer.conf /etc/slurm/burst_buffer.conf
+COPY config/qfw-slurm/burst-buffer.lua.conf /etc/qfw-slurm/burst-buffer.lua.conf
+COPY config/qfw-slurm/resources.lua /etc/qfw-slurm/resources.lua
+COPY config/qfw-slurm/plugin.conf /etc/qfw-slurm/plugin.conf
+COPY config/qfw-slurm/gateway.yaml /etc/qfw-slurm/gateway.yaml
+COPY config/qfw-slurm/plugstack.conf /etc/slurm/plugstack.conf
 RUN set -x \
+    && groupadd -r qfw-slurm \
+    && useradd -r -g qfw-slurm -d /var/lib/qfw-slurm-gateway \
+        -s /sbin/nologin qfw-slurm \
+    && install -o root -g root -m 0644 \
+        "${QFW_SLURM_PREFIX}/share/qfw-slurm/slurm/job_submit.lua" \
+        /etc/slurm/job_submit.lua \
+    && install -o root -g root -m 0644 \
+        "${QFW_SLURM_PREFIX}/share/qfw-slurm/slurm/burst_buffer.lua" \
+        /etc/slurm/burst_buffer.lua \
     && openssl rand -hex 32 > /etc/slurm/jwt.key \
     && chown slurm:slurm /etc/slurm/slurm.conf \
     && chown slurm:slurm /etc/slurm/jwt.key \
     && chown slurm:slurm /etc/slurm/rest.conf \
     && chown slurm:slurm /etc/slurm/gres.conf \
     && chown slurm:slurm /etc/slurm/slurmdbd.conf \
+    && chown root:root /etc/slurm/job_submit.lua \
+        /etc/slurm/burst_buffer.lua /etc/slurm/burst_buffer.conf \
+        /etc/slurm/plugstack.conf /etc/qfw-slurm/resources.lua \
+        /etc/qfw-slurm/burst-buffer.lua.conf \
+    && chown root:slurm /etc/qfw-slurm/plugin.conf \
+    && chown root:qfw-slurm /etc/qfw-slurm/gateway.yaml \
+    && chmod 0644 /etc/slurm/job_submit.lua /etc/slurm/burst_buffer.lua \
+        /etc/slurm/burst_buffer.conf /etc/slurm/plugstack.conf \
+        /etc/qfw-slurm/resources.lua \
+    && chmod 0640 /etc/qfw-slurm/plugin.conf \
+        /etc/qfw-slurm/gateway.yaml \
     && chmod 600 /etc/slurm/jwt.key \
-    && chmod 600 /etc/slurm/slurmdbd.conf
+    && chmod 600 /etc/slurm/slurmdbd.conf \
+    && test -x /usr/lib64/slurm/job_submit_lua.so \
+    && test -x /usr/lib64/slurm/burst_buffer_lua.so \
+    && test -x /usr/lib64/slurm/spank_quantum.so \
+    && test -f /etc/slurm/job_submit.lua \
+    && test -f /etc/slurm/burst_buffer.lua \
+    && test -f /etc/qfw-slurm/plugin.conf
 
 RUN set -x \
     &&  useradd -r -g users --uid=1010 -m -c "Solomon Grundy" sgrundy

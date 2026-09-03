@@ -70,6 +70,8 @@ if ${DRY_RUN}; then
         QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
         QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
         QFW_REF="${QFW_REF:-release/v0.1}"
+        QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
+        QFW_SLURM_REF="${QFW_SLURM_REF:-release/v0.1}"
         echo "Would run:"
         if ${FORCE}; then
             echo "  docker build \\"
@@ -82,6 +84,8 @@ if ${DRY_RUN}; then
         echo "    --build-arg QFW_BUILD_JOBS=${QFW_BUILD_JOBS} \\"
         echo "    --build-arg QFW_REPOSITORY=${QFW_REPOSITORY} \\"
         echo "    --build-arg QFW_REF=${QFW_REF} \\"
+        echo "    --build-arg QFW_SLURM_REPOSITORY=${QFW_SLURM_REPOSITORY} \\"
+        echo "    --build-arg QFW_SLURM_REF=${QFW_SLURM_REF} \\"
         echo "    ${SCRIPT_DIR}"
     else
         cat <<EOF
@@ -99,10 +103,38 @@ set +a
 QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
 QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
 QFW_REF="${QFW_REF:-release/v0.1}"
+QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
+QFW_SLURM_REF="${QFW_SLURM_REF:-release/v0.1}"
+
+resolve_remote_ref() {
+    local repository="$1"
+    local ref="$2"
+    local revision
+
+    if [[ "${ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        printf '%s\n' "${ref}"
+        return
+    fi
+    revision="$(git ls-remote "${repository}" "${ref}" |
+        awk 'NR == 1 { print $1 }')"
+    if [ -z "${revision}" ]; then
+        echo "Unable to resolve ${ref} from ${repository}" >&2
+        exit 1
+    fi
+    printf '%s\n' "${revision}"
+}
+
+QFW_SOURCE_REVISION="$(resolve_remote_ref "${QFW_REPOSITORY}" "${QFW_REF}")"
+QFW_SLURM_SOURCE_REVISION="$(
+    resolve_remote_ref "${QFW_SLURM_REPOSITORY}" "${QFW_SLURM_REF}"
+)"
 
 echo "Building ${IMAGE_NAME}:${IMAGE_TAG} with SLURM_TAG=${SLURM_TAG}"
 echo "Building image-contained QFw with QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
 echo "Using QFw ${QFW_REF} from ${QFW_REPOSITORY}"
+echo "Using qfw-slurm ${QFW_SLURM_REF} from ${QFW_SLURM_REPOSITORY}"
+echo "Resolved QFw revision ${QFW_SOURCE_REVISION}"
+echo "Resolved qfw-slurm revision ${QFW_SLURM_SOURCE_REVISION}"
 
 if ${FORCE}; then
     docker build \
@@ -112,6 +144,10 @@ if ${FORCE}; then
         --build-arg "QFW_BUILD_JOBS=${QFW_BUILD_JOBS}" \
         --build-arg "QFW_REPOSITORY=${QFW_REPOSITORY}" \
         --build-arg "QFW_REF=${QFW_REF}" \
+        --build-arg "QFW_SOURCE_REVISION=${QFW_SOURCE_REVISION}" \
+        --build-arg "QFW_SLURM_REPOSITORY=${QFW_SLURM_REPOSITORY}" \
+        --build-arg "QFW_SLURM_REF=${QFW_SLURM_REF}" \
+        --build-arg "QFW_SLURM_SOURCE_REVISION=${QFW_SLURM_SOURCE_REVISION}" \
         "${SCRIPT_DIR}"
 else
     docker build \
@@ -120,5 +156,9 @@ else
         --build-arg "QFW_BUILD_JOBS=${QFW_BUILD_JOBS}" \
         --build-arg "QFW_REPOSITORY=${QFW_REPOSITORY}" \
         --build-arg "QFW_REF=${QFW_REF}" \
+        --build-arg "QFW_SOURCE_REVISION=${QFW_SOURCE_REVISION}" \
+        --build-arg "QFW_SLURM_REPOSITORY=${QFW_SLURM_REPOSITORY}" \
+        --build-arg "QFW_SLURM_REF=${QFW_SLURM_REF}" \
+        --build-arg "QFW_SLURM_SOURCE_REVISION=${QFW_SLURM_SOURCE_REVISION}" \
         "${SCRIPT_DIR}"
 fi

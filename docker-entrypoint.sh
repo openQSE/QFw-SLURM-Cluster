@@ -58,6 +58,36 @@ ensure_munge_key() {
     chmod 0400 /etc/munge/munge.key
 }
 
+start_qfw_slurm_gateway() {
+    local log=/var/log/qfw-slurm-gateway/gateway.log
+
+    install -d -o slurm -g slurm -m 0700 \
+        /var/lib/qfw-slurm/allocations
+    install -d -o qfw-slurm -g qfw-slurm -m 0700 \
+        /var/lib/qfw-slurm-gateway
+    install -d -o qfw-slurm -g qfw-slurm -m 0750 \
+        /var/log/qfw-slurm-gateway
+
+    if pgrep -u qfw-slurm -f qfw-slurm-gateway >/dev/null 2>&1; then
+        return
+    fi
+    echo "---> Starting the QFw Slurm gateway supervisor ..."
+    gosu qfw-slurm /bin/bash -c '
+        while true; do
+            export QFW_SHARED_ROOT=/workspace/qfw-container-base
+            source /opt/openqse/qfw/bin/qfw-activate \
+                --venv /opt/openqse/qfw-venv
+            qfw-slurm-gateway-launch \
+                --config /etc/qfw-slurm/gateway.yaml serve
+            status=$?
+            qfw-deactivate || true
+            printf "qfw-slurm-gateway exited with status %s; retrying\n" \
+                "${status}" >&2
+            sleep 2
+        done
+    ' >>"${log}" 2>&1 &
+}
+
 
 if [ "$1" = "TJNXXX" ]
 then
@@ -117,6 +147,8 @@ then
     ensure_munge_key
     echo "---> Starting the MUNGE Authentication service (munged) ..."
     gosu munge /usr/sbin/munged
+
+    start_qfw_slurm_gateway
 
     echo "---> Waiting for slurmdbd to become active before starting slurmctld ..."
 

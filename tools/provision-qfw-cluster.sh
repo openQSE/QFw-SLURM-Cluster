@@ -6,6 +6,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 user_file="${script_dir}/config/qfw-users.conf"
 profile_file="${script_dir}/config/qfw-user-profile.sh"
 site_file="${script_dir}/config/site.yaml"
+nwqsim_runtime_file="${script_dir}/config/nwqsim-site-runtime.yaml"
 device_file="${script_dir}/config/device-access.yaml"
 credential_file="${script_dir}/config/qpu-users.json"
 account="qfw-test"
@@ -17,6 +18,7 @@ die() {
 }
 
 for path in "${user_file}" "${profile_file}" "${site_file}" \
+		"${nwqsim_runtime_file}" \
 		"${device_file}" "${credential_file}"; do
 	[[ -r "${path}" ]] || die "required file is not readable: ${path}"
 done
@@ -95,7 +97,7 @@ EOF
 
 	docker cp "${profile_file}" \
 		"${container}:/tmp/qfw-test-user-profile.sh"
-	docker exec "${container}" bash -s <<'EOF'
+	docker exec -i "${container}" bash -s <<'EOF'
 set -euo pipefail
 install -o root -g root -m 0644 /tmp/qfw-test-user-profile.sh \
 	/etc/profile.d/qfw-test-user.sh
@@ -104,6 +106,7 @@ EOF
 
 	declare -a files=(
 		"${site_file}:/etc/openqse/qfw/site.yaml:0644"
+		"${nwqsim_runtime_file}:/etc/openqse/qfw/nwqsim-site-runtime.yaml:0644"
 		"${device_file}:/etc/openqse/qfw/device/device-access.yaml:0600"
 		"${credential_file}:/etc/openqse/qfw/device/qpu-users.json:0600"
 	)

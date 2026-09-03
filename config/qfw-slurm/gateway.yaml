@@ -1,0 +1,24 @@
+listen:
+  host: 0.0.0.0
+  port: 18095
+  max-credential-bytes: 65536
+  max-frame-bytes: 262144
+  connect-timeout-seconds: 5
+  request-timeout-seconds: 120
+
+authentication:
+  mechanism: munge
+  accepted-uids: [root, slurm]
+  expected-plugin-name: spank_quantum
+
+slurm:
+  cluster-name: linux
+  command: scontrol
+
+qfw:
+  activation: /opt/openqse/qfw/bin/qfw-activate
+  venv: /opt/openqse/qfw-venv
+  site-config: /etc/openqse/qfw/site.yaml
+
+journal:
+  path: /var/lib/qfw-slurm-gateway/reservations.sqlite3

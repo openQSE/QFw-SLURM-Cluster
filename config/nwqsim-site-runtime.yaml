@@ -1,0 +1,8 @@
+resolver:
+  scope-order:
+    - site
+
+local-services:
+  start-prte: true
+  prte:
+    hosts: ${QFW_SIMULATOR_NODES}
