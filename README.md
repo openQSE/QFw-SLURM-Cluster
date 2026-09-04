@@ -21,6 +21,7 @@ SLURM SPANK plugin) and [QDMI] (via IQM's `iqm-qdmi` reference implementation).
 
 - [Build The Environment](#build-the-environment)
 - [Start And Use The Cluster](#start-and-use-the-cluster)
+- [Operational Recipes](docs/recipes/README.md)
 - [Build And Run QFw](#build-and-run-qfw)
 - [Running Against The IQM QPU](IQM-ACCESS.md) — credentials, remote access, hardware smoke tests
 - [Design Overview](#design-overview)
