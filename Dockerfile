@@ -395,6 +395,8 @@ RUN set -ex \
     && rm -f /etc/munge/munge.key /run/munge/munge.pid \
         /run/munge/munge.socket.2 \
     && cmake --install "${QFW_SLURM_BUILD}" \
+    && install -d -m 0755 /usr/local/share/man \
+    && cp -a "${QFW_SLURM_PREFIX}/share/man/." /usr/local/share/man/ \
     && install -o root -g root -m 0755 \
         "${QFW_SLURM_PREFIX}/lib64/slurm/spank_quantum.so" \
         /usr/lib64/slurm/spank_quantum.so \
@@ -404,9 +406,13 @@ RUN set -ex \
     && test -f "${QFW_SLURM_PREFIX}/share/licenses/qfw-slurm/LICENSE" \
     && test -f "${QFW_SLURM_PREFIX}/share/man/man7/qfw-slurm.7" \
     && test -f "${QFW_SLURM_PREFIX}/share/man/man8/qfw-slurm-gateway.8" \
+    && test -f "${QFW_SLURM_PREFIX}/share/man/man1/qfw-sinfo.1" \
+    && test -f "${QFW_SLURM_PREFIX}/share/man/man1/qfw-squeue.1" \
     && test -f "${QFW_SLURM_PREFIX}/share/qfw-slurm/config/plugin.conf.example" \
     && "${QFW_IMAGE_VENV}/bin/python" -c \
-        'import qfw_slurm_gateway' \
+        'import qfw_slurm_gateway, qfw_slurm_inspect' \
+    && test -x "${QFW_IMAGE_VENV}/bin/qfw-sinfo" \
+    && test -x "${QFW_IMAGE_VENV}/bin/qfw-squeue" \
     && rm -rf "${QFW_SLURM_SOURCE}" "${QFW_SLURM_BUILD}"
 
 ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
