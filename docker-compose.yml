@@ -29,7 +29,7 @@ services:
       - etc_munge:/etc/munge
       - etc_slurm:/etc/slurm
       - var_log_slurm:/var/log/slurm
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
     expose:
       - "6819"
     depends_on:
@@ -49,8 +49,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
@@ -74,7 +74,7 @@ services:
       - etc_slurm:/etc/slurm
       - var_log_slurm:/var/log/slurm
       - slurm_jobdir:/data
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
     expose:
       - "6820"
     ports:
@@ -97,8 +97,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
@@ -122,8 +122,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
@@ -147,8 +147,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
@@ -172,8 +172,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
@@ -197,8 +197,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
@@ -222,8 +222,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
@@ -247,8 +247,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
@@ -272,8 +272,8 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - ./shared-dir:/mnt
-      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
       # Shim live-edit overlay: the new parallel bifurcation service plus its
       # service-registry entry. Native svc_iqm_qpm is unchanged, so it needs
       # no overlay. (Targeted mounts avoid shadowing image-built artifacts.)
