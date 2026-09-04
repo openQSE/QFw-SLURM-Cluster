@@ -197,7 +197,7 @@ RUN set -ex \
     && cd /tmp \
     && curl -L -o osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz \
         https://mvapich.cse.ohio-state.edu/download/mvapich/osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz \
-    && tar -xzf osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz \
+    && tar --no-same-owner -xzf osu-micro-benchmarks-${OSU_OMB_VERSION}.tar.gz \
     && cd osu-micro-benchmarks-${OSU_OMB_VERSION} \
     && ./configure CC=mpicc CXX=mpicxx --prefix="${OSU_OMB_PREFIX}" \
     && make -j"$(nproc)" all \
