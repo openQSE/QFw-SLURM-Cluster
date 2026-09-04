@@ -10,7 +10,11 @@ nwqsim_runtime_file="${script_dir}/config/nwqsim-site-runtime.yaml"
 device_file="${script_dir}/config/device-access.yaml"
 credential_file="${script_dir}/config/qpu-users.json"
 account="qfw-test"
-containers=(slurmdbd slurmctld slurmrestd c1 c2 c3 c4 c5 c6 c7 c8)
+containers=(
+	slurmdbd slurmctld slurmrestd
+	c1 c2 c3 c4 c5 c6 c7 c8
+	nwqsim-head nwqsim-worker-1 nwqsim-worker-2 iqm-head
+)
 
 die() {
 	echo "qfw-provision: $*" >&2

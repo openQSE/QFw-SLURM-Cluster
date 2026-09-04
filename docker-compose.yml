@@ -305,6 +305,98 @@ services:
     networks:
       - slurm-network
 
+  nwqsim-head:
+    <<: *slurmd-resources
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: nwqsim-head
+    container_name: nwqsim-head
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
+  nwqsim-worker-1:
+    <<: *slurmd-resources
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: nwqsim-worker-1
+    container_name: nwqsim-worker-1
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
+  nwqsim-worker-2:
+    <<: *slurmd-resources
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: nwqsim-worker-2
+    container_name: nwqsim-worker-2
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
+  iqm-head:
+    <<: *slurmd-resources
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: iqm-head
+    container_name: iqm-head
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
 volumes:
   etc_munge:
   etc_slurm:

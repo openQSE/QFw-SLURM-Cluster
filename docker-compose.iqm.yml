@@ -33,26 +33,14 @@
 #   docker compose --env-file qfw-install.env \
 #       -f docker-compose.yml -f docker-compose.iqm.yml up -d
 #
-# Only the quantum-partition nodes (c5-c8) talk to the QPU; slurmctld is included
-# so `docker exec slurmctld ...` can verify the configuration.
+# Only the IQM service host talks to the QPU. slurmctld is included so
+# `docker exec slurmctld ...` can verify the configuration.
 
 services:
   slurmctld:
     environment:
       QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml
 
-  c5:
-    environment:
-      QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml
-
-  c6:
-    environment:
-      QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml
-
-  c7:
-    environment:
-      QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml
-
-  c8:
+  iqm-head:
     environment:
       QFW_DEVICE_ACCESS_CFG: /workspace/qfw-container-base/iqm-device-access.yaml

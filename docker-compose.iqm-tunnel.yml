@@ -28,18 +28,6 @@ services:
     extra_hosts:
       - "qccsw.ccs.ornl.gov:host-gateway"
 
-  c5:
-    extra_hosts:
-      - "qccsw.ccs.ornl.gov:host-gateway"
-
-  c6:
-    extra_hosts:
-      - "qccsw.ccs.ornl.gov:host-gateway"
-
-  c7:
-    extra_hosts:
-      - "qccsw.ccs.ornl.gov:host-gateway"
-
-  c8:
+  iqm-head:
     extra_hosts:
       - "qccsw.ccs.ornl.gov:host-gateway"

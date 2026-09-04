@@ -10,11 +10,5 @@ return {
 				["ornl-iqm-20q"] = true,
 			},
 		},
-		quantum = {
-			allowed = {
-				nwqsim = true,
-				["ornl-iqm-20q"] = true,
-			},
-		},
 	},
 }
