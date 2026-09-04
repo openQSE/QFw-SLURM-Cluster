@@ -419,9 +419,19 @@ ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
     QRMI_PREFIX=${QRMI_PREFIX} \
     QRMI_VERSION=${QRMI_VERSION} \
     MODULEPATH=/etc/modulefiles:/usr/share/Modules/modulefiles:/usr/share/modulefiles \
-    LD_LIBRARY_PATH=${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH}
+    LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${OMPI_PREFIX}/lib64:${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH}
 
 COPY modulefiles /etc/modulefiles
+RUN set -ex \
+    && env -i PATH=/usr/share/Modules/bin:/usr/bin:/bin \
+        MODULEPATH=/etc/modulefiles:/usr/share/Modules/modulefiles \
+        modulecmd sh load libfabric openmpi nwqsim \
+        >/tmp/qfw-simulator-environment.sh \
+    && . /tmp/qfw-simulator-environment.sh \
+    && command -v prte \
+    && command -v pterm \
+    && command -v circuit_runner.nwqsim \
+    && rm -f /tmp/qfw-simulator-environment.sh
 
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf
@@ -476,6 +486,10 @@ RUN set -x \
     &&  useradd -r -g users --uid=1010 -m -c "Solomon Grundy" sgrundy
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY tools/qfw-site-services /usr/local/sbin/qfw-site-services
+COPY man/man8/qfw-site-services.8 /usr/local/share/man/man8/qfw-site-services.8
+RUN chmod 0755 /usr/local/sbin/qfw-site-services \
+    && chmod 0644 /usr/local/share/man/man8/qfw-site-services.8
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 CMD ["slurmdbd"]

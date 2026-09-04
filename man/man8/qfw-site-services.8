@@ -1,0 +1,67 @@
+.TH QFW-SITE-SERVICES 8 "September 2026" "QFw Slurm Cluster" "Administration"
+.SH NAME
+qfw-site-services \- manage the virtual cluster QFw service plane
+.SH SYNOPSIS
+.B qfw-site-services
+.RB [ \-\-dry-run ]
+.BR start | status | stop
+.SH DESCRIPTION
+.B qfw-site-services
+starts and stops the administrator-owned site directory, NWQSim DVM and QPM,
+and IQM QPM used by the QFw virtual Slurm cluster.
+The command runs on
+.B slurmctld
+as root and invokes the installed QFw service managers on their assigned
+service nodes.
+.SH ACTIONS
+.TP
+.B start
+Start the directory service, NWQSim service, and IQM service in dependency
+order.  Partial startup failure removes only components created by that
+invocation.
+.TP
+.B status
+Report the state of each service manager and the gateway endpoint.
+.TP
+.B stop
+Stop the IQM QPM, NWQSim QPM and DVM, then the directory service.
+.SH OPTIONS
+.TP
+.B \-\-dry-run
+Print the remote commands and dependency order without executing them.
+.SH ENVIRONMENT
+The command accepts administrator overrides through
+.BR QFW_INSTALL_PREFIX ,
+.BR QFW_VENV ,
+.BR QFW_SHARED_ROOT ,
+.BR QFW_SITE_CONFIG ,
+.BR QFW_SITE_RUN_ROOT ,
+.BR QFW_DIR_NODE ,
+.BR QFW_NWQSIM_NODE ,
+.BR QFW_IQM_NODE ,
+.BR QFW_SIMULATOR_NODES ,
+.BR QFW_GATEWAY_HOST ,
+.BR QFW_GATEWAY_PORT ,
+and
+.BR QFW_SITE_START_TIMEOUT .
+.SH FILES
+.TP
+.I /etc/openqse/qfw/site.yaml
+Default QFw site configuration.
+.TP
+.I /var/lib/qfw-site-services
+Default administrator-owned manager state root on each service host.
+.SH EXAMPLES
+.nf
+qfw-site-services start
+qfw-site-services status
+qfw-site-services stop
+.fi
+.SH SECURITY
+The command requires root for live actions.  It passes protected configuration
+paths to the QPM and does not display or replace credential contents.
+.SH SEE ALSO
+.BR qfw-dir-svc (1),
+.BR qfw-qpm-svc (1),
+.BR qfw-sinfo (1),
+.BR qfw-squeue (1)

@@ -1,0 +1,252 @@
+#!/bin/bash
+
+set -uo pipefail
+
+QFW_INSTALL_PREFIX="${QFW_INSTALL_PREFIX:-/opt/openqse/qfw}"
+QFW_VENV="${QFW_VENV:-/opt/openqse/qfw-venv}"
+QFW_SHARED_ROOT="${QFW_SHARED_ROOT:-/workspace/qfw-container-base}"
+QFW_SITE_CONFIG="${QFW_SITE_CONFIG:-/etc/openqse/qfw/site.yaml}"
+QFW_SITE_RUN_ROOT="${QFW_SITE_RUN_ROOT:-/var/lib/qfw-site-services}"
+QFW_DIR_NODE="${QFW_DIR_NODE:-slurmctld}"
+QFW_NWQSIM_NODE="${QFW_NWQSIM_NODE:-nwqsim-head}"
+QFW_IQM_NODE="${QFW_IQM_NODE:-iqm-head}"
+QFW_SIMULATOR_NODES="${QFW_SIMULATOR_NODES:-nwqsim-head,nwqsim-worker-1,nwqsim-worker-2}"
+QFW_GATEWAY_HOST="${QFW_GATEWAY_HOST:-slurmctld}"
+QFW_GATEWAY_PORT="${QFW_GATEWAY_PORT:-18095}"
+QFW_SITE_START_TIMEOUT="${QFW_SITE_START_TIMEOUT:-300}"
+
+directory_run_dir="${QFW_SITE_RUN_ROOT}/directory"
+nwqsim_run_dir="${QFW_SITE_RUN_ROOT}/qpm/nwqsim"
+iqm_run_dir="${QFW_SITE_RUN_ROOT}/qpm/iqm-ornl-20q"
+dry_run=false
+
+usage() {
+	cat <<EOF
+Usage: qfw-site-services [--dry-run] start|status|stop
+
+Manage the virtual cluster's administrator-owned QFw service plane.
+
+Actions:
+  start      Start the directory, NWQSim DVM/QPM, and IQM QPM
+  status     Report each service manager and gateway endpoint
+  stop       Stop both QPMs and then the directory service
+
+Options:
+  --dry-run  Print the commands without executing them
+EOF
+}
+
+die() {
+	echo "qfw-site-services: $*" >&2
+	exit 1
+}
+
+quote_command() {
+	printf '%q ' "$@"
+	printf '\n'
+}
+
+run_qfw() {
+	local node="$1"
+	shift
+	if ${dry_run}; then
+		printf '%s: ' "${node}"
+		quote_command "$@"
+		return 0
+	fi
+
+	ssh -o BatchMode=yes -o ConnectTimeout=10 "root@${node}" \
+		/bin/bash -s -- \
+		"${QFW_INSTALL_PREFIX}" \
+		"${QFW_VENV}" \
+		"${QFW_SHARED_ROOT}" \
+		"${QFW_SITE_CONFIG}" \
+		"${QFW_SIMULATOR_NODES}" \
+		"$@" <<'EOF'
+set -uo pipefail
+
+qfw_prefix="$1"
+qfw_venv="$2"
+qfw_shared_root="$3"
+qfw_site_config="$4"
+qfw_simulator_nodes="$5"
+shift 5
+
+export QFW_SHARED_ROOT="${qfw_shared_root}"
+export QFW_SITE_CONFIG="${qfw_site_config}"
+export QFW_SIMULATOR_NODES="${qfw_simulator_nodes}"
+
+source "${qfw_prefix}/bin/qfw-activate" --venv "${qfw_venv}"
+"$@"
+status=$?
+qfw-deactivate >/dev/null 2>&1 || true
+exit "${status}"
+EOF
+}
+
+gateway_ready() {
+	if ${dry_run}; then
+		echo "${QFW_GATEWAY_HOST}: test TCP ${QFW_GATEWAY_PORT}"
+		return 0
+	fi
+	ssh -o BatchMode=yes -o ConnectTimeout=10 \
+		"root@${QFW_GATEWAY_HOST}" \
+		python3 - "${QFW_GATEWAY_HOST}" "${QFW_GATEWAY_PORT}" <<'PY'
+import socket
+import sys
+
+host = sys.argv[1]
+port = int(sys.argv[2])
+with socket.create_connection((host, port), timeout=5):
+    pass
+PY
+}
+
+wait_for_gateway() {
+	local deadline=$((SECONDS + QFW_SITE_START_TIMEOUT))
+	until gateway_ready >/dev/null 2>&1; do
+		if (( SECONDS >= deadline )); then
+			return 1
+		fi
+		sleep 2
+	done
+}
+
+stop_directory() {
+	run_qfw "${QFW_DIR_NODE}" qfw-dir-svc stop \
+		--run-dir "${directory_run_dir}"
+}
+
+stop_nwqsim() {
+	run_qfw "${QFW_NWQSIM_NODE}" qfw-qpm-svc stop \
+		--run-dir "${nwqsim_run_dir}"
+}
+
+stop_iqm() {
+	run_qfw "${QFW_IQM_NODE}" qfw-qpm-svc stop \
+		--run-dir "${iqm_run_dir}"
+}
+
+start_services() {
+	local directory_started=false
+	local nwqsim_started=false
+	local iqm_started=false
+
+	if ${dry_run}; then
+		echo "NWQSim simulator nodes: ${QFW_SIMULATOR_NODES}"
+	fi
+
+	if ! run_qfw "${QFW_DIR_NODE}" qfw-dir-svc start \
+			--scope site \
+			--run-dir "${directory_run_dir}" \
+			--site-config "${QFW_SITE_CONFIG}" \
+			--timeout "${QFW_SITE_START_TIMEOUT}"; then
+		return 1
+	fi
+	directory_started=true
+
+	if ! run_qfw "${QFW_NWQSIM_NODE}" qfw-qpm-svc start \
+			--scope site \
+			--run-dir "${nwqsim_run_dir}" \
+			--site-config "${QFW_SITE_CONFIG}" \
+			--service-id nwqsim \
+			--timeout "${QFW_SITE_START_TIMEOUT}"; then
+		${directory_started} && stop_directory >/dev/null 2>&1 || true
+		return 1
+	fi
+	nwqsim_started=true
+
+	if ! run_qfw "${QFW_IQM_NODE}" qfw-qpm-svc start \
+			--scope site \
+			--run-dir "${iqm_run_dir}" \
+			--site-config "${QFW_SITE_CONFIG}" \
+			--service-id iqm-ornl-20q \
+			--timeout "${QFW_SITE_START_TIMEOUT}"; then
+		${nwqsim_started} && stop_nwqsim >/dev/null 2>&1 || true
+		${directory_started} && stop_directory >/dev/null 2>&1 || true
+		return 1
+	fi
+	iqm_started=true
+
+	if ! wait_for_gateway; then
+		echo "qfw-site-services: gateway did not become ready" >&2
+		${iqm_started} && stop_iqm >/dev/null 2>&1 || true
+		${nwqsim_started} && stop_nwqsim >/dev/null 2>&1 || true
+		${directory_started} && stop_directory >/dev/null 2>&1 || true
+		return 1
+	fi
+
+	echo "QFw site services are ready."
+}
+
+service_status() {
+	local status=0
+
+	echo "Directory service (${QFW_DIR_NODE})"
+	run_qfw "${QFW_DIR_NODE}" qfw-dir-svc status \
+		--run-dir "${directory_run_dir}" || status=1
+	echo "NWQSim QPM (${QFW_NWQSIM_NODE})"
+	run_qfw "${QFW_NWQSIM_NODE}" qfw-qpm-svc status \
+		--run-dir "${nwqsim_run_dir}" || status=1
+	echo "IQM QPM (${QFW_IQM_NODE})"
+	run_qfw "${QFW_IQM_NODE}" qfw-qpm-svc status \
+		--run-dir "${iqm_run_dir}" || status=1
+	echo "QFw Slurm gateway (${QFW_GATEWAY_HOST}:${QFW_GATEWAY_PORT})"
+	if gateway_ready; then
+		echo "ready"
+	else
+		echo "not-ready"
+		status=1
+	fi
+	return "${status}"
+}
+
+stop_services() {
+	local status=0
+
+	stop_iqm || status=1
+	stop_nwqsim || status=1
+	stop_directory || status=1
+	return "${status}"
+}
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--dry-run)
+		dry_run=true
+		shift
+		;;
+	-h|--help)
+		usage
+		exit 0
+		;;
+	start|status|stop)
+		[[ -z "${action:-}" ]] || die "only one action may be specified"
+		action="$1"
+		shift
+		;;
+	*)
+		die "unknown argument: $1"
+		;;
+	esac
+done
+
+[[ -n "${action:-}" ]] || {
+	usage >&2
+	exit 2
+}
+if ! ${dry_run} && [[ ${EUID} -ne 0 ]]; then
+	die "must run as root"
+fi
+
+case "${action}" in
+start)
+	start_services
+	;;
+status)
+	service_status
+	;;
+stop)
+	stop_services
+	;;
+esac
