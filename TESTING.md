@@ -16,31 +16,62 @@ the `quantum` partition.
 ## Prerequisites
 
 - Docker + Docker Compose.
-- Both repos checked out at the branch under test:
-  - this repo (`QFw-SLURM-Cluster`) on `shim-phase2` (or `main` once merged);
-  - the QFw checkout the cluster bind-mounts, in `shared-dir/QFw`, on the
-    matching branch.
+- This repo (`QFw-SLURM-Cluster`) checked out.
+- A QFw checkout at `shared-dir/QFw`, which the cluster bind-mounts. QFw is a
+  separate repository and not a submodule of this one, so clone it yourself:
 
 ```bash
-# inner QFw checkout with the shim wiring (PR branch shown; use openQSE/main if merged)
-git clone https://github.com/DougSO/QFw.git shared-dir/QFw
-cd shared-dir/QFw && git checkout shim-phase2 && git submodule update --init --recursive && cd ../..
+git clone --recursive https://github.com/openQSE/QFw.git shared-dir/QFw
+```
+
+`--recursive` is required, since the shim needs the `qhw-*` packages and DEFw.
+QFw declares its submodules over SSH, so without GitHub SSH access to openQSE,
+rewrite them to HTTPS first:
+
+```bash
+git config --global url."https://github.com/".insteadOf "git@github.com:"
 ```
 
 ## Build
 
 ```bash
 ./do_configure.sh
-./do_build.sh        # builds QRMI + iqm-qdmi[qiskit] + QFw + qhw; takes a while
+./do_build.sh        # image: QRMI C library + SPANK plugin, OpenMPI, libfabric
+./do_startup.sh      # start the cluster
+./do_qfw_build.sh    # QFw + DEFw + the shim venv, onto the shared mount
 ```
+
+The order matters. QFw is not baked into the image, so `do_build.sh` only builds
+the image, and `do_qfw_build.sh` builds your `shared-dir/QFw` checkout *inside*
+the running cluster. That is why the cluster has to be started between them.
+`do_qfw_build.sh` also installs the QRMI and QDMI Python bindings into the
+shared-mount venv, pinned to the `QRMI_VERSION` the image exports.
 
 The shim Python is bind-mounted, so after the first build, code changes in
 `shared-dir/QFw/services/svc_lib_qpm` are picked up without rebuilding.
 
 ## Tier 1 — Local smoke (no credentials)
 
+The smoke test resolves a device descriptor for `ornl-iqm-20q`, which it reads
+from a device-access config. That file is gitignored and the install tree ships
+no default, so copy the example once:
+
 ```bash
-./do_startup.sh
+cp shared-dir/iqm-device-access.yaml.example shared-dir/iqm-device-access.yaml
+```
+
+Leave the contents as they are. Tier 1 reads only the descriptor fields
+(`provider`, `provider-device-id`, `libraries`, `preference`, `caps`), so the
+`url` and `credential-db` values in the example are never dereferenced and no
+credentials or network access are needed. Skipping this step fails with:
+
+```text
+QFw device access config file was not found: ...
+```
+
+Then, with the cluster running:
+
+```bash
 docker exec -w /workspace/qfw-container-base slurmctld sbatch shim-smoke.sbatch
 # read the result:
 cat shared-dir/shim-smoke.<jobid>.out
