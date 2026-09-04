@@ -63,6 +63,11 @@ fi
 # Older images predate that ENV, so fall back to the Dockerfile's pinned ARG.
 QRMI_VERSION_HOST="$(sed -n 's/^ARG QRMI_VERSION=//p' "${SCRIPT_DIR}/Dockerfile" | head -1)"
 
+# The host path behind the shared mount, so the preflight checks below can name
+# the directory the user actually has to fix rather than the container path.
+QFW_HOST_BASE="$(sed -n 's/^QFW_CONTAINER_BASE=//p' "${SCRIPT_DIR}/qfw-install.env" 2>/dev/null | head -1)"
+[ -n "${QFW_HOST_BASE}" ] || QFW_HOST_BASE="shared-dir"
+
 echo "Building QFw + DEFw inside ${CONTAINER}"
 
 docker exec -i \
@@ -70,6 +75,8 @@ docker exec -i \
     -e QFW_BUILD_JOBS_OVERRIDE="${JOBS}" \
     -e QFW_DO_CLEAN="${CLEAN}" \
     -e QFW_SKIP_VENV="${SKIP_VENV}" \
+    -e QFW_HOST_BASE="${QFW_HOST_BASE}" \
+    -e QFW_CONTAINER_NAME="${CONTAINER}" \
     "${CONTAINER}" bash -s <<'REMOTE'
 set -euo pipefail
 
@@ -78,13 +85,46 @@ QFW_SRC="${QFW_SRC:-${QFW_BASE}/QFw}"
 QFW_VENV="${QFW_VENV:-${QFW_BASE}/qfw-venv}"
 QFW_BUILD="${QFW_BUILD:-${QFW_BASE}/qfw-build}"
 QFW_PREFIX="${QFW_PREFIX:-${QFW_BASE}/qfw-install}"
+QFW_HOST_BASE="${QFW_HOST_BASE:-shared-dir}"
+QFW_CONTAINER_NAME="${QFW_CONTAINER_NAME:-slurmctld}"
 
 jobs="${QFW_BUILD_JOBS_OVERRIDE:-}"
 [ -n "${jobs}" ] || jobs="$(nproc)"
 
+# Preflight. These conditions all used to surface as "No CMakeLists.txt",
+# because a [ -f ] test is false whether a file is absent or merely unreadable.
+# An unlabelled SELinux bind mount therefore reported a missing checkout, which
+# sends you looking in the wrong place entirely.
+if [ ! -d "${QFW_BASE}" ]; then
+    echo "The shared mount ${QFW_BASE} does not exist in this container." >&2
+    echo "Check QFW_CONTAINER_BASE in qfw-install.env, then re-run ./do_startup.sh." >&2
+    exit 1
+fi
+
+if ! ls "${QFW_BASE}" >/dev/null 2>&1; then
+    echo "The shared mount ${QFW_BASE} exists but its contents cannot be read." >&2
+    echo "On an SELinux host this is the bind-mount label, not a missing checkout." >&2
+    echo "Compare the host against the container:" >&2
+    echo "    ls -l ${QFW_HOST_BASE}" >&2
+    echo "    docker exec ${QFW_CONTAINER_NAME} ls -l ${QFW_BASE}" >&2
+    echo "If the host can read it and the container cannot, relabel it:" >&2
+    echo "    chcon -Rt container_file_t ${QFW_HOST_BASE}" >&2
+    exit 1
+fi
+
+if [ ! -d "${QFW_SRC}" ]; then
+    echo "No QFw checkout at ${QFW_SRC}." >&2
+    echo "QFw is a separate repository, not a submodule of the cluster repo, so" >&2
+    echo "clone it onto the shared mount from the host:" >&2
+    echo "    git clone --recursive https://github.com/openQSE/QFw.git ${QFW_HOST_BASE}/QFw" >&2
+    exit 1
+fi
+
 if [ ! -f "${QFW_SRC}/CMakeLists.txt" ]; then
     echo "No CMakeLists.txt in ${QFW_SRC}." >&2
     echo "This build needs a QFw checkout on the v0.1 release line or later." >&2
+    echo "Check what the checkout is on with:" >&2
+    echo "    git -C ${QFW_HOST_BASE}/QFw log --oneline -1" >&2
     exit 1
 fi
 
