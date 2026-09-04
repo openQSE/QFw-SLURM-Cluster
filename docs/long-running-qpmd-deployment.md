@@ -11,6 +11,29 @@ The root account owns the directory service, optional PRTE DVM, and QPMd.
 Regular users own their Slurm jobs and QFw application runtime state. Stopping
 an application does not stop the site-owned service plane.
 
+## Service Node Topology
+
+Slurm manages eight ordinary application nodes and four dedicated service
+hosts. The `normal` partition contains `c1` through `c8`. The visible
+`qfw-services` partition contains the following administrator-only nodes:
+
+| Node | Role |
+| --- | --- |
+| `nwqsim-head` | NWQSim QPMd and PRTE DVM master |
+| `nwqsim-worker-1` | NWQSim DVM worker |
+| `nwqsim-worker-2` | NWQSim DVM worker |
+| `iqm-head` | IQM QPMd and provider client |
+
+Every service host runs `slurmd` and participates in the same MUNGE trust
+domain as the controller and application nodes. Static node features include
+the owning QPM service ID. This allows `qfw-sinfo` to retain a `DOWN` row when
+the QPM is absent from the directory.
+
+Regular users cannot submit work to `qfw-services`. Application allocations
+therefore consume classical nodes and logical QPM capacity independently.
+Several allocations can reserve slices of one QPM when its admission policy
+permits that sharing.
+
 ## Cluster Users
 
 The cluster provides three regular test users with stable identities.
@@ -227,10 +250,31 @@ directory and long-running QPM. CI injects IQM credentials before the hardware
 QPM starts. A regular user then enters through `do_ssh.sh --user`, requests a
 Slurm allocation, activates QFw, and runs an example in site service mode.
 
+The cluster provides one root command for the complete site service plane:
+
+```bash
+qfw-site-services start
+qfw-site-services status
+```
+
+Startup creates the directory on `slurmctld`, starts one PRTE DVM across the
+three NWQSim hosts, and starts the NWQSim and IQM QPMs. The command waits for
+manager readiness and gateway connectivity. Run `man 8 qfw-site-services` for
+its configuration and failure behavior.
+
 ```bash
 cd "${QFW_SHARE_DIR}/examples"
 ./qfw_run_all.sh --service-mode site --backend nwqsim
 ```
+
+Users inspect service and active allocation state after activation:
+
+```bash
+qfw-sinfo
+qfw-squeue
+```
+
+The corresponding references are `qfw-sinfo(1)` and `qfw-squeue(1)`.
 
 For IQM validation, the user selects the IQM backend and the bounded test
 approved by the CI workflow. Application teardown removes state beneath that
@@ -255,3 +299,24 @@ Deployment validation must confirm:
 - A root-owned long-running QPM remains alive across application teardown.
 - Multiple users can reserve and execute against the same QPM without sharing
   application runtime or reservation state.
+
+## Recovery
+
+Run `qfw-site-services status` before restarting any component. A stale QPM or
+directory manager record remains under `/var/lib/qfw-site-services` on the
+host that owns it. The QFw manager reports stale process state and refuses to
+replace a live instance.
+
+Use `qfw-site-services stop` to unwind the service plane in dependency order.
+It stops both QPMs before the directory and terminates the NWQSim DVM with its
+recorded URI. If a host is unavailable, recover that host and repeat `stop`.
+Do not delete manager state while a recorded process remains alive.
+
+After host recovery, run `start` and confirm service registration with
+`qfw-sinfo`. A restarted QPM has a new runtime identity and a later in-memory
+directory generation. Slurm nodes that remain `DOWN` should be resumed only
+after their `slurmd`, MUNGE identity, CPU count, and memory agree with
+`slurm.conf`.
+
+Protected IQM files are independent from generated manager state. Recovery
+must preserve `/etc/openqse/qfw/device` ownership, permissions, and contents.
