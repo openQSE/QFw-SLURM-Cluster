@@ -741,6 +741,61 @@ If you only need to see what a helper would run:
 
 </details>
 
+<details>
+<summary>SELinux hosts (Fedora, RHEL, Rocky, CentOS Stream)</summary>
+
+The compose file mounts two host paths into every service, `QFW_CONTAINER_BASE`
+and `shared-dir`. On a host with SELinux enforcing, a bind mount keeps whatever
+label the host directory already carries, container processes run as
+`container_t`, and access is denied:
+
+```text
+$ podman exec -ti slurmctld ls -l /workspace/qfw-container-base
+ls: cannot open directory '/workspace/qfw-container-base': Permission denied
+```
+
+Both mounts therefore carry the `:z` suffix, which asks the container runtime to
+relabel those directories as shared container content. It is `:z` rather than
+`:Z` because eleven services mount the same two paths, and `:Z` would give each
+service a private label and lock the others out. Nothing is required on your
+side. The suffix is ignored on hosts without SELinux, so macOS, Debian, and
+Ubuntu are unaffected.
+
+This failure is worth recognising because it does not announce itself.
+`do_qfw_build.sh` looks for the [QFw] checkout with a `[ -f ]` test, and that test
+is false whether the file is missing or merely unreadable. An unlabelled mount is
+therefore reported as a missing checkout:
+
+```text
+No CMakeLists.txt in /workspace/qfw-container-base/QFw.
+This build needs a QFw checkout on the v0.1 release line or later.
+```
+
+Check that the mount is readable before going looking for a missing clone.
+
+There are two cases where `:z` is not the right tool:
+
+- Relabelling is recursive and happens in place. `QFW_CONTAINER_BASE` defaults to
+  `./shared-dir` inside this repository, which is the intended target. Do not
+  point it at your home directory or another broadly shared path.
+- The filesystem has to support extended attributes. Relabelling fails on NFS and
+  similar, so a shared directory on a network filesystem needs another approach.
+
+In either case, remove the suffix and label a repository-local directory
+yourself:
+
+```bash
+sudo semanage fcontext -a -t container_file_t "$(pwd)/shared-dir(/.*)?"
+sudo restorecon -R shared-dir
+```
+
+`chcon -Rt container_file_t shared-dir` has the same immediate effect and is
+useful for a one-off test, but it does not survive `restorecon` or a filesystem
+relabel. When it is reverted the cluster fails exactly as above, with nothing to
+connect the failure to a relabel that happened days earlier.
+
+</details>
+
 [DEFw]: https://github.com/openQSE/DEFw
 [libfabric]: https://github.com/ofiwg/libfabric
 [NWQ-Sim]: https://github.com/pnnl/NWQ-Sim
