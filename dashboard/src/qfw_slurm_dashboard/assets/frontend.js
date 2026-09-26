@@ -2391,9 +2391,10 @@
     const editing = active instanceof Element
       && active.matches("input, textarea, select, [contenteditable=true]")
       && container.contains(active);
+    const expandedSelect = container.querySelector("select[aria-expanded=true]");
     const scrolling = [...activeScrollPointers.values()].some((target) =>
       container.contains(target));
-    return editing || scrolling || selectionIntersects(container);
+    return Boolean(expandedSelect) || editing || scrolling || selectionIntersects(container);
   }
 
   function refreshExperimentSubmissionStatus(root) {
