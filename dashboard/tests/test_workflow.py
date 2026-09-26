@@ -89,8 +89,11 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert 'container.querySelector("select[aria-expanded=true]")' in frontend
     assert 'container.querySelector("details[open]")' in frontend
     assert "const SCROLL_INTERACTION_GRACE_MS = 1200;" in frontend
+    assert "const CONTROL_INTERACTION_GRACE_MS = 2500;" in frontend
     assert "function recentlyScrolledInside(container)" in frontend
+    assert "function recentlyInteractedWithControlInside(container)" in frontend
     assert 'document.addEventListener("wheel", trackRecentScrollInteraction, true)' in frontend
+    assert 'document.addEventListener("pointerdown", trackRecentControlInteraction, true)' in frontend
     assert frontend.index("if (group.experimentLauncher) renderExperimentForm(grid);") < frontend.index(
         "group.widgets.forEach"
     )
@@ -334,6 +337,8 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function userIsInteractingWith(container)" in popout
     assert 'container.querySelector("details[open]")' in popout
     assert "const activeScrollPointers = new Map();" in popout
+    assert "const CONTROL_INTERACTION_GRACE_MS = 2500;" in popout
+    assert "function recentlyInteractedWithControlInside(container)" in popout
     assert "function scrollInteractionTarget(event)" in popout
     assert "if (userIsInteractingWith(output))" in popout
     assert 'output.addEventListener("focusout"' in popout

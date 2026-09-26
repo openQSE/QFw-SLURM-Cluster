@@ -151,6 +151,8 @@
     let camera = { x: 24, y: 24, scale: 1 };
     let pan = null;
     const activeScrollPointers = new Map();
+    const CONTROL_INTERACTION_GRACE_MS = 2500;
+    const recentControlInteractions = new Map();
 
     function publishPresentation(presentation) {
       channel.postMessage({
@@ -502,7 +504,41 @@
       return Boolean(expandedSelect || expandedDisclosure)
         || editing
         || scrolling
+        || recentlyInteractedWithControlInside(container)
         || selectionIntersects(container);
+    }
+
+    function controlInteractionTarget(event) {
+      return event.composedPath().find((target) =>
+        target instanceof Element
+        && target.matches("input, textarea, select, button, summary, [contenteditable=true]"));
+    }
+
+    function rememberControlInteraction(target) {
+      if (!(target instanceof Element)) return;
+      const expiresAt = Date.now() + CONTROL_INTERACTION_GRACE_MS;
+      recentControlInteractions.set(target, expiresAt);
+      window.setTimeout(() => {
+        if ((recentControlInteractions.get(target) || 0) <= Date.now()) {
+          recentControlInteractions.delete(target);
+        }
+      }, CONTROL_INTERACTION_GRACE_MS + 50);
+    }
+
+    function recentlyInteractedWithControlInside(container) {
+      const now = Date.now();
+      for (const [target, expiresAt] of recentControlInteractions) {
+        if (expiresAt <= now || !target.isConnected) {
+          recentControlInteractions.delete(target);
+        } else if (container.contains(target)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function trackRecentControlInteraction(event) {
+      rememberControlInteraction(controlInteractionTarget(event));
     }
 
     function scrollInteractionTarget(event) {
@@ -522,6 +558,10 @@
       const target = scrollInteractionTarget(event);
       if (target) activeScrollPointers.set(event.pointerId, target);
     }, true);
+    document.addEventListener("pointerdown", trackRecentControlInteraction, true);
+    document.addEventListener("focusin", trackRecentControlInteraction, true);
+    document.addEventListener("input", trackRecentControlInteraction, true);
+    document.addEventListener("change", trackRecentControlInteraction, true);
     ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => {
       document.addEventListener(type, (event) => {
         activeScrollPointers.delete(event.pointerId);
