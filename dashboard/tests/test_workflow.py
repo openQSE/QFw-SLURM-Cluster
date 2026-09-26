@@ -87,6 +87,7 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "refreshPackagedExamples(root);" in frontend
     assert "control === document.activeElement" in frontend
     assert 'container.querySelector("select[aria-expanded=true]")' in frontend
+    assert 'container.querySelector("details[open]")' in frontend
     assert "const SCROLL_INTERACTION_GRACE_MS = 1200;" in frontend
     assert "function recentlyScrolledInside(container)" in frontend
     assert 'document.addEventListener("wheel", trackRecentScrollInteraction, true)' in frontend
@@ -331,6 +332,7 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert 'if (topologyGraph) topologyGraph.style.width = "100%"' in popout
     assert "function selectionIntersects(container)" in popout
     assert "function userIsInteractingWith(container)" in popout
+    assert 'container.querySelector("details[open]")' in popout
     assert "const activeScrollPointers = new Map();" in popout
     assert "function scrollInteractionTarget(event)" in popout
     assert "if (userIsInteractingWith(output))" in popout

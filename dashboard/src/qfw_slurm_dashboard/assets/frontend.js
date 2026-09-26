@@ -2455,9 +2455,10 @@
       && active.matches("input, textarea, select, [contenteditable=true]")
       && container.contains(active);
     const expandedSelect = container.querySelector("select[aria-expanded=true]");
+    const expandedDisclosure = container.querySelector("details[open]");
     const scrolling = [...activeScrollPointers.values()].some((target) =>
       container.contains(target));
-    return Boolean(expandedSelect)
+    return Boolean(expandedSelect || expandedDisclosure)
       || editing
       || scrolling
       || recentlyScrolledInside(container)
