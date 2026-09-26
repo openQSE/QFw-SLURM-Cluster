@@ -69,6 +69,49 @@ cmp "${temporary}/health-summary.expected" "${temporary}/health-summary.out"
 	dry_run=false
 	target=all
 	json_status=true
+	directory_ready() {
+		echo 'qfw-dir-svc: service-plane state not found: /var/lib/qfw-site-services/directory/state/service-plane.json'
+		return 1
+	}
+	nwqsim_ready() {
+		echo 'qfw-qpm-svc: service-plane state not found: /var/lib/qfw-site-services/qpm/nwqsim/state/service-plane.json'
+		return 1
+	}
+	iqm_ready() {
+		echo 'qfw-qpm-svc: service-plane state not found: /var/lib/qfw-site-services/qpm/iqm-ornl-20q/state/service-plane.json'
+		return 1
+	}
+	shim_ready() {
+		echo 'qfw-qpm-svc: service-plane state not found: /var/lib/qfw-site-services/qpm/shim-ornl-20q/state/service-plane.json'
+		return 1
+	}
+	fake_iqm_ready() {
+		echo 'qfw-qpm-svc: service-plane state not found: /var/lib/qfw-site-services/qpm/fake-iqm/state/service-plane.json'
+		return 1
+	}
+	gateway_managed_ready() { echo 'not-ready'; return 1; }
+	service_status
+) >"${temporary}/missing-state-health.json"
+python3 - "${temporary}/missing-state-health.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    status = json.load(stream)
+assert status["schema"] == "qfw-site-services-status-v1"
+assert status["state"] == "down"
+assert all(
+    service["state"] == "down"
+    for service in status["services"].values()
+)
+assert status["services"]["directory"]["detail"]["state"] == "stopped"
+PY
+
+(
+	source "${command}"
+	dry_run=false
+	target=all
+	json_status=true
 	directory_ready() { echo '{"state":"ready"}'; }
 	nwqsim_ready() { echo '{"state":"ready"}'; }
 	iqm_ready() { echo '{"state":"ready"}'; }
