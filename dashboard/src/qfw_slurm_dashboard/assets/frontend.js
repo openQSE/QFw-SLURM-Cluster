@@ -1872,6 +1872,23 @@
     return mode === "dry-run" ? "Dry-Run" : "Run";
   }
 
+  function submissionMode() {
+    return widgetStates.submission_mode === "dry-run" ? "dry-run" : "submit";
+  }
+
+  function submissionModeLabel(count) {
+    return submissionMode() === "dry-run"
+      ? `Dry-Run (${count})`
+      : `Submit All (${count})`;
+  }
+
+  function setSubmissionMode(mode) {
+    widgetStates.submission_mode = mode === "dry-run" ? "dry-run" : "submit";
+    savePresentation();
+    renderDashboard();
+    publishWidgets();
+  }
+
   function setOperationMode(widget, mode) {
     widgetStates[widget] = {
       ...widgetStates[widget],
@@ -2468,6 +2485,44 @@
       || selectionIntersects(container);
   }
 
+  function formatSubmissionDryRun(result) {
+    const experiments = Array.isArray(result?.experiments) ? result.experiments : [];
+    const output = ["DRY RUN - jobs were not submitted"];
+    experiments.forEach((item, index) => {
+      output.push(
+        "",
+        `Application ${index + 1} · ${item.example || "application"}`,
+        `Experiment: ${item.experiment_id || "unknown"}`,
+        `Batch script: ${item.batch_script_path || "unknown"}`,
+        `Output file: ${item.output_path || "unknown"}`,
+      );
+      if (item.write_host_command) {
+        output.push(
+          "Would run from Docker host to write the batch file:",
+          `  ${item.write_host_command}`,
+        );
+      }
+      if (item.write_command) {
+        output.push(
+          "Would run inside the container to write the batch file:",
+          `  ${item.write_command}`,
+        );
+      }
+      output.push(
+        "Would submit from Docker host:",
+        `  ${item.submit_host_command || ""}`,
+        "Would run inside the container:",
+        `  ${item.submit_command || ""}`,
+      );
+      if (item.batch_script) {
+        output.push("", "Generated batch file:", item.batch_script.trimEnd());
+      } else if (item.external_batch) {
+        output.push("", "Existing batch file would be submitted as-is.");
+      }
+    });
+    return output.join("\n");
+  }
+
   function refreshExperimentSubmissionStatus(root) {
     const form = root?.querySelector(".qfw-experiment-form");
     if (!form) return;
@@ -2480,7 +2535,7 @@
     const staged = entries.filter((entry) => !submissionEntryIsInFlight(entry));
     const batchStatus = widgetStates.submissionSetStatus || {};
     const editing = Boolean(widgetStates.submissionSetEditing);
-    const requestPending = batchStatus.status === "requesting";
+    const requestPending = ["requesting", "dry-running"].includes(batchStatus.status);
     form.querySelectorAll(".qfw-submission-set-row").forEach((row) => {
       const entry = entries.find((item) => item.draft_id === row.dataset.draftId);
       if (!entry) return;
@@ -2507,12 +2562,20 @@
     form.classList.toggle("has-error", failed);
     submit.classList.toggle("is-depressed", requestPending);
     submit.disabled = requestPending || editing || entries.length === 0;
-    submit.textContent = `Submit All (${staged.length})`;
+    submit.textContent = submissionModeLabel(staged.length);
     submit.setAttribute("aria-pressed", requestPending ? "true" : "false");
     submit.setAttribute("aria-busy", requestPending ? "true" : "false");
     if (requestPending) {
-      output.textContent = `Submitting ${staged.length} applications …`;
+      output.textContent = batchStatus.status === "dry-running"
+        ? `Dry-running ${staged.length} applications ...`
+        : `Submitting ${staged.length} applications ...`;
       output.dataset.state = "running";
+      return;
+    }
+    if (batchStatus.status === "dry-run") {
+      output.textContent = `Dry-run ready · ${batchStatus.count || staged.length} applications`;
+      output.dataset.state = "succeeded";
+      terminal.textContent = batchStatus.output || "No dry-run output.";
       return;
     }
     if (batchStatus.status === "failed") {
@@ -3150,10 +3213,35 @@
     );
     submissionStatus.dataset.qfwSubmissionStatus = "";
     submissionStatus.dataset.state = "idle";
-    const submitSet = element("button", "qfw-submit-set", "Submit All (0)");
+    const submitSplit = element(
+      "div", "qfw-operation-run-split qfw-submission-run-split",
+    );
+    const submitSet = element(
+      "button", "qfw-submit-set qfw-operation-run", "Submit All (0)",
+    );
     submitSet.type = "button";
     submitSet.dataset.qfwSubmitSet = "";
-    submissionActions.append(submissionStatus, submitSet);
+    const submissionModeValue = element("input");
+    submissionModeValue.type = "hidden";
+    submissionModeValue.dataset.qfwControl = "submission_mode";
+    submissionModeValue.value = submissionMode();
+    const submissionModePicker = element("details", "qfw-operation-mode-picker");
+    const submissionModeToggle = element(
+      "summary", "qfw-operation-mode-toggle", "▾",
+    );
+    submissionModeToggle.setAttribute("aria-label", "Choose submission mode");
+    const submissionModeMenu = element("div", "qfw-operation-mode-menu");
+    [["submit", "Submit"], ["dry-run", "Dry-Run"]].forEach(([value, label]) => {
+      const choice = element("button", "", label);
+      choice.type = "button";
+      choice.dataset.qfwModeChoice = value;
+      choice.setAttribute("aria-pressed", String(value === submissionMode()));
+      choice.addEventListener("click", () => setSubmissionMode(value));
+      submissionModeMenu.append(choice);
+    });
+    submissionModePicker.append(submissionModeToggle, submissionModeMenu);
+    submitSplit.append(submitSet, submissionModeValue, submissionModePicker);
+    submissionActions.append(submissionStatus, submitSplit);
     submissionSetSection.append(
       submissionSetHeader, submissionSetList, submissionActions, previewOutput,
     );
@@ -3397,15 +3485,56 @@
         submissionStatus.dataset.state = "idle";
         return;
       }
+      const dryRun = submissionMode() === "dry-run";
       const hardwareBackendNames = hardwareBackends();
       const hardware = staged.some((entry) => (
         hardwareBackendNames.has(entry.request?.backend)
       ));
-      if (hardware && !await confirmDashboardAction(
+      if (!dryRun && hardware && !await confirmDashboardAction(
         "Submit real-hardware applications",
         "This Submission Set contains bounded work for real IQM hardware.",
         { severity: "warning", confirmLabel: "Submit all applications" },
       )) return;
+      if (dryRun) {
+        widgetStates.submissionSetStatus = {
+          status: "dry-running", count: staged.length,
+        };
+        const executionRequests = staged.map((entry) => ({
+          ...submissionDefinition(entry.request, entry.draft_id),
+          identity: activeIdentity,
+          submission_entry_id: entry.draft_id,
+          experiment_id: window.crypto.randomUUID(),
+        }));
+        savePresentation();
+        refreshExperimentSubmissionStatus(form);
+        try {
+          const result = await request("/api/qfw-dashboard/experiments/batch", {
+            method: "POST",
+            body: JSON.stringify({
+              identity: activeIdentity,
+              dry_run: true,
+              experiments: executionRequests,
+            }),
+          });
+          const output = formatSubmissionDryRun(result);
+          widgetStates.submissionSetStatus = {
+            status: "dry-run",
+            count: staged.length,
+            output,
+          };
+          savePresentation();
+          refreshExperimentSubmissionStatus(form);
+        } catch (error) {
+          widgetStates.submissionSetStatus = {
+            status: "failed",
+            error: error.message,
+          };
+          savePresentation();
+          refreshExperimentSubmissionStatus(form);
+          await notifyDashboard("Dry-run failed", error.message, "danger");
+        }
+        return;
+      }
       widgetStates.submissionSetStatus = {
         status: "requesting", count: staged.length,
       };

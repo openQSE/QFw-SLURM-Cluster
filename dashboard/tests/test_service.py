@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import shlex
 from pathlib import Path
 from unittest.mock import patch
 import zipfile
@@ -483,6 +484,65 @@ def test_submission_set_starts_each_validated_experiment(tmp_path) -> None:
     assert {
         item["experiment_id"] for item in dashboard.store.experiments()
     } == {first_id, second_id}
+
+
+def test_submission_set_dry_run_reports_commands_without_running(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    experiment_id = "2440c16e-865b-4a67-834e-dda390a67f32"
+
+    with patch.object(dashboard.runner, "cluster") as cluster:
+        result = dashboard.dry_run_experiment_batch({
+            "identity": "user-a",
+            "experiments": [{
+                "experiment_id": experiment_id,
+                "backend": "nwqsim",
+                "example": "qiskit-simple",
+            }],
+        })
+
+    cluster.assert_not_called()
+    assert result["outcome"] == "dry-run"
+    assert dashboard.store.experiments() == []
+    entry = result["experiments"][0]
+    assert entry["experiment_id"] == experiment_id
+    assert entry["submit_command"] == (
+        "sbatch --parsable "
+        f"/workspace/home/user-a/qfw-dashboard/experiments/{experiment_id}/job.sbatch"
+    )
+    assert "docker exec --user user-a" in entry["submit_host_command"]
+    assert "timeout --signal=TERM --kill-after=2 30" in entry["submit_host_command"]
+    assert entry["write_command"].startswith("python3 -c ")
+    assert "docker exec --user user-a" in entry["write_host_command"]
+    write_argv = shlex.split(entry["write_command"])
+    assert base64.b64decode(write_argv[-1]).decode("utf-8") == entry["batch_script"]
+    assert "#SBATCH --qpu=nwqsim" in entry["batch_script"]
+    assert "qfw_run_all.sh --service-mode site --backend nwqsim" in entry["batch_script"]
+
+
+def test_submission_set_dry_run_external_sbatch_skips_batch_write(tmp_path) -> None:
+    dashboard = service(tmp_path)
+
+    with patch.object(dashboard.runner, "cluster") as cluster:
+        result = dashboard.dry_run_experiment_batch({
+            "identity": "user-a",
+            "experiments": [{
+                "experiment_id": "f23bf181-f679-4a18-ae19-b880826ffaba",
+                "backend": "nwqsim",
+                "application_source": "path",
+                "application_submission_type": "sbatch",
+                "application_path": "/workspace/home/user-a/manual.sbatch",
+            }],
+        })
+
+    cluster.assert_not_called()
+    entry = result["experiments"][0]
+    assert entry["external_batch"] is True
+    assert entry["batch_script"] == ""
+    assert entry["write_command"] == ""
+    assert entry["write_host_command"] == ""
+    assert entry["submit_command"] == (
+        "sbatch --parsable /workspace/home/user-a/manual.sbatch"
+    )
 
 
 def test_submission_records_reusable_submission_entry_identity(tmp_path) -> None:

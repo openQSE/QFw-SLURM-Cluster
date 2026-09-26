@@ -1099,6 +1099,7 @@
 .qfw-operation-buttons button { min-width: 7em; }
 
 .qfw-operation-run-split {
+  align-items: stretch;
   display: inline-flex;
   position: relative;
 }
@@ -1110,6 +1111,7 @@
 }
 
 .qfw-operation-mode-picker {
+  display: flex;
   position: relative;
 }
 
@@ -1124,6 +1126,7 @@
   cursor: pointer;
   display: flex;
   min-width: 2.2em;
+  min-height: 100%;
   justify-content: center;
   list-style: none;
   padding: 0 0.6em;

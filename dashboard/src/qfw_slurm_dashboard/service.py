@@ -46,6 +46,23 @@ class OperationActionPlan:
     dry_run_commands: tuple[CommandSpec, ...] = ()
 
 
+@dataclass(frozen=True)
+class ExperimentSubmissionPlan:
+    experiment_id: str
+    identity: str
+    backend: str
+    example: str
+    allocation_mode: str
+    requirements: dict[str, Any]
+    experiment_root: str
+    output_path: str
+    batch_path: str
+    batch_script: str
+    external_batch: bool
+    submit_argv: tuple[str, ...]
+    write_argv: tuple[str, ...] | None
+
+
 class SubmissionSetValidationError(ValueError):
     """Identify the staged experiment that failed batch validation."""
 
@@ -987,9 +1004,15 @@ class DashboardService:
             thread.start()
         return experiment
 
-    def submit_experiment_batch(
-        self, request: dict[str, Any]
-    ) -> list[Experiment]:
+    def _prepared_experiment_batch(
+        self,
+        request: dict[str, Any],
+        *,
+        require_hardware_confirmation: bool,
+    ) -> tuple[
+        str,
+        list[tuple[dict[str, Any], tuple[str, str, str, str, dict[str, Any]]]],
+    ]:
         identity = str(request.get("identity", ""))
         submissions = request.get("experiments")
         if identity not in IDENTITIES:
@@ -1000,7 +1023,9 @@ class DashboardService:
             raise ValueError("submission set cannot exceed 64 experiments")
 
         hardware_confirmed = request.get("submit_real_hardware") is True
-        prepared: list[dict[str, Any]] = []
+        prepared: list[
+            tuple[dict[str, Any], tuple[str, str, str, str, dict[str, Any]]]
+        ] = []
         experiment_ids: set[str] = set()
         for index, submission in enumerate(submissions):
             if not isinstance(submission, dict):
@@ -1015,10 +1040,10 @@ class DashboardService:
             supplied_id = str(candidate.get("experiment_id", "")).strip()
             try:
                 experiment_id = self._experiment_id(candidate)
-                self._validated_experiment_request(
+                validated = self._validated_experiment_request(
                     candidate,
                     default_identity="",
-                    require_hardware_confirmation=True,
+                    require_hardware_confirmation=require_hardware_confirmation,
                 )
             except (PermissionError, TypeError, ValueError) as error:
                 raise SubmissionSetValidationError(
@@ -1031,7 +1056,19 @@ class DashboardService:
                     f"duplicate experiment in submission set: {experiment_id}",
                 )
             experiment_ids.add(experiment_id)
-            prepared.append({**candidate, "experiment_id": experiment_id})
+            prepared.append(({**candidate, "experiment_id": experiment_id}, validated))
+        return identity, prepared
+
+    def submit_experiment_batch(
+        self, request: dict[str, Any]
+    ) -> list[Experiment]:
+        _identity, prepared = self._prepared_experiment_batch(
+            request, require_hardware_confirmation=True
+        )
+        prepared_requests = [item for item, _validated in prepared]
+        experiment_ids = {
+            str(item["experiment_id"]) for item in prepared_requests
+        }
 
         with self._lifecycle_lock:
             existing_ids = {
@@ -1042,7 +1079,7 @@ class DashboardService:
             if duplicate:
                 experiment_id = duplicate[0]
                 index = next(
-                    index for index, item in enumerate(prepared)
+                    index for index, item in enumerate(prepared_requests)
                     if item["experiment_id"] == experiment_id
                 )
                 raise SubmissionSetValidationError(
@@ -1050,7 +1087,29 @@ class DashboardService:
                     experiment_id,
                     f"experiment already exists: {experiment_id}",
                 )
-            return [self.submit_experiment(item) for item in prepared]
+            return [self.submit_experiment(item) for item in prepared_requests]
+
+    def dry_run_experiment_batch(self, request: dict[str, Any]) -> dict[str, Any]:
+        _identity, prepared = self._prepared_experiment_batch(
+            request, require_hardware_confirmation=False
+        )
+        experiments: list[dict[str, Any]] = []
+        for candidate, validated in prepared:
+            identity, backend, example, mode, requirements = validated
+            experiment = Experiment(
+                str(candidate["experiment_id"]),
+                identity,
+                backend,
+                example,
+                mode,
+            )
+            plan = self._experiment_submission_plan(experiment, requirements)
+            experiments.append(self._submission_dry_run_payload(plan))
+        return {
+            "schema": "qfw-dashboard-submission-dry-run-v1",
+            "outcome": "dry-run",
+            "experiments": experiments,
+        }
 
     def _validated_experiment_request(
         self,
@@ -1431,6 +1490,68 @@ class DashboardService:
             "component": "slurm",
         })
         self.store.save_experiment(experiment)
+        plan = self._experiment_submission_plan(experiment, requirements)
+        experiment.manifest["command"] = shlex.join(plan.submit_argv)
+        experiment.manifest["batch_script_path"] = plan.batch_path
+        if plan.batch_script:
+            experiment.manifest["batch_script_sha256"] = hashlib.sha256(
+                plan.batch_script.encode("utf-8")
+            ).hexdigest()
+        experiment.manifest["output_path"] = plan.output_path
+        experiment.manifest["submitted_at"] = utc_now()
+        if plan.external_batch:
+            result = self.runner.cluster(
+                experiment.identity, plan.submit_argv, timeout=30
+            )
+            failure_classification = "submission"
+        else:
+            write_result = self._write_batch_script(
+                experiment.identity, plan.batch_path, plan.batch_script
+            )
+            if write_result.returncode:
+                result = write_result
+                failure_classification = "batch-script"
+            else:
+                result = self.runner.cluster(
+                    experiment.identity, plan.submit_argv, timeout=30
+                )
+                failure_classification = "submission"
+        if result.returncode:
+            experiment.status = "failed"
+            experiment.result = {
+                "failure_classification": failure_classification,
+                "error": result.stderr or result.stdout,
+            }
+            experiment.completed_at = utc_now()
+            experiment.timeline.append({
+                "timestamp": experiment.completed_at, "phase": "failed",
+                "component": "slurm", "classification": failure_classification,
+            })
+        else:
+            experiment.slurm_job_id = result.stdout.strip().split(";")[0]
+            experiment.status = "submitted"
+            experiment.artifacts = (
+                [plan.batch_path]
+                if plan.external_batch else [plan.output_path, plan.batch_path]
+            )
+            experiment.timeline.append({
+                "timestamp": utc_now(), "phase": "submitted",
+                "component": "slurm", "job_id": experiment.slurm_job_id,
+            })
+        self.store.save_experiment(experiment)
+        self.store.append_event({
+            "kind": "progress",
+            "component": "application",
+            "identity": experiment.identity,
+            "experiment_id": experiment.experiment_id,
+            "job_id": experiment.slurm_job_id,
+            "severity": "error" if result.returncode else "info",
+            "message": experiment.status,
+        })
+
+    def _experiment_submission_plan(
+        self, experiment: Experiment, requirements: dict[str, Any]
+    ) -> ExperimentSubmissionPlan:
         experiment_root = (
             f"/workspace/home/{experiment.identity}/qfw-dashboard/experiments/"
             f"{experiment.experiment_id}"
@@ -1451,62 +1572,56 @@ class DashboardService:
                 or self._batch_script(experiment, requirements, output_path)
             )
         submit_argv = ("sbatch", "--parsable", batch_path)
-        experiment.manifest["command"] = shlex.join(submit_argv)
-        experiment.manifest["batch_script_path"] = batch_path
-        if batch_script:
-            experiment.manifest["batch_script_sha256"] = hashlib.sha256(
-                batch_script.encode("utf-8")
-            ).hexdigest()
-        experiment.manifest["output_path"] = output_path
-        experiment.manifest["submitted_at"] = utc_now()
-        if external_batch:
-            result = self.runner.cluster(
-                experiment.identity, submit_argv, timeout=30
-            )
-            failure_classification = "submission"
-        else:
-            write_result = self._write_batch_script(
-                experiment.identity, batch_path, batch_script
-            )
-            if write_result.returncode:
-                result = write_result
-                failure_classification = "batch-script"
-            else:
-                result = self.runner.cluster(
-                    experiment.identity, submit_argv, timeout=30
-                )
-                failure_classification = "submission"
-        if result.returncode:
-            experiment.status = "failed"
-            experiment.result = {
-                "failure_classification": failure_classification,
-                "error": result.stderr or result.stdout,
-            }
-            experiment.completed_at = utc_now()
-            experiment.timeline.append({
-                "timestamp": experiment.completed_at, "phase": "failed",
-                "component": "slurm", "classification": failure_classification,
-            })
-        else:
-            experiment.slurm_job_id = result.stdout.strip().split(";")[0]
-            experiment.status = "submitted"
-            experiment.artifacts = (
-                [batch_path] if external_batch else [output_path, batch_path]
-            )
-            experiment.timeline.append({
-                "timestamp": utc_now(), "phase": "submitted",
-                "component": "slurm", "job_id": experiment.slurm_job_id,
-            })
-        self.store.save_experiment(experiment)
-        self.store.append_event({
-            "kind": "progress",
-            "component": "application",
-            "identity": experiment.identity,
-            "experiment_id": experiment.experiment_id,
-            "job_id": experiment.slurm_job_id,
-            "severity": "error" if result.returncode else "info",
-            "message": experiment.status,
-        })
+        write_argv = (
+            None if external_batch
+            else self._batch_script_write_argv(batch_path, batch_script)
+        )
+        return ExperimentSubmissionPlan(
+            experiment_id=experiment.experiment_id,
+            identity=experiment.identity,
+            backend=experiment.backend,
+            example=experiment.example,
+            allocation_mode=experiment.allocation_mode,
+            requirements=requirements,
+            experiment_root=experiment_root,
+            output_path=output_path,
+            batch_path=batch_path,
+            batch_script=batch_script,
+            external_batch=external_batch,
+            submit_argv=submit_argv,
+            write_argv=write_argv,
+        )
+
+    def _submission_dry_run_payload(
+        self, plan: ExperimentSubmissionPlan
+    ) -> dict[str, Any]:
+        write_command = ""
+        write_host_command = ""
+        if plan.write_argv is not None:
+            write_command = shlex.join(plan.write_argv)
+            write_host_command = shlex.join(self.runner.cluster_argv(
+                plan.identity, plan.write_argv, timeout=15
+            ))
+        return {
+            "schema": "qfw-dashboard-submission-dry-run-entry-v1",
+            "outcome": "dry-run",
+            "experiment_id": plan.experiment_id,
+            "identity": plan.identity,
+            "backend": plan.backend,
+            "example": plan.example,
+            "allocation_mode": plan.allocation_mode,
+            "experiment_root": plan.experiment_root,
+            "output_path": plan.output_path,
+            "batch_script_path": plan.batch_path,
+            "batch_script": plan.batch_script,
+            "external_batch": plan.external_batch,
+            "write_command": write_command,
+            "write_host_command": write_host_command,
+            "submit_command": shlex.join(plan.submit_argv),
+            "submit_host_command": shlex.join(self.runner.cluster_argv(
+                plan.identity, plan.submit_argv, timeout=30
+            )),
+        }
 
     def _batch_script(
         self,
@@ -1632,6 +1747,16 @@ class DashboardService:
         batch_path: str,
         batch_script: str,
     ) -> CommandResult:
+        return self.runner.cluster(
+            identity,
+            self._batch_script_write_argv(batch_path, batch_script),
+            timeout=15,
+        )
+
+    @staticmethod
+    def _batch_script_write_argv(
+        batch_path: str, batch_script: str
+    ) -> tuple[str, ...]:
         encoded = base64.b64encode(batch_script.encode("utf-8")).decode("ascii")
         writer = (
             "import base64, os, pathlib, sys; "
@@ -1641,9 +1766,7 @@ class DashboardService:
             "temporary.write_bytes(base64.b64decode(sys.argv[2], validate=True)); "
             "os.chmod(temporary, 0o700); temporary.replace(path)"
         )
-        return self.runner.cluster(
-            identity, ("python3", "-c", writer, batch_path, encoded), timeout=15
-        )
+        return ("python3", "-c", writer, batch_path, encoded)
 
     @staticmethod
     def _application_batch_script_save_path(application_path: str) -> str:

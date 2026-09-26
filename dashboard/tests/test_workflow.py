@@ -126,7 +126,7 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert 'previewOutput.dataset.qfwSubmissionOutput = ""' in frontend
     assert "Submitting ${staged.length} applications" in frontend
     assert "qfwSubmitSet" in frontend
-    assert 'const requestPending = batchStatus.status === "requesting";' in frontend
+    assert '["requesting", "dry-running"].includes(batchStatus.status)' in frontend
     assert "submit.disabled = requestPending || editing || entries.length === 0;" in frontend
     assert "submit.disabled = active;" not in frontend
     assert '"Add to Submission Set"' in frontend
@@ -255,6 +255,13 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert 'modeValue.dataset.qfwControl = "operation_mode";' in frontend
     assert "choice.dataset.qfwModeChoice = value;" in frontend
     assert "dry_run: dryRun" in frontend
+    assert "function submissionMode()" in frontend
+    assert 'submissionModeValue.dataset.qfwControl = "submission_mode";' in frontend
+    assert "qfw-submission-run-split" in frontend
+    assert "function formatSubmissionDryRun(result)" in frontend
+    assert "dry_run: true" in frontend
+    assert "submit_host_command" in frontend
+    assert "write_host_command" in frontend
     assert 'status.setAttribute("aria-live", "polite")' in frontend
     assert 'run.classList.toggle("is-pressed", control.busy)' in frontend
     assert "function renderNodeControl()" in frontend

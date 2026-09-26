@@ -218,7 +218,13 @@ def _experiment(request: RouteRequest) -> JsonResponse:
 
 def _experiment_batch(request: RouteRequest) -> JsonResponse:
     try:
-        experiments = _service(request).submit_experiment_batch(request.body())
+        body = request.body()
+        if body.get("dry_run") is True:
+            return JsonResponse(
+                _service(request).dry_run_experiment_batch(body),
+                status=HTTPStatus.OK,
+            )
+        experiments = _service(request).submit_experiment_batch(body)
         return JsonResponse({
             "schema": "qfw-dashboard-submission-set-v1",
             "outcome": "accepted",
