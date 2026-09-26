@@ -79,7 +79,8 @@ RUN set -ex \
     && dnf clean all \
     && rm -rf /var/cache/yum
 
-RUN pip3 install Cython pytest
+COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /uvx /usr/local/bin/
+RUN uv pip install --system Cython pytest
 
 ARG HTTP_PARSER_VERSION=v2.9.4
 ARG HTTP_PARSER_PREFIX=/opt/qfw/http-parser
@@ -237,6 +238,10 @@ ARG QFW_SLURM_PREFIX=/opt/openqse/qfw-slurm
 ARG NWQSIM_PREFIX=/opt/openqse/nwqsim
 ARG TNQVM_PREFIX=/opt/openqse/tnqvm
 ARG SIMULATOR_WORK_ROOT=/tmp/qfw-simulator-build
+ARG MQT_CORE_REPOSITORY=https://github.com/munich-quantum-toolkit/core.git
+ARG MQT_CORE_REF=151a69f9f99d0d1fb3bd735833d3f338ebb4d8a6
+ARG MQT_CC_VENV=/opt/openqse/mqt-cc-venv
+ARG MQT_CORE_SOURCE=/tmp/mqt-core-source
 
 ENV QFW_BASE=/workspace/qfw-container-base \
     QFW_BUILD_JOBS=${QFW_BUILD_JOBS}
@@ -386,23 +391,14 @@ RUN set -ex \
     && test -x "${TNQVM_PREFIX}/bin/circuit_runner.tnqvm" \
     && test -f "${TNQVM_PREFIX}/xacc/plugins/libtnqvm.so"
 
-# The shim's QRMI/QDMI dependencies. Keep these in step with do_qfw_build.sh,
-# which installs the same packages for the developer build. The two lists
-# drifted once already, and the image kept building without error while its
-# QDMI leg could not import.
-#
-# mqt-core 3.9.2: services/svc_lib_qpm/drivers/qdmi_driver.py imports
-# mqt.core.qdmi.driver, which does not exist before 3.9.
-#
-# iqm-qdmi>=1.4 without the [qiskit] extra, as do_qfw_build.sh does. The shim
-# never imports iqm.qdmi.qiskit, and Qiskit already comes from
-# setup/requirements.txt. Combined with an older mqt-core pin, that extra is
-# also what let pip settle on iqm-qdmi 1.2.0.
+# Keep the QFw shim's Python dependencies aligned with do_qfw_build.sh.
+# Its QDMI driver needs mqt.core.qdmi.driver and the IQM device library;
+# setup/requirements.txt supplies Qiskit.
 RUN set -ex \
-    && python3 -m venv "${QFW_IMAGE_VENV}" \
-    && "${QFW_IMAGE_VENV}/bin/python" -m pip install --upgrade \
+    && uv venv --python python3 "${QFW_IMAGE_VENV}" \
+    && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
         pip setuptools wheel \
-    && "${QFW_IMAGE_VENV}/bin/python" -m pip install \
+    && uv pip install --python "${QFW_IMAGE_VENV}" \
         -r "${QFW_IMAGE_SOURCE}/setup/build-requirements.txt" \
         -r "${QFW_IMAGE_SOURCE}/setup/requirements.txt" \
         "qrmi==${QRMI_VERSION}" \
@@ -429,7 +425,7 @@ RUN set -ex \
     && git -C "${QFW_SLURM_SOURCE}" switch --detach FETCH_HEAD \
     && test "$(git -C "${QFW_SLURM_SOURCE}" rev-parse HEAD)" = \
         "${QFW_SLURM_SOURCE_REVISION}" \
-    && "${QFW_IMAGE_VENV}/bin/python" -m pip install \
+    && uv pip install --python "${QFW_IMAGE_VENV}" \
         --no-build-isolation "${QFW_SLURM_SOURCE}" pytest \
     && cmake -S "${QFW_SLURM_SOURCE}" -B "${QFW_SLURM_BUILD}" \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -469,6 +465,38 @@ RUN set -ex \
     && test -x "${QFW_IMAGE_VENV}/bin/qfw-squeue" \
     && rm -rf "${QFW_SLURM_SOURCE}" "${QFW_SLURM_BUILD}"
 
+# The separate environment keeps Qiskit 2.5.x apart from QFw's SDK pins.
+ARG SETUP_MLIR_VERSION=v1.4.2
+ARG MLIR_VERSION=23.1.1
+ARG MLIR_PREFIX=/opt/llvm-23.1.1
+ENV MLIR_DIR=${MLIR_PREFIX}/lib/cmake/mlir
+RUN set -ex \
+    && curl -LsSf \
+        "https://github.com/munich-quantum-software/setup-mlir/releases/download/${SETUP_MLIR_VERSION}/setup-mlir.sh" \
+        -o /tmp/setup-mlir.sh \
+    && bash /tmp/setup-mlir.sh -v "${MLIR_VERSION}" -p "${MLIR_PREFIX}" \
+    && test -f "${MLIR_DIR}/MLIRConfig.cmake" \
+    && rm /tmp/setup-mlir.sh
+
+ARG MQT_CORE_SOURCE_REVISION
+RUN set -ex \
+    && git clone "${MQT_CORE_REPOSITORY}" "${MQT_CORE_SOURCE}" \
+    && git -C "${MQT_CORE_SOURCE}" fetch origin "${MQT_CORE_REF}" \
+    && git -C "${MQT_CORE_SOURCE}" switch --detach FETCH_HEAD \
+    && test "$(git -C "${MQT_CORE_SOURCE}" rev-parse HEAD)" = \
+        "${MQT_CORE_SOURCE_REVISION}" \
+    && uv venv --python python3 "${MQT_CC_VENV}" \
+    && uv pip install --python "${MQT_CC_VENV}" --upgrade pip \
+    && CMAKE_BUILD_PARALLEL_LEVEL="${QFW_BUILD_JOBS}" \
+        uv pip install --python "${MQT_CC_VENV}" \
+        "${MQT_CORE_SOURCE}" 'qiskit==2.5.2' \
+    && rm -rf "${MQT_CORE_SOURCE}"
+
+COPY shared-dir/mqt-cc-smoke-test.sbatch /tmp/mqt-cc-smoke-test.sbatch
+RUN set -ex \
+    && MQT_CC_VENV="${MQT_CC_VENV}" bash /tmp/mqt-cc-smoke-test.sbatch \
+    && rm /tmp/mqt-cc-smoke-test.sbatch
+
 ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
     QFW_IMAGE_VENV=${QFW_IMAGE_VENV} \
     QFW_PREFIX=${QFW_IMAGE_PREFIX} \
@@ -479,7 +507,8 @@ ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
     QRMI_PREFIX=${QRMI_PREFIX} \
     QRMI_VERSION=${QRMI_VERSION} \
     MODULEPATH=/etc/modulefiles:/usr/share/Modules/modulefiles:/usr/share/modulefiles \
-    LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${OMPI_PREFIX}/lib64:${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH}
+    LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${OMPI_PREFIX}/lib64:${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH} \
+    MQT_CC_VENV=${MQT_CC_VENV}
 
 COPY modulefiles /etc/modulefiles
 RUN set -ex \

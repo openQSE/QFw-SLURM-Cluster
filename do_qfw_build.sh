@@ -8,9 +8,9 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [--jobs N] [--clean] [--skip-venv] [--container NAME]
 
-Build and install a QFw + DEFw developer override inside the running cluster,
-out of the shared mount. The cluster image's official installation remains
-unchanged.
+Build and install QFw + DEFw and MQT Core developer overrides inside the
+running cluster from checkouts on the shared mount. The cluster image's official
+installation remains unchanged.
 
 Everything lands on the shared mount, so every node sees the same install and
 the tree being built is your own shared-dir/QFw checkout:
@@ -19,6 +19,8 @@ the tree being built is your own shared-dir/QFw checkout:
   python venv         \${QFW_BASE}/qfw-venv
   build tree          \${QFW_BASE}/qfw-build
   install tree        \${QFW_BASE}/qfw-install
+  mqt-core source     \${QFW_BASE}/mqt-core
+  mqt-cc venv         \${QFW_BASE}/mqt-cc-venv
 
 Activate the result inside a container with:
 
@@ -26,8 +28,8 @@ Activate the result inside a container with:
 
 Options:
   --jobs N          Parallel build jobs (default: nproc in the container)
-  --clean           Remove the build and install trees first
-  --skip-venv       Reuse the existing venv, skip all pip installs
+  --clean           Remove the QFw build and install trees first
+  --skip-venv       Reuse the existing venv, skip Python installs
   --container NAME  Container to build in (default: slurmctld)
   -h, --help        Show this help
 EOF
@@ -80,12 +82,14 @@ docker exec -i \
 set -euo pipefail
 
 QFW_BASE="${QFW_BASE:-/workspace/qfw-container-base}"
-QFW_SRC="${QFW_SRC:-${QFW_DEV_SRC:-${QFW_BASE}/QFw}}"
-QFW_VENV="${QFW_VENV:-${QFW_DEV_VENV:-${QFW_BASE}/qfw-venv}}"
-QFW_BUILD="${QFW_BUILD:-${QFW_DEV_BUILD:-${QFW_BASE}/qfw-build}}"
-QFW_PREFIX="${QFW_PREFIX:-${QFW_DEV_PREFIX:-${QFW_BASE}/qfw-install}}"
+QFW_SRC="${QFW_DEV_SRC:-${QFW_BASE}/QFw}"
+QFW_VENV="${QFW_DEV_VENV:-${QFW_BASE}/qfw-venv}"
+QFW_BUILD="${QFW_DEV_BUILD:-${QFW_BASE}/qfw-build}"
+QFW_PREFIX="${QFW_DEV_PREFIX:-${QFW_BASE}/qfw-install}"
 QFW_HOST_BASE="${QFW_HOST_BASE:-shared-dir}"
 QFW_CONTAINER_NAME="${QFW_CONTAINER_NAME:-slurmctld}"
+MQT_CORE_SRC="${QFW_BASE}/mqt-core"
+export MLIR_DIR="${MLIR_DIR:-/opt/llvm-23.1.1/lib/cmake/mlir}"
 
 jobs="${QFW_BUILD_JOBS_OVERRIDE:-}"
 [ -n "${jobs}" ] || jobs="$(nproc)"
@@ -127,6 +131,19 @@ if [ ! -f "${QFW_SRC}/CMakeLists.txt" ]; then
     exit 1
 fi
 
+if [ "${QFW_SKIP_VENV}" != "true" ]; then
+    if [ ! -f "${MQT_CORE_SRC}/pyproject.toml" ]; then
+        echo "No MQT Core checkout at ${MQT_CORE_SRC}." >&2
+        echo "Clone it onto the shared mount from the host:" >&2
+        echo "    git clone https://github.com/munich-quantum-toolkit/core.git ${QFW_HOST_BASE}/mqt-core" >&2
+        exit 1
+    fi
+    if [ ! -f "${MLIR_DIR}/MLIRConfig.cmake" ]; then
+        echo "No MLIR installation at ${MLIR_DIR}. Rebuild the cluster image first." >&2
+        exit 1
+    fi
+fi
+
 if [ "${QFW_DO_CLEAN}" = "true" ]; then
     echo "== removing ${QFW_BUILD} and ${QFW_PREFIX}"
     rm -rf "${QFW_BUILD}" "${QFW_PREFIX}"
@@ -134,59 +151,34 @@ fi
 
 if [ "${QFW_SKIP_VENV}" != "true" ]; then
     echo "== python venv: ${QFW_VENV}"
-    [ -d "${QFW_VENV}" ] || python3 -m venv "${QFW_VENV}"
+    [ -d "${QFW_VENV}" ] || uv venv --python python3 "${QFW_VENV}"
     # shellcheck disable=SC1091
     source "${QFW_VENV}/bin/activate"
-    python -m pip install --upgrade pip setuptools wheel
-    python -m pip install -r "${QFW_SRC}/setup/build-requirements.txt"
-    python -m pip install -r "${QFW_SRC}/setup/requirements.txt"
+    uv pip install --upgrade pip setuptools wheel
+    uv pip install -r "${QFW_SRC}/setup/build-requirements.txt"
+    uv pip install -r "${QFW_SRC}/setup/requirements.txt"
 
-    # Shim dependencies. These used to be baked into the image venv. The C ABI
-    # in ${QRMI_PREFIX}/lib is built at image build time, so the bindings are
-    # pinned to the same QRMI_VERSION the image exported.
+    # Match the QRMI bindings to the C library built into the image.
     qrmi_pin="${QRMI_VERSION:-${QFW_VERSION_FALLBACK:-}}"
     if [ -n "${qrmi_pin}" ]; then
         echo "== qrmi bindings pinned to ${qrmi_pin}"
-        python -m pip install "qrmi==${qrmi_pin}"
+        uv pip install "qrmi==${qrmi_pin}"
     else
         echo "No QRMI version pin available; installing unpinned qrmi" >&2
-        python -m pip install qrmi
+        uv pip install qrmi
     fi
-    # QDMI-on-IQM. The base package is all the shim needs: it carries the IQM
-    # device library plus the stable device ID and prefix the QDMI driver
-    # registers it under. The [qiskit] extra is still deliberately NOT
-    # installed: it only buys MQT Core's Qiskit adapter (iqm.qdmi.qiskit),
-    # which the shim does not import, and Qiskit itself already comes from
-    # QFw's setup/requirements.txt.
-    #
-    # The floor is 1.4, which is where the device library serves the QDMI queue
-    # properties and moves to QDMI 1.3.3. That last part matters more than it
-    # looks: 1.3.0 built against QDMI 1.3.2, one patch release behind the 1.3.3
-    # that mqt-core 3.9 uses, and a property added in 1.3.3 came back from the
-    # older library as INVALIDARGUMENT rather than NOTSUPPORTED. Matching the
-    # two sides removes that whole class of confusion.
-    python -m pip install 'iqm-qdmi>=1.4'
+    # The QFw driver needs the IQM device library, ID, and prefix. Version 1.4
+    # also provides the queue properties used with QDMI 1.3.3.
+    uv pip install 'iqm-qdmi>=1.4'
 
-    # mqt-core 3.8.0 replaced fomac.add_dynamic_device_library with
-    # register_device/open_device, and 3.9.0 moved the Python module from
-    # mqt.core.fomac to mqt.core.qdmi (the old name still works but warns).
-    # services/svc_lib_qpm/drivers/qdmi_driver.py calls the 3.9 API.
-    #
-    # 3.9.2 rather than 3.9.0 keeps this in step with iqm-qdmi 1.4.0. The two
-    # projects handed the IQM JSON conversion across in a matched pair: mqt-core
-    # 3.9.1 removed qiskit_to_iqm_json and iqm-qdmi 1.4.0 took it over. QFw uses
-    # neither side of that converter, so the pairing does not gate us, but
-    # running one half of a handoff against the other half's predecessor is not
-    # a state worth being in. iqm-qdmi 1.4.0's own [qiskit] extra now asks for
-    # mqt-core ~=3.9.1, so this also keeps that extra restorable if it is ever
-    # wanted. Installed after iqm-qdmi so this pin wins over what that resolves.
-    python -m pip install 'mqt-core==3.9.2'
+    # The QFw driver imports mqt.core.qdmi.driver, available since 3.9.
+    uv pip install 'mqt-core==3.9.2'
 
     # The bundled QHW packages (qhw-data, qhw-iqm, qhw-admission, qhw-scheduler)
-    # are installed into site-packages by file copy, so pip never resolves the
-    # dependencies their pyproject.toml declares. qhw-data needs jsonschema for
+    # are installed into site-packages by file copy, so their declared
+    # dependencies are not resolved. qhw-data needs jsonschema for
     # schema validation, which the shim's qhw record building relies on.
-    python -m pip install 'jsonschema>=4'
+    uv pip install 'jsonschema>=4'
 else
     # shellcheck disable=SC1091
     source "${QFW_VENV}/bin/activate"
@@ -203,6 +195,16 @@ cmake --build "${QFW_BUILD}" -j "${jobs}"
 
 echo "== cmake install"
 cmake --install "${QFW_BUILD}"
+
+if [ "${QFW_SKIP_VENV}" != "true" ]; then
+    # Build mqt-cc from the mounted checkout, apart from QFw's SDK dependencies.
+    mqt_cc_venv="${QFW_BASE}/mqt-cc-venv"
+    [ -d "${mqt_cc_venv}" ] || uv venv --python python3 "${mqt_cc_venv}"
+    uv pip install --python "${mqt_cc_venv}" --upgrade pip
+    CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" \
+        uv pip install --python "${mqt_cc_venv}" \
+        "${MQT_CORE_SRC}" 'qiskit==2.5.2'
+fi
 
 echo
 echo "QFw installed to ${QFW_PREFIX}"

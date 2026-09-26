@@ -62,9 +62,10 @@ git switch release/v0.1
 ./do_build.sh
 ```
 
-The cluster branch controls this repository's files. The QFw and qfw-slurm
-sources installed into the image come from the refs passed to `do_configure.sh`,
-so release builds should pass matching release tags explicitly.
+The cluster branch controls this repository's files. The QFw, qfw-slurm, and
+MQT Core sources installed into the image come from the refs passed to
+`do_configure.sh`. Release builds should pass matching QFw and qfw-slurm
+release tags explicitly.
 
 If `--prefix` is omitted, `do_configure.sh` creates and uses:
 
@@ -188,7 +189,7 @@ image:
 
 </details>
 
-To validate the QRMI/QDMI shim (a smoke test — local routing/normalization, and device introspection on IQM hardware), see [TESTING.md](TESTING.md).
+To validate the QRMI/QDMI shim (local routing/normalization and device introspection on IQM hardware) or run the `mqt-cc` smoke test, see [TESTING.md](TESTING.md).
 
 ## Build And Run [QFw]
 
@@ -253,9 +254,11 @@ shared-dir/
   qfw-install/  # optional QFw install tree
   benchmarks/   # optional benchmark outputs
   rocm/         # optional ROCm prefix for ROCm/HIP builds
+  mqt-core/     # optional active MQT Core checkout
+  mqt-cc-venv/  # optional compiler Python venv created inside the container
 ```
 
-1. Configure the host mount and clone [QFw]:
+1. Configure the host mount and clone [QFw] and MQT Core:
 
 ```bash
 QFW_CONTAINER_BASE=/path/to/shared-dir
@@ -264,6 +267,8 @@ QFW_CONTAINER_BASE=/path/to/shared-dir
 
 git clone --recursive git@github.com:openQSE/QFw.git \
   "${QFW_CONTAINER_BASE}/QFw"
+git clone https://github.com/munich-quantum-toolkit/core.git \
+  "${QFW_CONTAINER_BASE}/mqt-core"
 ```
 
 2. Start the cluster, then build the shared override from the host:
@@ -393,7 +398,7 @@ The image builds and installs:
 - [QRMI] runtime: `libqrmi.so` and `qrmi.h` under `/opt/qfw/qrmi/`, the `qrmi`
   Python wheel installed into the [QFw] venv, and the SLURM SPANK plugin
   installed into `/usr/lib64/slurm/`
-- [QDMI] runtime: IQM's `iqm-qdmi[qiskit]` wheel installed into the [QFw]
+- [QDMI] runtime: IQM's `iqm-qdmi` wheel installed into the [QFw]
   venv
 
 The image-level runtime environment includes:
@@ -719,12 +724,13 @@ If [Slurm] config changes are not visible inside the running containers:
 ./update_slurmfiles.sh slurm.conf gres.conf rest.conf cgroup.conf
 ```
 
-If a mounted Python venv came from an older image:
+If the mounted developer venvs came from an older image:
 
 ```bash
-./do_ssh.sh
-rm -rf /workspace/qfw-container-base/venv
-python3 -m venv /workspace/qfw-container-base/venv
+docker exec slurmctld rm -rf \
+  /workspace/qfw-container-base/qfw-venv \
+  /workspace/qfw-container-base/mqt-cc-venv
+./do_qfw_build.sh
 ```
 
 If Docker cache is suspect:
