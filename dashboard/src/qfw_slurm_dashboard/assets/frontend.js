@@ -67,6 +67,7 @@
   const TOPOLOGY_ZOOM_MIN = 10;
   const TOPOLOGY_ZOOM_MAX = 1000;
   const TOPOLOGY_ZOOM_STEP = 10;
+  const SCROLL_INTERACTION_GRACE_MS = 1200;
   const ACTIVE_EXPERIMENT_STATES = new Set([
     "created", "submitting", "submitted", "pending",
     "configuring", "running", "completing", "cancel-requested",
@@ -158,6 +159,7 @@
   let experimentResultsClearStatus = "idle";
   const nonPrimarySelectionPointers = new Set();
   const activeScrollPointers = new Map();
+  const recentScrollInteractions = new Map();
   const popupWindows = new Map();
   const activeDashboardDialogs = new Set();
 
@@ -2394,7 +2396,11 @@
     const expandedSelect = container.querySelector("select[aria-expanded=true]");
     const scrolling = [...activeScrollPointers.values()].some((target) =>
       container.contains(target));
-    return Boolean(expandedSelect) || editing || scrolling || selectionIntersects(container);
+    return Boolean(expandedSelect)
+      || editing
+      || scrolling
+      || recentlyScrolledInside(container)
+      || selectionIntersects(container);
   }
 
   function refreshExperimentSubmissionStatus(root) {
@@ -3935,6 +3941,35 @@
     activeScrollPointers.delete(event.pointerId);
   }
 
+  function rememberScrollInteraction(target) {
+    if (!(target instanceof Element)) return;
+    const expiresAt = Date.now() + SCROLL_INTERACTION_GRACE_MS;
+    recentScrollInteractions.set(target, expiresAt);
+    window.setTimeout(() => {
+      if ((recentScrollInteractions.get(target) || 0) <= Date.now()) {
+        recentScrollInteractions.delete(target);
+      }
+    }, SCROLL_INTERACTION_GRACE_MS + 50);
+  }
+
+  function recentlyScrolledInside(container) {
+    const now = Date.now();
+    for (const [target, expiresAt] of recentScrollInteractions) {
+      if (expiresAt <= now || !target.isConnected) {
+        recentScrollInteractions.delete(target);
+      } else if (container.contains(target)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function trackRecentScrollInteraction(event) {
+    const target = scrollInteractionTarget(event)
+      || (event.target instanceof Element ? event.target : null);
+    rememberScrollInteraction(target);
+  }
+
   function activate(runtime) {
     runtimeApi = runtime;
     runtimeApi.ui.setWorkflowSideSheetCollapsed(true);
@@ -3948,6 +3983,8 @@
     installProgressTools();
     document.addEventListener("pointerdown", trackDashboardPointerSelection, true);
     document.addEventListener("pointerdown", trackScrollPointer, true);
+    document.addEventListener("wheel", trackRecentScrollInteraction, true);
+    document.addEventListener("scroll", trackRecentScrollInteraction, true);
     document.addEventListener("pointerup", finishNonPrimarySelectionPointer, true);
     document.addEventListener("pointerup", finishScrollPointer, true);
     document.addEventListener("pointercancel", finishNonPrimarySelectionPointer, true);
@@ -3987,8 +4024,11 @@
     selectedExperimentPhase = null;
     nonPrimarySelectionPointers.clear();
     activeScrollPointers.clear();
+    recentScrollInteractions.clear();
     document.removeEventListener("pointerdown", trackDashboardPointerSelection, true);
     document.removeEventListener("pointerdown", trackScrollPointer, true);
+    document.removeEventListener("wheel", trackRecentScrollInteraction, true);
+    document.removeEventListener("scroll", trackRecentScrollInteraction, true);
     document.removeEventListener("pointerup", finishNonPrimarySelectionPointer, true);
     document.removeEventListener("pointerup", finishScrollPointer, true);
     document.removeEventListener("pointercancel", finishNonPrimarySelectionPointer, true);

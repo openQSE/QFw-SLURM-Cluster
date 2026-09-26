@@ -87,6 +87,9 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "refreshPackagedExamples(root);" in frontend
     assert "control === document.activeElement" in frontend
     assert 'container.querySelector("select[aria-expanded=true]")' in frontend
+    assert "const SCROLL_INTERACTION_GRACE_MS = 1200;" in frontend
+    assert "function recentlyScrolledInside(container)" in frontend
+    assert 'document.addEventListener("wheel", trackRecentScrollInteraction, true)' in frontend
     assert frontend.index("if (group.experimentLauncher) renderExperimentForm(grid);") < frontend.index(
         "group.widgets.forEach"
     )
