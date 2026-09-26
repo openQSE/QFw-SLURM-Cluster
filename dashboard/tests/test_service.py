@@ -214,6 +214,60 @@ def test_action_is_idempotent_by_request_id(tmp_path) -> None:
     assert host.call_count == 1
 
 
+def test_cluster_action_dry_run_records_command_without_streaming(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    with patch.object(dashboard.runner, "stream_host") as host:
+        operation = dashboard.submit_action(
+            "cluster-start", "root", dry_run=True
+        )
+    host.assert_not_called()
+    assert operation.dry_run is True
+    assert operation.status == "succeeded"
+    assert operation.return_code == 0
+    output = "\n".join(operation.output)
+    assert "DRY RUN - command was not executed" in output
+    assert "./do_startup.sh" in output
+    assert "./do_startup.sh --dry-run" in output
+
+
+def test_service_action_dry_run_keeps_logging_env_without_streaming(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    with patch.object(dashboard.runner, "stream_host") as host:
+        operation = dashboard.submit_action(
+            "service-restart",
+            "root",
+            target="nwqsim",
+            options={
+                "defw_log_level": "all",
+                "defw_py_loglevel": "DEFW_ALL",
+            },
+            dry_run=True,
+        )
+    host.assert_not_called()
+    assert operation.dry_run is True
+    output = "\n".join(operation.output)
+    assert "QFW_SERVICE_DEFW_LOG_LEVEL=all" in output
+    assert "QFW_SERVICE_DEFW_PY_LOGLEVEL=DEFW_ALL" in output
+    assert "qfw-site-services restart --target nwqsim" in output
+    assert "qfw-site-services --dry-run restart --target nwqsim" in output
+
+
+def test_node_action_dry_run_records_scontrol_without_streaming(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    with patch.object(dashboard.runner, "stream_host") as host:
+        operation = dashboard.submit_action(
+            "node-drain",
+            "root",
+            target="compute-1",
+            reason="maintenance",
+            dry_run=True,
+        )
+    host.assert_not_called()
+    assert operation.dry_run is True
+    output = "\n".join(operation.output)
+    assert "scontrol update NodeName=compute-1 State=DRAIN Reason=maintenance" in output
+
+
 def test_packaged_application_catalog_includes_supported_examples(tmp_path) -> None:
     dashboard = service(tmp_path)
     with patch.object(dashboard.runner, "cluster") as cluster:
