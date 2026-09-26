@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,18 @@ from .logs import LogSource, SERVICE_DIAGNOSTICS, SOURCES, read_source
 from .redaction import redact, redact_payload
 from .runner import CommandRunner, IDENTITIES
 from .store import DashboardStore
+
+
+@dataclass(frozen=True)
+class CommandSpec:
+    argv: tuple[str, ...]
+    container: str | None = None
+
+
+@dataclass(frozen=True)
+class OperationActionPlan:
+    command: CommandSpec
+    dry_run_commands: tuple[CommandSpec, ...] = ()
 
 
 class SubmissionSetValidationError(ValueError):
@@ -601,54 +614,11 @@ class DashboardService:
         request_id: str = "",
         reason: str = "qfw-dashboard",
         options: dict[str, Any] | None = None,
+        dry_run: bool = False,
     ) -> Operation:
-        if identity not in IDENTITIES:
-            raise ValueError("unsupported identity")
-        if action in self.HOST_ACTIONS:
-            if identity != "root":
-                raise PermissionError("host cluster actions require root selection")
-            argv = self.HOST_ACTIONS[action]
-            container = None
-        elif action.startswith("service-"):
-            if identity != "root":
-                raise PermissionError("service actions require root selection")
-            service_operation = action.removeprefix("service-")
-            if service_operation not in self.SERVICE_OPERATIONS:
-                raise ValueError(f"unsupported service operation: {service_operation}")
-            if target not in self.SERVICE_TARGETS:
-                raise ValueError(f"unsupported service target: {target}")
-            command = (
-                "qfw-site-services", service_operation, "--target", target,
-            )
-            if service_operation in {"start", "restart", "recover"}:
-                log_env = self._service_log_environment(options or {})
-                argv = (
-                    (
-                        "/usr/bin/env",
-                        *(f"{name}={value}" for name, value in log_env.items()),
-                        *command,
-                    )
-                    if log_env else command
-                )
-            else:
-                argv = command
-            container = "slurmctld"
-        elif action in {"node-drain", "node-resume"}:
-            if identity != "root" or not _SAFE_NAME.fullmatch(target):
-                raise PermissionError("valid node and root selection required")
-            if len(reason) > 200 or any(character in reason for character in "\r\n"):
-                raise ValueError("invalid node reason")
-            argv = (
-                "scontrol",
-                "update",
-                f"NodeName={target}",
-                "State=DRAIN" if action == "node-drain" else "State=RESUME",
-                f"Reason={reason}" if action == "node-drain" else "",
-            )
-            argv = tuple(item for item in argv if item)
-            container = "slurmctld"
-        else:
-            raise ValueError(f"unsupported action: {action}")
+        plan = self._operation_action_plan(
+            action, identity, target, reason, options or {}
+        )
         if request_id:
             for existing in self.store.operations():
                 if existing.get("request_id") == request_id:
@@ -663,11 +633,14 @@ class DashboardService:
             target=target,
             request_id=request_id,
         )
+        if dry_run:
+            self._complete_dry_run_operation(operation, plan)
+            return operation
         with self._lifecycle_lock:
             self.store.save_operation(operation)
             thread = threading.Thread(
                 target=self._run_operation,
-                args=(operation, argv, container),
+                args=(operation, plan.command),
                 daemon=True,
                 name=f"qfw-dashboard-{operation.operation_id}",
             )
@@ -675,8 +648,144 @@ class DashboardService:
             thread.start()
         return operation
 
+    def _operation_action_plan(
+        self,
+        action: str,
+        identity: str,
+        target: str,
+        reason: str,
+        options: dict[str, Any],
+    ) -> OperationActionPlan:
+        if identity not in IDENTITIES:
+            raise ValueError("unsupported identity")
+        if action in self.HOST_ACTIONS:
+            if identity != "root":
+                raise PermissionError("host cluster actions require root selection")
+            argv = self.HOST_ACTIONS[action]
+            return OperationActionPlan(
+                CommandSpec(argv),
+                self._host_dry_run_commands(action),
+            )
+        elif action.startswith("service-"):
+            if identity != "root":
+                raise PermissionError("service actions require root selection")
+            service_operation = action.removeprefix("service-")
+            if service_operation not in self.SERVICE_OPERATIONS:
+                raise ValueError(f"unsupported service operation: {service_operation}")
+            if target not in self.SERVICE_TARGETS:
+                raise ValueError(f"unsupported service target: {target}")
+            command = (
+                "qfw-site-services", service_operation, "--target", target,
+            )
+            dry_run_command = (
+                "qfw-site-services", "--dry-run", service_operation,
+                "--target", target,
+            )
+            if service_operation in {"start", "restart", "recover"}:
+                log_env = self._service_log_environment(options)
+                argv = (
+                    (
+                        "/usr/bin/env",
+                        *(f"{name}={value}" for name, value in log_env.items()),
+                        *command,
+                    )
+                    if log_env else command
+                )
+                dry_run_argv = (
+                    (
+                        "/usr/bin/env",
+                        *(f"{name}={value}" for name, value in log_env.items()),
+                        *dry_run_command,
+                    )
+                    if log_env else dry_run_command
+                )
+            else:
+                argv = command
+                dry_run_argv = dry_run_command
+            return OperationActionPlan(
+                CommandSpec(argv, "slurmctld"),
+                (CommandSpec(dry_run_argv, "slurmctld"),),
+            )
+        elif action in {"node-drain", "node-resume"}:
+            if identity != "root" or not _SAFE_NAME.fullmatch(target):
+                raise PermissionError("valid node and root selection required")
+            if len(reason) > 200 or any(character in reason for character in "\r\n"):
+                raise ValueError("invalid node reason")
+            argv = (
+                "scontrol",
+                "update",
+                f"NodeName={target}",
+                "State=DRAIN" if action == "node-drain" else "State=RESUME",
+                f"Reason={reason}" if action == "node-drain" else "",
+            )
+            argv = tuple(item for item in argv if item)
+            return OperationActionPlan(CommandSpec(argv, "slurmctld"))
+        else:
+            raise ValueError(f"unsupported action: {action}")
+
+    def _host_dry_run_commands(self, action: str) -> tuple[CommandSpec, ...]:
+        commands = {
+            "cluster-build": (("./do_build.sh", "--dry-run"),),
+            "cluster-status": (("./do_ls.sh", "--dry-run"),),
+            "cluster-start": (("./do_startup.sh", "--dry-run"),),
+            "cluster-stop": (("./do_stop.sh", "--dry-run"),),
+            "cluster-restart": (("./do_restart.sh", "--dry-run"),),
+            "cluster-rebuild-incremental": (
+                ("./do_build.sh", "--dry-run"),
+                ("./do_stop.sh", "--dry-run"),
+                ("./do_startup.sh", "--dry-run"),
+            ),
+            "cluster-rebuild-clean": (
+                ("./do_build.sh", "--dry-run", "--no-cache"),
+                ("./do_stop.sh", "--dry-run"),
+                ("./do_startup.sh", "--dry-run"),
+            ),
+        }
+        return tuple(CommandSpec(command) for command in commands.get(action, ()))
+
+    def _render_command(self, identity: str, command: CommandSpec) -> str:
+        if command.container is None:
+            return shlex.join(command.argv)
+        return shlex.join(self.runner.cluster_argv(
+            identity,
+            command.argv,
+            container=command.container,
+        ))
+
+    def _complete_dry_run_operation(
+        self, operation: Operation, plan: OperationActionPlan
+    ) -> None:
+        operation.started_at = utc_now()
+        operation.completed_at = operation.started_at
+        operation.status = "succeeded"
+        operation.return_code = 0
+        output = [
+            "DRY RUN - command was not executed",
+            "Would run from the Docker host:",
+            f"  {self._render_command(operation.identity, plan.command)}",
+        ]
+        if plan.dry_run_commands:
+            output.extend(["", "Available dry-run helper command(s):"])
+            output.extend(
+                f"  {self._render_command(operation.identity, command)}"
+                for command in plan.dry_run_commands
+            )
+        operation.output = output
+        with self._lifecycle_lock:
+            self.store.save_operation(operation)
+            self.store.audit({
+                "identity": operation.identity,
+                "host_identity": "electroboy-service",
+                "action": operation.action,
+                "target": operation.target,
+                "request_id": operation.request_id,
+                "operation_id": operation.operation_id,
+                "started_at": operation.started_at,
+                "outcome": "dry-run",
+            })
+
     def _run_operation(
-        self, operation: Operation, argv: tuple[str, ...], container: str | None
+        self, operation: Operation, command_spec: CommandSpec
     ) -> None:
         operation.status = "running"
         operation.started_at = utc_now()
@@ -692,8 +801,13 @@ class DashboardService:
             "outcome": "started",
         })
         try:
-            command = argv if container is None else self.runner.cluster_argv(
-                operation.identity, argv, container=container
+            command = (
+                command_spec.argv if command_spec.container is None
+                else self.runner.cluster_argv(
+                    operation.identity,
+                    command_spec.argv,
+                    container=command_spec.container,
+                )
             )
             def on_start(process: subprocess.Popen[str]) -> None:
                 with self._operation_lock:
