@@ -1862,6 +1862,24 @@
       || matching[0] || null;
   }
 
+  function operationMode(widget) {
+    return widgetStates[widget]?.operation_mode === "dry-run" ? "dry-run" : "run";
+  }
+
+  function operationModeLabel(mode) {
+    return mode === "dry-run" ? "Dry-Run" : "Run";
+  }
+
+  function setOperationMode(widget, mode) {
+    widgetStates[widget] = {
+      ...widgetStates[widget],
+      operation_mode: mode === "dry-run" ? "dry-run" : "run",
+    };
+    savePresentation();
+    renderDashboard();
+    publishWidgets();
+  }
+
   async function runOperation(group, payload) {
     pendingOperationGroups.add(group);
     refreshDashboardData();
@@ -1934,17 +1952,37 @@
 
   function operationButtons(widget, group, submit) {
     const buttons = element("div", "qfw-operation-buttons");
-    const run = element("button", "qfw-operation-run", "Run");
+    const mode = operationMode(widget);
+    const split = element("div", "qfw-operation-run-split");
+    const run = element("button", "qfw-operation-run", operationModeLabel(mode));
     run.type = "button";
     run.dataset.qfwAction = "run";
     run.dataset.qfwWidget = widget;
     run.addEventListener("click", async () => {
       try {
-        await submit();
+        await submit(operationMode(widget));
       } catch (error) {
         await notifyDashboard("Operation failed", error.message, "danger");
       }
     });
+    const modeValue = element("input");
+    modeValue.type = "hidden";
+    modeValue.dataset.qfwControl = "operation_mode";
+    modeValue.value = mode;
+    const modePicker = element("details", "qfw-operation-mode-picker");
+    const modeToggle = element("summary", "qfw-operation-mode-toggle", "▾");
+    modeToggle.setAttribute("aria-label", "Choose operation mode");
+    const modeMenu = element("div", "qfw-operation-mode-menu");
+    [["run", "Run"], ["dry-run", "Dry-Run"]].forEach(([value, label]) => {
+      const choice = element("button", "", label);
+      choice.type = "button";
+      choice.dataset.qfwModeChoice = value;
+      choice.setAttribute("aria-pressed", String(value === mode));
+      choice.addEventListener("click", () => setOperationMode(widget, value));
+      modeMenu.append(choice);
+    });
+    modePicker.append(modeToggle, modeMenu);
+    split.append(run, modeValue, modePicker);
     const abort = element("button", "danger", "Abort");
     abort.type = "button";
     abort.dataset.qfwAction = "abort";
@@ -1965,7 +2003,7 @@
     const status = element("output", "qfw-operation-status");
     status.dataset.qfwOperationStatus = group;
     status.setAttribute("aria-live", "polite");
-    buttons.append(run, status, abort);
+    buttons.append(split, status, abort);
     applyOperationControlState(buttons, group);
     return buttons;
   }
@@ -2030,11 +2068,12 @@
     cluster.append(
       operationField("Operation", clusterAction),
       operationField("Rebuild mode", rebuildMode),
-      operationButtons(widget, "cluster", async () => {
+      operationButtons(widget, "cluster", async (mode) => {
         const operation = clusterAction.value;
         const action = operation === "rebuild"
           ? `cluster-rebuild-${rebuildMode.value}` : `cluster-${operation}`;
-        if (operation !== "status") {
+        const dryRun = mode === "dry-run";
+        if (!dryRun && operation !== "status") {
           const clean = operation === "rebuild" && rebuildMode.value === "clean";
           const consequence = operation === "rebuild"
             ? ` This performs a ${clean ? "no-cache" : "cached"} image build, then restarts and provisions the cluster without deleting named volumes.`
@@ -2049,7 +2088,7 @@
             },
           )) return;
         }
-        await runOperation("cluster", { action, target: "cluster" });
+        await runOperation("cluster", { action, target: "cluster", dry_run: dryRun });
       }),
       operationOutput("cluster"),
     );
@@ -2082,10 +2121,11 @@
       operationField("Next defw_out.log level", serviceOutLogLevel),
       operationField("Next defw_py.log level", servicePyLogLevel),
       loggingNote,
-      operationButtons(widget, "services", async () => {
+      operationButtons(widget, "services", async (mode) => {
         const action = serviceAction.value;
+        const dryRun = mode === "dry-run";
         const dangerous = ["stop", "restart"].includes(action);
-        if (action !== "status" && !await confirmDashboardAction(
+        if (!dryRun && action !== "status" && !await confirmDashboardAction(
           `${action[0].toUpperCase()}${action.slice(1)} service`,
           `${action} ${serviceTarget.value} as root?`,
           {
@@ -2096,6 +2136,7 @@
         await runOperation("services", {
           action: `service-${action}`,
           target: serviceTarget.value,
+          dry_run: dryRun,
           options: ["start", "restart", "recover"].includes(action) ? {
             defw_log_level: serviceOutLogLevel.value,
             defw_py_loglevel: servicePyLogLevel.value,
@@ -2131,9 +2172,10 @@
       operationField("Node", node),
       operationField("Operation", nodeAction),
       operationField("Reason", reason),
-      operationButtons(widget, "nodes", async () => {
+      operationButtons(widget, "nodes", async (mode) => {
         const action = nodeAction.value;
-        if (!await confirmDashboardAction(
+        const dryRun = mode === "dry-run";
+        if (!dryRun && !await confirmDashboardAction(
           `${action[0].toUpperCase()}${action.slice(1)} node`,
           `${action} ${node.value} as root?`,
           {
@@ -2145,6 +2187,7 @@
           action: `node-${action}`,
           target: node.value,
           reason: reason.value,
+          dry_run: dryRun,
         });
       }),
       operationOutput("nodes"),
@@ -3667,6 +3710,7 @@
       return;
     }
     if (message.action !== "run") return;
+    const dryRun = values.operation_mode === "dry-run";
     if (message.widget === "cluster-control") {
       if (!["status", "synchronize", "start", "stop", "restart", "rebuild"].includes(
         values.operation,
@@ -3676,7 +3720,7 @@
         ? `cluster-rebuild-${values.rebuild_mode}`
         : `cluster-${values.operation}`;
       await runOperation("cluster", {
-        action, target: "cluster",
+        action, target: "cluster", dry_run: dryRun,
       });
     } else if (message.widget === "service-control") {
       if (!["status", "start", "stop", "restart", "recover"].includes(
@@ -3685,6 +3729,7 @@
       if (!serviceTargetChoices().some(([target]) => target === values.target)) return;
       await runOperation("services", {
         action: `service-${values.operation}`, target: values.target,
+        dry_run: dryRun,
       });
     } else if (message.widget === "node-control") {
       if (!["drain", "resume"].includes(values.operation)) return;
@@ -3692,6 +3737,7 @@
         action: `node-${values.operation}`,
         target: values.node || "",
         reason: values.reason || "qfw-dashboard",
+        dry_run: dryRun,
       });
     }
   }

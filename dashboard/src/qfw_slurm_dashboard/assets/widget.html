@@ -424,6 +424,15 @@
           publishPresentation({ [control.dataset.qfwControl]: control.value });
         });
       });
+      output.querySelectorAll("[data-qfw-mode-choice]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const mode = button.dataset.qfwModeChoice === "dry-run"
+            ? "dry-run" : "run";
+          const value = output.querySelector("[data-qfw-control=operation_mode]");
+          if (value) value.value = mode;
+          publishPresentation({ operation_mode: mode });
+        });
+      });
       output.querySelectorAll("[data-qfw-action]").forEach((button) => {
         button.addEventListener("click", async () => {
           const values = Object.fromEntries(
@@ -431,14 +440,15 @@
               .map((control) => [control.dataset.qfwControl, control.value]),
           );
           const action = button.dataset.qfwAction;
+          const dryRun = values.operation_mode === "dry-run";
           const description = action === "abort"
             ? "Abort the current operation?"
             : action === "open-shell"
               ? `Open a shell in ${values.node || "slurmctld"}?`
-              : `Run ${values.operation || action}?`;
+              : `${dryRun ? "Dry-run" : "Run"} ${values.operation || action}?`;
           const danger = action === "abort"
             || ["stop", "restart", "rebuild", "drain"].includes(values.operation);
-          if (values.operation !== "status"
+          if (!dryRun && values.operation !== "status"
               && !await confirmWidgetAction("Confirm operation", description, danger)) return;
           channel.postMessage({ type: "control-action", widget, action, values });
         });

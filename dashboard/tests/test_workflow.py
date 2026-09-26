@@ -245,6 +245,11 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "if (pendingAbortGroups.delete(group))" in frontend
     assert "function operationControlState(group)" in frontend
     assert "function applyOperationControlState(container, group)" in frontend
+    assert "function operationMode(widget)" in frontend
+    assert '"Dry-Run"' in frontend
+    assert 'modeValue.dataset.qfwControl = "operation_mode";' in frontend
+    assert "choice.dataset.qfwModeChoice = value;" in frontend
+    assert "dry_run: dryRun" in frontend
     assert 'status.setAttribute("aria-live", "polite")' in frontend
     assert 'run.classList.toggle("is-pressed", control.busy)' in frontend
     assert "function renderNodeControl()" in frontend
@@ -295,6 +300,8 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function hydrateWidget()" in popout
     assert 'widget === "topology"' in popout
     assert 'type: "control-action"' in popout
+    assert "[data-qfw-mode-choice]" in popout
+    assert "values.operation_mode === \"dry-run\"" in popout
     assert 'values.operation !== "status"' in popout
     assert "controlWidgets.has(widget)" in popout
     assert "graph.style.width" in popout
@@ -409,6 +416,9 @@ def test_dashboard_uses_electroboy_pane_colors() -> None:
     assert "background: #0a2235;" in stylesheet
     assert ".qfw-operation-control" in stylesheet
     assert ".qfw-operation-output" in stylesheet
+    assert ".qfw-operation-run-split" in stylesheet
+    assert ".qfw-operation-mode-toggle" in stylesheet
+    assert ".qfw-operation-mode-menu" in stylesheet
     assert ".qfw-operation-run.is-pressed" in stylesheet
     assert ".qfw-operation-status" in stylesheet
     assert "@keyframes qfw-operation-dot" in stylesheet
