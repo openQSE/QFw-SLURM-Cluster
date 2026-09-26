@@ -263,6 +263,7 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function renderClusterAccess()" in frontend
     assert 'action: `service-${action}`' in frontend
     assert 'message.type === "control-action"' in frontend
+    assert 'operation.dry_run ? "DRY-RUN"' in frontend
     assert "function mountWorkflowPane(" in frontend
     assert "const dashboardMirrors = new Set();" in frontend
     assert "function renderDashboardRoot(root)" in frontend

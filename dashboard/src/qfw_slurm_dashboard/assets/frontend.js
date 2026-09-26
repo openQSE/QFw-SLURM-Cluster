@@ -1940,8 +1940,9 @@
       output.textContent = "No operation has run in this group.";
       return output;
     }
+    const headingStatus = operation.dry_run ? "DRY-RUN" : operation.status.toUpperCase();
     const heading = [
-      `${operation.status.toUpperCase()} · ${operation.action}`,
+      `${headingStatus} · ${operation.action}`,
       `target=${operation.target} operation=${operation.operation_id}`,
       `created=${operation.created_at || "unknown"} completed=${operation.completed_at || "pending"}`,
     ];

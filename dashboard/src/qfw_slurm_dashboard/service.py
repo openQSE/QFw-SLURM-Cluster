@@ -759,6 +759,7 @@ class DashboardService:
         operation.completed_at = operation.started_at
         operation.status = "succeeded"
         operation.return_code = 0
+        operation.dry_run = True
         output = [
             "DRY RUN - command was not executed",
             "Would run from the Docker host:",
