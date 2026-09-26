@@ -1894,6 +1894,9 @@
         }),
       });
       selectedOperations[group] = response.operation_id;
+      upsertOperation(response);
+      refreshDashboardData();
+      publishWidgets();
       if (pendingAbortGroups.delete(group)) {
         await request("/api/qfw-dashboard/operations/abort", {
           method: "POST",
@@ -1910,6 +1913,20 @@
       refreshDashboardData();
       publishWidgets();
     }
+  }
+
+  function upsertOperation(operation) {
+    if (!operation?.operation_id) return;
+    const operations = state.operations || [];
+    const index = operations.findIndex((item) =>
+      item.operation_id === operation.operation_id);
+    state = {
+      ...state,
+      operations: index >= 0
+        ? operations.map((item, itemIndex) =>
+          itemIndex === index ? operation : item)
+        : [...operations, operation],
+    };
   }
 
   async function abortOperation(group) {

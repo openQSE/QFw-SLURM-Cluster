@@ -243,6 +243,7 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "const pendingAbortGroups = new Set();" in frontend
     assert "if (pendingOperationGroups.has(group))" in frontend
     assert "if (pendingAbortGroups.delete(group))" in frontend
+    assert "function upsertOperation(operation)" in frontend
     assert "function operationControlState(group)" in frontend
     assert "function applyOperationControlState(container, group)" in frontend
     assert "function operationMode(widget)" in frontend
