@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import shlex
 from pathlib import Path
 from unittest.mock import patch
 import zipfile
@@ -212,6 +213,60 @@ def test_action_is_idempotent_by_request_id(tmp_path) -> None:
             )
     assert first.operation_id == second.operation_id
     assert host.call_count == 1
+
+
+def test_cluster_action_dry_run_records_command_without_streaming(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    with patch.object(dashboard.runner, "stream_host") as host:
+        operation = dashboard.submit_action(
+            "cluster-start", "root", dry_run=True
+        )
+    host.assert_not_called()
+    assert operation.dry_run is True
+    assert operation.status == "succeeded"
+    assert operation.return_code == 0
+    output = "\n".join(operation.output)
+    assert "DRY RUN - command was not executed" in output
+    assert "./do_startup.sh" in output
+    assert "./do_startup.sh --dry-run" in output
+
+
+def test_service_action_dry_run_keeps_logging_env_without_streaming(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    with patch.object(dashboard.runner, "stream_host") as host:
+        operation = dashboard.submit_action(
+            "service-restart",
+            "root",
+            target="nwqsim",
+            options={
+                "defw_log_level": "all",
+                "defw_py_loglevel": "DEFW_ALL",
+            },
+            dry_run=True,
+        )
+    host.assert_not_called()
+    assert operation.dry_run is True
+    output = "\n".join(operation.output)
+    assert "QFW_SERVICE_DEFW_LOG_LEVEL=all" in output
+    assert "QFW_SERVICE_DEFW_PY_LOGLEVEL=DEFW_ALL" in output
+    assert "qfw-site-services restart --target nwqsim" in output
+    assert "qfw-site-services --dry-run restart --target nwqsim" in output
+
+
+def test_node_action_dry_run_records_scontrol_without_streaming(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    with patch.object(dashboard.runner, "stream_host") as host:
+        operation = dashboard.submit_action(
+            "node-drain",
+            "root",
+            target="compute-1",
+            reason="maintenance",
+            dry_run=True,
+        )
+    host.assert_not_called()
+    assert operation.dry_run is True
+    output = "\n".join(operation.output)
+    assert "scontrol update NodeName=compute-1 State=DRAIN Reason=maintenance" in output
 
 
 def test_packaged_application_catalog_includes_supported_examples(tmp_path) -> None:
@@ -429,6 +484,65 @@ def test_submission_set_starts_each_validated_experiment(tmp_path) -> None:
     assert {
         item["experiment_id"] for item in dashboard.store.experiments()
     } == {first_id, second_id}
+
+
+def test_submission_set_dry_run_reports_commands_without_running(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    experiment_id = "2440c16e-865b-4a67-834e-dda390a67f32"
+
+    with patch.object(dashboard.runner, "cluster") as cluster:
+        result = dashboard.dry_run_experiment_batch({
+            "identity": "user-a",
+            "experiments": [{
+                "experiment_id": experiment_id,
+                "backend": "nwqsim",
+                "example": "qiskit-simple",
+            }],
+        })
+
+    cluster.assert_not_called()
+    assert result["outcome"] == "dry-run"
+    assert dashboard.store.experiments() == []
+    entry = result["experiments"][0]
+    assert entry["experiment_id"] == experiment_id
+    assert entry["submit_command"] == (
+        "sbatch --parsable "
+        f"/workspace/home/user-a/qfw-dashboard/experiments/{experiment_id}/job.sbatch"
+    )
+    assert "docker exec --user user-a" in entry["submit_host_command"]
+    assert "timeout --signal=TERM --kill-after=2 30" in entry["submit_host_command"]
+    assert entry["write_command"].startswith("python3 -c ")
+    assert "docker exec --user user-a" in entry["write_host_command"]
+    write_argv = shlex.split(entry["write_command"])
+    assert base64.b64decode(write_argv[-1]).decode("utf-8") == entry["batch_script"]
+    assert "#SBATCH --qpu=nwqsim" in entry["batch_script"]
+    assert "qfw_run_all.sh --service-mode site --backend nwqsim" in entry["batch_script"]
+
+
+def test_submission_set_dry_run_external_sbatch_skips_batch_write(tmp_path) -> None:
+    dashboard = service(tmp_path)
+
+    with patch.object(dashboard.runner, "cluster") as cluster:
+        result = dashboard.dry_run_experiment_batch({
+            "identity": "user-a",
+            "experiments": [{
+                "experiment_id": "f23bf181-f679-4a18-ae19-b880826ffaba",
+                "backend": "nwqsim",
+                "application_source": "path",
+                "application_submission_type": "sbatch",
+                "application_path": "/workspace/home/user-a/manual.sbatch",
+            }],
+        })
+
+    cluster.assert_not_called()
+    entry = result["experiments"][0]
+    assert entry["external_batch"] is True
+    assert entry["batch_script"] == ""
+    assert entry["write_command"] == ""
+    assert entry["write_host_command"] == ""
+    assert entry["submit_command"] == (
+        "sbatch --parsable /workspace/home/user-a/manual.sbatch"
+    )
 
 
 def test_submission_records_reusable_submission_entry_identity(tmp_path) -> None:

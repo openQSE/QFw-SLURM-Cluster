@@ -1,8 +1,8 @@
-# Testing the QRMI/QDMI shim (`svc_lib_qpm`)
+# Testing the QRMI/QDMI shim and `mqt-cc`
 
 This describes how to validate the QFw QRMI/QDMI front-end
-(`services/svc_lib_qpm`) in the containerized Slurm cluster. There are two
-tiers:
+(`services/svc_lib_qpm`) and the MQT Compiler Collection (`mqt-cc`) in the
+containerized Slurm cluster. The shim has two test tiers:
 
 1. **Local smoke:** routing and `qhw` normalization, with no credentials and no
    network access. This is the everyday check.
@@ -10,7 +10,7 @@ tiers:
    QRMI against an IQM system, confirming they return the same `qhw` shape.
    Requires IQM credentials.
 
-The test vehicle is `shared-dir/shim-smoke.sbatch`. It needs no Slurm
+The shim test vehicle is `shared-dir/shim-smoke.sbatch`. It needs no Slurm
 allocation and reads no Slurm environment, so both tiers run it directly inside
 `slurmctld`.
 
@@ -27,7 +27,7 @@ simulators, the image installs QFw at `/opt/openqse/qfw`, and its Python
 environment at `/opt/openqse/qfw-venv`, including the shim's QRMI and QDMI
 dependencies.
 
-## Which installation the smoke tests
+## Which shim installation is tested
 
 The image sets `QFW_PREFIX` and `QFW_VENV` to those paths, and
 `shim-smoke.sbatch` honours both. So **by default the smoke tests the image
@@ -38,14 +38,18 @@ and point the run at it, as described next.
 
 ## Optional: a developer override
 
-Clone QFw onto the shared mount and build it inside the running cluster:
+Clone QFw and MQT Core onto the shared mount and build them inside the running
+cluster:
 
 ```bash
 git clone --recursive https://github.com/openQSE/QFw.git shared-dir/QFw
+git clone https://github.com/munich-quantum-toolkit/core.git shared-dir/mqt-core
 ./do_qfw_build.sh
 ```
 
 `--recursive` is required, because the shim needs DEFw and the `qhw-*` packages.
+Check out the desired MQT Core ref before running `do_qfw_build.sh`. The image
+provides the MLIR toolchain used to build its Python package.
 QFw declares its submodules over SSH, so without GitHub SSH access to openQSE,
 rewrite them to HTTPS before cloning:
 
@@ -186,8 +190,44 @@ That wording predates the shim supplying the environment itself. Treat it as a
 QRMI failure and read the exception name in the parentheses. The run still
 passes on the QDMI leg.
 
+## `mqt-cc` smoke test (no credentials)
+
+The image builds MQT Core from the ref selected by `do_configure.sh` and installs
+it with Qiskit at `/opt/openqse/mqt-cc-venv`. This separate
+environment allows the compiler and QFw to use different Qiskit versions.
+`do_qfw_build.sh` builds the mounted MQT Core checkout into
+`/workspace/qfw-container-base/mqt-cc-venv` unless `--skip-venv` is used.
+
+`shared-dir/mqt-cc-smoke-test.sbatch` compiles a Qiskit circuit for
+MQT Core's bundled IQM Garnet model to QIR Base. It uses QDMI to read the
+model's capabilities and run the QIR on local DDSIM. The model is a
+historical hardware snapshot, not live device discovery. This check makes no hardware calls and does not exercise
+QFw submission or QRMI. The image build runs it too.
+
+Test the image installation:
+
+```bash
+docker exec -w /workspace/qfw-container-base slurmctld \
+  bash mqt-cc-smoke-test.sbatch 2>&1 | tee shared-dir/mqt-cc-smoke-test.out
+```
+
+For the developer environment, add
+`-e MQT_CC_VENV=/workspace/qfw-container-base/mqt-cc-venv` to `docker exec`.
+To test on a Slurm application node, submit from inside `slurmctld`:
+
+```bash
+cd /workspace/qfw-container-base
+sbatch --wait mqt-cc-smoke-test.sbatch
+```
+
+The job uses the `normal` partition and needs no QPU allocation. Success ends
+with `MQT-CC QIR SMOKE TEST: PASS`.
+
 ## What to capture
 
 The full `shim-smoke.out`, in particular the qubit and edge counts from each
 leg, whether the QRMI leg ran or reported unavailable, and whether the
 `cross-library: ... agree` line appeared.
+
+For the `mqt-cc` smoke test, capture `mqt-cc-smoke-test.out` or the Slurm job's
+`mqt-cc-smoke-test.<job-id>.out`.

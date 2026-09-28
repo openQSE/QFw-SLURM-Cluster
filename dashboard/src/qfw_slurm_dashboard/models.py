@@ -38,6 +38,7 @@ class Operation:
     return_code: int | None = None
     output: list[str] = field(default_factory=list)
     request_id: str = ""
+    dry_run: bool = False
 
     def payload(self) -> dict[str, Any]:
         return {"schema": SCHEMA_VERSION, **asdict(self)}

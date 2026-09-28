@@ -67,6 +67,8 @@
   const TOPOLOGY_ZOOM_MIN = 10;
   const TOPOLOGY_ZOOM_MAX = 1000;
   const TOPOLOGY_ZOOM_STEP = 10;
+  const SCROLL_INTERACTION_GRACE_MS = 1200;
+  const CONTROL_INTERACTION_GRACE_MS = 2500;
   const ACTIVE_EXPERIMENT_STATES = new Set([
     "created", "submitting", "submitted", "pending",
     "configuring", "running", "completing", "cancel-requested",
@@ -158,6 +160,8 @@
   let experimentResultsClearStatus = "idle";
   const nonPrimarySelectionPointers = new Set();
   const activeScrollPointers = new Map();
+  const recentScrollInteractions = new Map();
+  const recentControlInteractions = new Map();
   const popupWindows = new Map();
   const activeDashboardDialogs = new Set();
 
@@ -1860,6 +1864,41 @@
       || matching[0] || null;
   }
 
+  function operationMode(widget) {
+    return widgetStates[widget]?.operation_mode === "dry-run" ? "dry-run" : "run";
+  }
+
+  function operationModeLabel(mode) {
+    return mode === "dry-run" ? "Dry-Run" : "Run";
+  }
+
+  function submissionMode() {
+    return widgetStates.submission_mode === "dry-run" ? "dry-run" : "submit";
+  }
+
+  function submissionModeLabel(count) {
+    return submissionMode() === "dry-run"
+      ? `Dry-Run (${count})`
+      : `Submit All (${count})`;
+  }
+
+  function setSubmissionMode(mode) {
+    widgetStates.submission_mode = mode === "dry-run" ? "dry-run" : "submit";
+    savePresentation();
+    renderDashboard();
+    publishWidgets();
+  }
+
+  function setOperationMode(widget, mode) {
+    widgetStates[widget] = {
+      ...widgetStates[widget],
+      operation_mode: mode === "dry-run" ? "dry-run" : "run",
+    };
+    savePresentation();
+    renderDashboard();
+    publishWidgets();
+  }
+
   async function runOperation(group, payload) {
     pendingOperationGroups.add(group);
     refreshDashboardData();
@@ -1874,6 +1913,9 @@
         }),
       });
       selectedOperations[group] = response.operation_id;
+      upsertOperation(response);
+      refreshDashboardData();
+      publishWidgets();
       if (pendingAbortGroups.delete(group)) {
         await request("/api/qfw-dashboard/operations/abort", {
           method: "POST",
@@ -1890,6 +1932,20 @@
       refreshDashboardData();
       publishWidgets();
     }
+  }
+
+  function upsertOperation(operation) {
+    if (!operation?.operation_id) return;
+    const operations = state.operations || [];
+    const index = operations.findIndex((item) =>
+      item.operation_id === operation.operation_id);
+    state = {
+      ...state,
+      operations: index >= 0
+        ? operations.map((item, itemIndex) =>
+          itemIndex === index ? operation : item)
+        : [...operations, operation],
+    };
   }
 
   async function abortOperation(group) {
@@ -1920,8 +1976,9 @@
       output.textContent = "No operation has run in this group.";
       return output;
     }
+    const headingStatus = operation.dry_run ? "DRY-RUN" : operation.status.toUpperCase();
     const heading = [
-      `${operation.status.toUpperCase()} · ${operation.action}`,
+      `${headingStatus} · ${operation.action}`,
       `target=${operation.target} operation=${operation.operation_id}`,
       `created=${operation.created_at || "unknown"} completed=${operation.completed_at || "pending"}`,
     ];
@@ -1932,17 +1989,37 @@
 
   function operationButtons(widget, group, submit) {
     const buttons = element("div", "qfw-operation-buttons");
-    const run = element("button", "qfw-operation-run", "Run");
+    const mode = operationMode(widget);
+    const split = element("div", "qfw-operation-run-split");
+    const run = element("button", "qfw-operation-run", operationModeLabel(mode));
     run.type = "button";
     run.dataset.qfwAction = "run";
     run.dataset.qfwWidget = widget;
     run.addEventListener("click", async () => {
       try {
-        await submit();
+        await submit(operationMode(widget));
       } catch (error) {
         await notifyDashboard("Operation failed", error.message, "danger");
       }
     });
+    const modeValue = element("input");
+    modeValue.type = "hidden";
+    modeValue.dataset.qfwControl = "operation_mode";
+    modeValue.value = mode;
+    const modePicker = element("details", "qfw-operation-mode-picker");
+    const modeToggle = element("summary", "qfw-operation-mode-toggle", "▾");
+    modeToggle.setAttribute("aria-label", "Choose operation mode");
+    const modeMenu = element("div", "qfw-operation-mode-menu");
+    [["run", "Run"], ["dry-run", "Dry-Run"]].forEach(([value, label]) => {
+      const choice = element("button", "", label);
+      choice.type = "button";
+      choice.dataset.qfwModeChoice = value;
+      choice.setAttribute("aria-pressed", String(value === mode));
+      choice.addEventListener("click", () => setOperationMode(widget, value));
+      modeMenu.append(choice);
+    });
+    modePicker.append(modeToggle, modeMenu);
+    split.append(run, modeValue, modePicker);
     const abort = element("button", "danger", "Abort");
     abort.type = "button";
     abort.dataset.qfwAction = "abort";
@@ -1963,7 +2040,7 @@
     const status = element("output", "qfw-operation-status");
     status.dataset.qfwOperationStatus = group;
     status.setAttribute("aria-live", "polite");
-    buttons.append(run, status, abort);
+    buttons.append(split, status, abort);
     applyOperationControlState(buttons, group);
     return buttons;
   }
@@ -2028,11 +2105,12 @@
     cluster.append(
       operationField("Operation", clusterAction),
       operationField("Rebuild mode", rebuildMode),
-      operationButtons(widget, "cluster", async () => {
+      operationButtons(widget, "cluster", async (mode) => {
         const operation = clusterAction.value;
         const action = operation === "rebuild"
           ? `cluster-rebuild-${rebuildMode.value}` : `cluster-${operation}`;
-        if (operation !== "status") {
+        const dryRun = mode === "dry-run";
+        if (!dryRun && operation !== "status") {
           const clean = operation === "rebuild" && rebuildMode.value === "clean";
           const consequence = operation === "rebuild"
             ? ` This performs a ${clean ? "no-cache" : "cached"} image build, then restarts and provisions the cluster without deleting named volumes.`
@@ -2047,7 +2125,7 @@
             },
           )) return;
         }
-        await runOperation("cluster", { action, target: "cluster" });
+        await runOperation("cluster", { action, target: "cluster", dry_run: dryRun });
       }),
       operationOutput("cluster"),
     );
@@ -2080,10 +2158,11 @@
       operationField("Next defw_out.log level", serviceOutLogLevel),
       operationField("Next defw_py.log level", servicePyLogLevel),
       loggingNote,
-      operationButtons(widget, "services", async () => {
+      operationButtons(widget, "services", async (mode) => {
         const action = serviceAction.value;
+        const dryRun = mode === "dry-run";
         const dangerous = ["stop", "restart"].includes(action);
-        if (action !== "status" && !await confirmDashboardAction(
+        if (!dryRun && action !== "status" && !await confirmDashboardAction(
           `${action[0].toUpperCase()}${action.slice(1)} service`,
           `${action} ${serviceTarget.value} as root?`,
           {
@@ -2094,6 +2173,7 @@
         await runOperation("services", {
           action: `service-${action}`,
           target: serviceTarget.value,
+          dry_run: dryRun,
           options: ["start", "restart", "recover"].includes(action) ? {
             defw_log_level: serviceOutLogLevel.value,
             defw_py_loglevel: servicePyLogLevel.value,
@@ -2129,9 +2209,10 @@
       operationField("Node", node),
       operationField("Operation", nodeAction),
       operationField("Reason", reason),
-      operationButtons(widget, "nodes", async () => {
+      operationButtons(widget, "nodes", async (mode) => {
         const action = nodeAction.value;
-        if (!await confirmDashboardAction(
+        const dryRun = mode === "dry-run";
+        if (!dryRun && !await confirmDashboardAction(
           `${action[0].toUpperCase()}${action.slice(1)} node`,
           `${action} ${node.value} as root?`,
           {
@@ -2143,6 +2224,7 @@
           action: `node-${action}`,
           target: node.value,
           reason: reason.value,
+          dry_run: dryRun,
         });
       }),
       operationOutput("nodes"),
@@ -2391,9 +2473,54 @@
     const editing = active instanceof Element
       && active.matches("input, textarea, select, [contenteditable=true]")
       && container.contains(active);
+    const expandedSelect = container.querySelector("select[aria-expanded=true]");
+    const expandedDisclosure = container.querySelector("details[open]");
     const scrolling = [...activeScrollPointers.values()].some((target) =>
       container.contains(target));
-    return editing || scrolling || selectionIntersects(container);
+    return Boolean(expandedSelect || expandedDisclosure)
+      || editing
+      || scrolling
+      || recentlyScrolledInside(container)
+      || recentlyInteractedWithControlInside(container)
+      || selectionIntersects(container);
+  }
+
+  function formatSubmissionDryRun(result) {
+    const experiments = Array.isArray(result?.experiments) ? result.experiments : [];
+    const output = ["DRY RUN - jobs were not submitted"];
+    experiments.forEach((item, index) => {
+      output.push(
+        "",
+        `Application ${index + 1} · ${item.example || "application"}`,
+        `Experiment: ${item.experiment_id || "unknown"}`,
+        `Batch script: ${item.batch_script_path || "unknown"}`,
+        `Output file: ${item.output_path || "unknown"}`,
+      );
+      if (item.write_host_command) {
+        output.push(
+          "Would run from Docker host to write the batch file:",
+          `  ${item.write_host_command}`,
+        );
+      }
+      if (item.write_command) {
+        output.push(
+          "Would run inside the container to write the batch file:",
+          `  ${item.write_command}`,
+        );
+      }
+      output.push(
+        "Would submit from Docker host:",
+        `  ${item.submit_host_command || ""}`,
+        "Would run inside the container:",
+        `  ${item.submit_command || ""}`,
+      );
+      if (item.batch_script) {
+        output.push("", "Generated batch file:", item.batch_script.trimEnd());
+      } else if (item.external_batch) {
+        output.push("", "Existing batch file would be submitted as-is.");
+      }
+    });
+    return output.join("\n");
   }
 
   function refreshExperimentSubmissionStatus(root) {
@@ -2408,7 +2535,7 @@
     const staged = entries.filter((entry) => !submissionEntryIsInFlight(entry));
     const batchStatus = widgetStates.submissionSetStatus || {};
     const editing = Boolean(widgetStates.submissionSetEditing);
-    const requestPending = batchStatus.status === "requesting";
+    const requestPending = ["requesting", "dry-running"].includes(batchStatus.status);
     form.querySelectorAll(".qfw-submission-set-row").forEach((row) => {
       const entry = entries.find((item) => item.draft_id === row.dataset.draftId);
       if (!entry) return;
@@ -2435,12 +2562,20 @@
     form.classList.toggle("has-error", failed);
     submit.classList.toggle("is-depressed", requestPending);
     submit.disabled = requestPending || editing || entries.length === 0;
-    submit.textContent = `Submit All (${staged.length})`;
+    submit.textContent = submissionModeLabel(staged.length);
     submit.setAttribute("aria-pressed", requestPending ? "true" : "false");
     submit.setAttribute("aria-busy", requestPending ? "true" : "false");
     if (requestPending) {
-      output.textContent = `Submitting ${staged.length} applications …`;
+      output.textContent = batchStatus.status === "dry-running"
+        ? `Dry-running ${staged.length} applications ...`
+        : `Submitting ${staged.length} applications ...`;
       output.dataset.state = "running";
+      return;
+    }
+    if (batchStatus.status === "dry-run") {
+      output.textContent = `Dry-run ready · ${batchStatus.count || staged.length} applications`;
+      output.dataset.state = "succeeded";
+      terminal.textContent = batchStatus.output || "No dry-run output.";
       return;
     }
     if (batchStatus.status === "failed") {
@@ -3078,10 +3213,35 @@
     );
     submissionStatus.dataset.qfwSubmissionStatus = "";
     submissionStatus.dataset.state = "idle";
-    const submitSet = element("button", "qfw-submit-set", "Submit All (0)");
+    const submitSplit = element(
+      "div", "qfw-operation-run-split qfw-submission-run-split",
+    );
+    const submitSet = element(
+      "button", "qfw-submit-set qfw-operation-run", "Submit All (0)",
+    );
     submitSet.type = "button";
     submitSet.dataset.qfwSubmitSet = "";
-    submissionActions.append(submissionStatus, submitSet);
+    const submissionModeValue = element("input");
+    submissionModeValue.type = "hidden";
+    submissionModeValue.dataset.qfwControl = "submission_mode";
+    submissionModeValue.value = submissionMode();
+    const submissionModePicker = element("details", "qfw-operation-mode-picker");
+    const submissionModeToggle = element(
+      "summary", "qfw-operation-mode-toggle", "▾",
+    );
+    submissionModeToggle.setAttribute("aria-label", "Choose submission mode");
+    const submissionModeMenu = element("div", "qfw-operation-mode-menu");
+    [["submit", "Submit"], ["dry-run", "Dry-Run"]].forEach(([value, label]) => {
+      const choice = element("button", "", label);
+      choice.type = "button";
+      choice.dataset.qfwModeChoice = value;
+      choice.setAttribute("aria-pressed", String(value === submissionMode()));
+      choice.addEventListener("click", () => setSubmissionMode(value));
+      submissionModeMenu.append(choice);
+    });
+    submissionModePicker.append(submissionModeToggle, submissionModeMenu);
+    submitSplit.append(submitSet, submissionModeValue, submissionModePicker);
+    submissionActions.append(submissionStatus, submitSplit);
     submissionSetSection.append(
       submissionSetHeader, submissionSetList, submissionActions, previewOutput,
     );
@@ -3325,15 +3485,56 @@
         submissionStatus.dataset.state = "idle";
         return;
       }
+      const dryRun = submissionMode() === "dry-run";
       const hardwareBackendNames = hardwareBackends();
       const hardware = staged.some((entry) => (
         hardwareBackendNames.has(entry.request?.backend)
       ));
-      if (hardware && !await confirmDashboardAction(
+      if (!dryRun && hardware && !await confirmDashboardAction(
         "Submit real-hardware applications",
         "This Submission Set contains bounded work for real IQM hardware.",
         { severity: "warning", confirmLabel: "Submit all applications" },
       )) return;
+      if (dryRun) {
+        widgetStates.submissionSetStatus = {
+          status: "dry-running", count: staged.length,
+        };
+        const executionRequests = staged.map((entry) => ({
+          ...submissionDefinition(entry.request, entry.draft_id),
+          identity: activeIdentity,
+          submission_entry_id: entry.draft_id,
+          experiment_id: window.crypto.randomUUID(),
+        }));
+        savePresentation();
+        refreshExperimentSubmissionStatus(form);
+        try {
+          const result = await request("/api/qfw-dashboard/experiments/batch", {
+            method: "POST",
+            body: JSON.stringify({
+              identity: activeIdentity,
+              dry_run: true,
+              experiments: executionRequests,
+            }),
+          });
+          const output = formatSubmissionDryRun(result);
+          widgetStates.submissionSetStatus = {
+            status: "dry-run",
+            count: staged.length,
+            output,
+          };
+          savePresentation();
+          refreshExperimentSubmissionStatus(form);
+        } catch (error) {
+          widgetStates.submissionSetStatus = {
+            status: "failed",
+            error: error.message,
+          };
+          savePresentation();
+          refreshExperimentSubmissionStatus(form);
+          await notifyDashboard("Dry-run failed", error.message, "danger");
+        }
+        return;
+      }
       widgetStates.submissionSetStatus = {
         status: "requesting", count: staged.length,
       };
@@ -3660,6 +3861,7 @@
       return;
     }
     if (message.action !== "run") return;
+    const dryRun = values.operation_mode === "dry-run";
     if (message.widget === "cluster-control") {
       if (!["status", "synchronize", "start", "stop", "restart", "rebuild"].includes(
         values.operation,
@@ -3669,7 +3871,7 @@
         ? `cluster-rebuild-${values.rebuild_mode}`
         : `cluster-${values.operation}`;
       await runOperation("cluster", {
-        action, target: "cluster",
+        action, target: "cluster", dry_run: dryRun,
       });
     } else if (message.widget === "service-control") {
       if (!["status", "start", "stop", "restart", "recover"].includes(
@@ -3678,6 +3880,7 @@
       if (!serviceTargetChoices().some(([target]) => target === values.target)) return;
       await runOperation("services", {
         action: `service-${values.operation}`, target: values.target,
+        dry_run: dryRun,
       });
     } else if (message.widget === "node-control") {
       if (!["drain", "resume"].includes(values.operation)) return;
@@ -3685,6 +3888,7 @@
         action: `node-${values.operation}`,
         target: values.node || "",
         reason: values.reason || "qfw-dashboard",
+        dry_run: dryRun,
       });
     }
   }
@@ -3934,6 +4138,68 @@
     activeScrollPointers.delete(event.pointerId);
   }
 
+  function rememberScrollInteraction(target) {
+    if (!(target instanceof Element)) return;
+    const expiresAt = Date.now() + SCROLL_INTERACTION_GRACE_MS;
+    recentScrollInteractions.set(target, expiresAt);
+    window.setTimeout(() => {
+      if ((recentScrollInteractions.get(target) || 0) <= Date.now()) {
+        recentScrollInteractions.delete(target);
+      }
+    }, SCROLL_INTERACTION_GRACE_MS + 50);
+  }
+
+  function recentlyScrolledInside(container) {
+    const now = Date.now();
+    for (const [target, expiresAt] of recentScrollInteractions) {
+      if (expiresAt <= now || !target.isConnected) {
+        recentScrollInteractions.delete(target);
+      } else if (container.contains(target)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function trackRecentScrollInteraction(event) {
+    const target = scrollInteractionTarget(event)
+      || (event.target instanceof Element ? event.target : null);
+    rememberScrollInteraction(target);
+  }
+
+  function controlInteractionTarget(event) {
+    return event.composedPath().find((target) =>
+      target instanceof Element
+      && target.matches("input, textarea, select, button, summary, [contenteditable=true]"));
+  }
+
+  function rememberControlInteraction(target) {
+    if (!(target instanceof Element)) return;
+    const expiresAt = Date.now() + CONTROL_INTERACTION_GRACE_MS;
+    recentControlInteractions.set(target, expiresAt);
+    window.setTimeout(() => {
+      if ((recentControlInteractions.get(target) || 0) <= Date.now()) {
+        recentControlInteractions.delete(target);
+      }
+    }, CONTROL_INTERACTION_GRACE_MS + 50);
+  }
+
+  function recentlyInteractedWithControlInside(container) {
+    const now = Date.now();
+    for (const [target, expiresAt] of recentControlInteractions) {
+      if (expiresAt <= now || !target.isConnected) {
+        recentControlInteractions.delete(target);
+      } else if (container.contains(target)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function trackRecentControlInteraction(event) {
+    rememberControlInteraction(controlInteractionTarget(event));
+  }
+
   function activate(runtime) {
     runtimeApi = runtime;
     runtimeApi.ui.setWorkflowSideSheetCollapsed(true);
@@ -3947,6 +4213,12 @@
     installProgressTools();
     document.addEventListener("pointerdown", trackDashboardPointerSelection, true);
     document.addEventListener("pointerdown", trackScrollPointer, true);
+    document.addEventListener("pointerdown", trackRecentControlInteraction, true);
+    document.addEventListener("focusin", trackRecentControlInteraction, true);
+    document.addEventListener("input", trackRecentControlInteraction, true);
+    document.addEventListener("change", trackRecentControlInteraction, true);
+    document.addEventListener("wheel", trackRecentScrollInteraction, true);
+    document.addEventListener("scroll", trackRecentScrollInteraction, true);
     document.addEventListener("pointerup", finishNonPrimarySelectionPointer, true);
     document.addEventListener("pointerup", finishScrollPointer, true);
     document.addEventListener("pointercancel", finishNonPrimarySelectionPointer, true);
@@ -3986,8 +4258,16 @@
     selectedExperimentPhase = null;
     nonPrimarySelectionPointers.clear();
     activeScrollPointers.clear();
+    recentScrollInteractions.clear();
+    recentControlInteractions.clear();
     document.removeEventListener("pointerdown", trackDashboardPointerSelection, true);
     document.removeEventListener("pointerdown", trackScrollPointer, true);
+    document.removeEventListener("pointerdown", trackRecentControlInteraction, true);
+    document.removeEventListener("focusin", trackRecentControlInteraction, true);
+    document.removeEventListener("input", trackRecentControlInteraction, true);
+    document.removeEventListener("change", trackRecentControlInteraction, true);
+    document.removeEventListener("wheel", trackRecentScrollInteraction, true);
+    document.removeEventListener("scroll", trackRecentScrollInteraction, true);
     document.removeEventListener("pointerup", finishNonPrimarySelectionPointer, true);
     document.removeEventListener("pointerup", finishScrollPointer, true);
     document.removeEventListener("pointercancel", finishNonPrimarySelectionPointer, true);

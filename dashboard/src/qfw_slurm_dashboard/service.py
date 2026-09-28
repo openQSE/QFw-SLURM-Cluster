@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,35 @@ from .logs import LogSource, SERVICE_DIAGNOSTICS, SOURCES, read_source
 from .redaction import redact, redact_payload
 from .runner import CommandRunner, IDENTITIES
 from .store import DashboardStore
+
+
+@dataclass(frozen=True)
+class CommandSpec:
+    argv: tuple[str, ...]
+    container: str | None = None
+
+
+@dataclass(frozen=True)
+class OperationActionPlan:
+    command: CommandSpec
+    dry_run_commands: tuple[CommandSpec, ...] = ()
+
+
+@dataclass(frozen=True)
+class ExperimentSubmissionPlan:
+    experiment_id: str
+    identity: str
+    backend: str
+    example: str
+    allocation_mode: str
+    requirements: dict[str, Any]
+    experiment_root: str
+    output_path: str
+    batch_path: str
+    batch_script: str
+    external_batch: bool
+    submit_argv: tuple[str, ...]
+    write_argv: tuple[str, ...] | None
 
 
 class SubmissionSetValidationError(ValueError):
@@ -601,54 +631,11 @@ class DashboardService:
         request_id: str = "",
         reason: str = "qfw-dashboard",
         options: dict[str, Any] | None = None,
+        dry_run: bool = False,
     ) -> Operation:
-        if identity not in IDENTITIES:
-            raise ValueError("unsupported identity")
-        if action in self.HOST_ACTIONS:
-            if identity != "root":
-                raise PermissionError("host cluster actions require root selection")
-            argv = self.HOST_ACTIONS[action]
-            container = None
-        elif action.startswith("service-"):
-            if identity != "root":
-                raise PermissionError("service actions require root selection")
-            service_operation = action.removeprefix("service-")
-            if service_operation not in self.SERVICE_OPERATIONS:
-                raise ValueError(f"unsupported service operation: {service_operation}")
-            if target not in self.SERVICE_TARGETS:
-                raise ValueError(f"unsupported service target: {target}")
-            command = (
-                "qfw-site-services", service_operation, "--target", target,
-            )
-            if service_operation in {"start", "restart", "recover"}:
-                log_env = self._service_log_environment(options or {})
-                argv = (
-                    (
-                        "/usr/bin/env",
-                        *(f"{name}={value}" for name, value in log_env.items()),
-                        *command,
-                    )
-                    if log_env else command
-                )
-            else:
-                argv = command
-            container = "slurmctld"
-        elif action in {"node-drain", "node-resume"}:
-            if identity != "root" or not _SAFE_NAME.fullmatch(target):
-                raise PermissionError("valid node and root selection required")
-            if len(reason) > 200 or any(character in reason for character in "\r\n"):
-                raise ValueError("invalid node reason")
-            argv = (
-                "scontrol",
-                "update",
-                f"NodeName={target}",
-                "State=DRAIN" if action == "node-drain" else "State=RESUME",
-                f"Reason={reason}" if action == "node-drain" else "",
-            )
-            argv = tuple(item for item in argv if item)
-            container = "slurmctld"
-        else:
-            raise ValueError(f"unsupported action: {action}")
+        plan = self._operation_action_plan(
+            action, identity, target, reason, options or {}
+        )
         if request_id:
             for existing in self.store.operations():
                 if existing.get("request_id") == request_id:
@@ -663,11 +650,14 @@ class DashboardService:
             target=target,
             request_id=request_id,
         )
+        if dry_run:
+            self._complete_dry_run_operation(operation, plan)
+            return operation
         with self._lifecycle_lock:
             self.store.save_operation(operation)
             thread = threading.Thread(
                 target=self._run_operation,
-                args=(operation, argv, container),
+                args=(operation, plan.command),
                 daemon=True,
                 name=f"qfw-dashboard-{operation.operation_id}",
             )
@@ -675,8 +665,145 @@ class DashboardService:
             thread.start()
         return operation
 
+    def _operation_action_plan(
+        self,
+        action: str,
+        identity: str,
+        target: str,
+        reason: str,
+        options: dict[str, Any],
+    ) -> OperationActionPlan:
+        if identity not in IDENTITIES:
+            raise ValueError("unsupported identity")
+        if action in self.HOST_ACTIONS:
+            if identity != "root":
+                raise PermissionError("host cluster actions require root selection")
+            argv = self.HOST_ACTIONS[action]
+            return OperationActionPlan(
+                CommandSpec(argv),
+                self._host_dry_run_commands(action),
+            )
+        elif action.startswith("service-"):
+            if identity != "root":
+                raise PermissionError("service actions require root selection")
+            service_operation = action.removeprefix("service-")
+            if service_operation not in self.SERVICE_OPERATIONS:
+                raise ValueError(f"unsupported service operation: {service_operation}")
+            if target not in self.SERVICE_TARGETS:
+                raise ValueError(f"unsupported service target: {target}")
+            command = (
+                "qfw-site-services", service_operation, "--target", target,
+            )
+            dry_run_command = (
+                "qfw-site-services", "--dry-run", service_operation,
+                "--target", target,
+            )
+            if service_operation in {"start", "restart", "recover"}:
+                log_env = self._service_log_environment(options)
+                argv = (
+                    (
+                        "/usr/bin/env",
+                        *(f"{name}={value}" for name, value in log_env.items()),
+                        *command,
+                    )
+                    if log_env else command
+                )
+                dry_run_argv = (
+                    (
+                        "/usr/bin/env",
+                        *(f"{name}={value}" for name, value in log_env.items()),
+                        *dry_run_command,
+                    )
+                    if log_env else dry_run_command
+                )
+            else:
+                argv = command
+                dry_run_argv = dry_run_command
+            return OperationActionPlan(
+                CommandSpec(argv, "slurmctld"),
+                (CommandSpec(dry_run_argv, "slurmctld"),),
+            )
+        elif action in {"node-drain", "node-resume"}:
+            if identity != "root" or not _SAFE_NAME.fullmatch(target):
+                raise PermissionError("valid node and root selection required")
+            if len(reason) > 200 or any(character in reason for character in "\r\n"):
+                raise ValueError("invalid node reason")
+            argv = (
+                "scontrol",
+                "update",
+                f"NodeName={target}",
+                "State=DRAIN" if action == "node-drain" else "State=RESUME",
+                f"Reason={reason}" if action == "node-drain" else "",
+            )
+            argv = tuple(item for item in argv if item)
+            return OperationActionPlan(CommandSpec(argv, "slurmctld"))
+        else:
+            raise ValueError(f"unsupported action: {action}")
+
+    def _host_dry_run_commands(self, action: str) -> tuple[CommandSpec, ...]:
+        commands = {
+            "cluster-build": (("./do_build.sh", "--dry-run"),),
+            "cluster-status": (("./do_ls.sh", "--dry-run"),),
+            "cluster-start": (("./do_startup.sh", "--dry-run"),),
+            "cluster-stop": (("./do_stop.sh", "--dry-run"),),
+            "cluster-restart": (("./do_restart.sh", "--dry-run"),),
+            "cluster-rebuild-incremental": (
+                ("./do_build.sh", "--dry-run"),
+                ("./do_stop.sh", "--dry-run"),
+                ("./do_startup.sh", "--dry-run"),
+            ),
+            "cluster-rebuild-clean": (
+                ("./do_build.sh", "--dry-run", "--no-cache"),
+                ("./do_stop.sh", "--dry-run"),
+                ("./do_startup.sh", "--dry-run"),
+            ),
+        }
+        return tuple(CommandSpec(command) for command in commands.get(action, ()))
+
+    def _render_command(self, identity: str, command: CommandSpec) -> str:
+        if command.container is None:
+            return shlex.join(command.argv)
+        return shlex.join(self.runner.cluster_argv(
+            identity,
+            command.argv,
+            container=command.container,
+        ))
+
+    def _complete_dry_run_operation(
+        self, operation: Operation, plan: OperationActionPlan
+    ) -> None:
+        operation.started_at = utc_now()
+        operation.completed_at = operation.started_at
+        operation.status = "succeeded"
+        operation.return_code = 0
+        operation.dry_run = True
+        output = [
+            "DRY RUN - command was not executed",
+            "Would run from the Docker host:",
+            f"  {self._render_command(operation.identity, plan.command)}",
+        ]
+        if plan.dry_run_commands:
+            output.extend(["", "Available dry-run helper command(s):"])
+            output.extend(
+                f"  {self._render_command(operation.identity, command)}"
+                for command in plan.dry_run_commands
+            )
+        operation.output = output
+        with self._lifecycle_lock:
+            self.store.save_operation(operation)
+            self.store.audit({
+                "identity": operation.identity,
+                "host_identity": "electroboy-service",
+                "action": operation.action,
+                "target": operation.target,
+                "request_id": operation.request_id,
+                "operation_id": operation.operation_id,
+                "started_at": operation.started_at,
+                "outcome": "dry-run",
+            })
+
     def _run_operation(
-        self, operation: Operation, argv: tuple[str, ...], container: str | None
+        self, operation: Operation, command_spec: CommandSpec
     ) -> None:
         operation.status = "running"
         operation.started_at = utc_now()
@@ -692,8 +819,13 @@ class DashboardService:
             "outcome": "started",
         })
         try:
-            command = argv if container is None else self.runner.cluster_argv(
-                operation.identity, argv, container=container
+            command = (
+                command_spec.argv if command_spec.container is None
+                else self.runner.cluster_argv(
+                    operation.identity,
+                    command_spec.argv,
+                    container=command_spec.container,
+                )
             )
             def on_start(process: subprocess.Popen[str]) -> None:
                 with self._operation_lock:
@@ -872,9 +1004,15 @@ class DashboardService:
             thread.start()
         return experiment
 
-    def submit_experiment_batch(
-        self, request: dict[str, Any]
-    ) -> list[Experiment]:
+    def _prepared_experiment_batch(
+        self,
+        request: dict[str, Any],
+        *,
+        require_hardware_confirmation: bool,
+    ) -> tuple[
+        str,
+        list[tuple[dict[str, Any], tuple[str, str, str, str, dict[str, Any]]]],
+    ]:
         identity = str(request.get("identity", ""))
         submissions = request.get("experiments")
         if identity not in IDENTITIES:
@@ -885,7 +1023,9 @@ class DashboardService:
             raise ValueError("submission set cannot exceed 64 experiments")
 
         hardware_confirmed = request.get("submit_real_hardware") is True
-        prepared: list[dict[str, Any]] = []
+        prepared: list[
+            tuple[dict[str, Any], tuple[str, str, str, str, dict[str, Any]]]
+        ] = []
         experiment_ids: set[str] = set()
         for index, submission in enumerate(submissions):
             if not isinstance(submission, dict):
@@ -900,10 +1040,10 @@ class DashboardService:
             supplied_id = str(candidate.get("experiment_id", "")).strip()
             try:
                 experiment_id = self._experiment_id(candidate)
-                self._validated_experiment_request(
+                validated = self._validated_experiment_request(
                     candidate,
                     default_identity="",
-                    require_hardware_confirmation=True,
+                    require_hardware_confirmation=require_hardware_confirmation,
                 )
             except (PermissionError, TypeError, ValueError) as error:
                 raise SubmissionSetValidationError(
@@ -916,7 +1056,19 @@ class DashboardService:
                     f"duplicate experiment in submission set: {experiment_id}",
                 )
             experiment_ids.add(experiment_id)
-            prepared.append({**candidate, "experiment_id": experiment_id})
+            prepared.append(({**candidate, "experiment_id": experiment_id}, validated))
+        return identity, prepared
+
+    def submit_experiment_batch(
+        self, request: dict[str, Any]
+    ) -> list[Experiment]:
+        _identity, prepared = self._prepared_experiment_batch(
+            request, require_hardware_confirmation=True
+        )
+        prepared_requests = [item for item, _validated in prepared]
+        experiment_ids = {
+            str(item["experiment_id"]) for item in prepared_requests
+        }
 
         with self._lifecycle_lock:
             existing_ids = {
@@ -927,7 +1079,7 @@ class DashboardService:
             if duplicate:
                 experiment_id = duplicate[0]
                 index = next(
-                    index for index, item in enumerate(prepared)
+                    index for index, item in enumerate(prepared_requests)
                     if item["experiment_id"] == experiment_id
                 )
                 raise SubmissionSetValidationError(
@@ -935,7 +1087,29 @@ class DashboardService:
                     experiment_id,
                     f"experiment already exists: {experiment_id}",
                 )
-            return [self.submit_experiment(item) for item in prepared]
+            return [self.submit_experiment(item) for item in prepared_requests]
+
+    def dry_run_experiment_batch(self, request: dict[str, Any]) -> dict[str, Any]:
+        _identity, prepared = self._prepared_experiment_batch(
+            request, require_hardware_confirmation=False
+        )
+        experiments: list[dict[str, Any]] = []
+        for candidate, validated in prepared:
+            identity, backend, example, mode, requirements = validated
+            experiment = Experiment(
+                str(candidate["experiment_id"]),
+                identity,
+                backend,
+                example,
+                mode,
+            )
+            plan = self._experiment_submission_plan(experiment, requirements)
+            experiments.append(self._submission_dry_run_payload(plan))
+        return {
+            "schema": "qfw-dashboard-submission-dry-run-v1",
+            "outcome": "dry-run",
+            "experiments": experiments,
+        }
 
     def _validated_experiment_request(
         self,
@@ -1316,6 +1490,68 @@ class DashboardService:
             "component": "slurm",
         })
         self.store.save_experiment(experiment)
+        plan = self._experiment_submission_plan(experiment, requirements)
+        experiment.manifest["command"] = shlex.join(plan.submit_argv)
+        experiment.manifest["batch_script_path"] = plan.batch_path
+        if plan.batch_script:
+            experiment.manifest["batch_script_sha256"] = hashlib.sha256(
+                plan.batch_script.encode("utf-8")
+            ).hexdigest()
+        experiment.manifest["output_path"] = plan.output_path
+        experiment.manifest["submitted_at"] = utc_now()
+        if plan.external_batch:
+            result = self.runner.cluster(
+                experiment.identity, plan.submit_argv, timeout=30
+            )
+            failure_classification = "submission"
+        else:
+            write_result = self._write_batch_script(
+                experiment.identity, plan.batch_path, plan.batch_script
+            )
+            if write_result.returncode:
+                result = write_result
+                failure_classification = "batch-script"
+            else:
+                result = self.runner.cluster(
+                    experiment.identity, plan.submit_argv, timeout=30
+                )
+                failure_classification = "submission"
+        if result.returncode:
+            experiment.status = "failed"
+            experiment.result = {
+                "failure_classification": failure_classification,
+                "error": result.stderr or result.stdout,
+            }
+            experiment.completed_at = utc_now()
+            experiment.timeline.append({
+                "timestamp": experiment.completed_at, "phase": "failed",
+                "component": "slurm", "classification": failure_classification,
+            })
+        else:
+            experiment.slurm_job_id = result.stdout.strip().split(";")[0]
+            experiment.status = "submitted"
+            experiment.artifacts = (
+                [plan.batch_path]
+                if plan.external_batch else [plan.output_path, plan.batch_path]
+            )
+            experiment.timeline.append({
+                "timestamp": utc_now(), "phase": "submitted",
+                "component": "slurm", "job_id": experiment.slurm_job_id,
+            })
+        self.store.save_experiment(experiment)
+        self.store.append_event({
+            "kind": "progress",
+            "component": "application",
+            "identity": experiment.identity,
+            "experiment_id": experiment.experiment_id,
+            "job_id": experiment.slurm_job_id,
+            "severity": "error" if result.returncode else "info",
+            "message": experiment.status,
+        })
+
+    def _experiment_submission_plan(
+        self, experiment: Experiment, requirements: dict[str, Any]
+    ) -> ExperimentSubmissionPlan:
         experiment_root = (
             f"/workspace/home/{experiment.identity}/qfw-dashboard/experiments/"
             f"{experiment.experiment_id}"
@@ -1336,62 +1572,56 @@ class DashboardService:
                 or self._batch_script(experiment, requirements, output_path)
             )
         submit_argv = ("sbatch", "--parsable", batch_path)
-        experiment.manifest["command"] = shlex.join(submit_argv)
-        experiment.manifest["batch_script_path"] = batch_path
-        if batch_script:
-            experiment.manifest["batch_script_sha256"] = hashlib.sha256(
-                batch_script.encode("utf-8")
-            ).hexdigest()
-        experiment.manifest["output_path"] = output_path
-        experiment.manifest["submitted_at"] = utc_now()
-        if external_batch:
-            result = self.runner.cluster(
-                experiment.identity, submit_argv, timeout=30
-            )
-            failure_classification = "submission"
-        else:
-            write_result = self._write_batch_script(
-                experiment.identity, batch_path, batch_script
-            )
-            if write_result.returncode:
-                result = write_result
-                failure_classification = "batch-script"
-            else:
-                result = self.runner.cluster(
-                    experiment.identity, submit_argv, timeout=30
-                )
-                failure_classification = "submission"
-        if result.returncode:
-            experiment.status = "failed"
-            experiment.result = {
-                "failure_classification": failure_classification,
-                "error": result.stderr or result.stdout,
-            }
-            experiment.completed_at = utc_now()
-            experiment.timeline.append({
-                "timestamp": experiment.completed_at, "phase": "failed",
-                "component": "slurm", "classification": failure_classification,
-            })
-        else:
-            experiment.slurm_job_id = result.stdout.strip().split(";")[0]
-            experiment.status = "submitted"
-            experiment.artifacts = (
-                [batch_path] if external_batch else [output_path, batch_path]
-            )
-            experiment.timeline.append({
-                "timestamp": utc_now(), "phase": "submitted",
-                "component": "slurm", "job_id": experiment.slurm_job_id,
-            })
-        self.store.save_experiment(experiment)
-        self.store.append_event({
-            "kind": "progress",
-            "component": "application",
-            "identity": experiment.identity,
-            "experiment_id": experiment.experiment_id,
-            "job_id": experiment.slurm_job_id,
-            "severity": "error" if result.returncode else "info",
-            "message": experiment.status,
-        })
+        write_argv = (
+            None if external_batch
+            else self._batch_script_write_argv(batch_path, batch_script)
+        )
+        return ExperimentSubmissionPlan(
+            experiment_id=experiment.experiment_id,
+            identity=experiment.identity,
+            backend=experiment.backend,
+            example=experiment.example,
+            allocation_mode=experiment.allocation_mode,
+            requirements=requirements,
+            experiment_root=experiment_root,
+            output_path=output_path,
+            batch_path=batch_path,
+            batch_script=batch_script,
+            external_batch=external_batch,
+            submit_argv=submit_argv,
+            write_argv=write_argv,
+        )
+
+    def _submission_dry_run_payload(
+        self, plan: ExperimentSubmissionPlan
+    ) -> dict[str, Any]:
+        write_command = ""
+        write_host_command = ""
+        if plan.write_argv is not None:
+            write_command = shlex.join(plan.write_argv)
+            write_host_command = shlex.join(self.runner.cluster_argv(
+                plan.identity, plan.write_argv, timeout=15
+            ))
+        return {
+            "schema": "qfw-dashboard-submission-dry-run-entry-v1",
+            "outcome": "dry-run",
+            "experiment_id": plan.experiment_id,
+            "identity": plan.identity,
+            "backend": plan.backend,
+            "example": plan.example,
+            "allocation_mode": plan.allocation_mode,
+            "experiment_root": plan.experiment_root,
+            "output_path": plan.output_path,
+            "batch_script_path": plan.batch_path,
+            "batch_script": plan.batch_script,
+            "external_batch": plan.external_batch,
+            "write_command": write_command,
+            "write_host_command": write_host_command,
+            "submit_command": shlex.join(plan.submit_argv),
+            "submit_host_command": shlex.join(self.runner.cluster_argv(
+                plan.identity, plan.submit_argv, timeout=30
+            )),
+        }
 
     def _batch_script(
         self,
@@ -1517,6 +1747,16 @@ class DashboardService:
         batch_path: str,
         batch_script: str,
     ) -> CommandResult:
+        return self.runner.cluster(
+            identity,
+            self._batch_script_write_argv(batch_path, batch_script),
+            timeout=15,
+        )
+
+    @staticmethod
+    def _batch_script_write_argv(
+        batch_path: str, batch_script: str
+    ) -> tuple[str, ...]:
         encoded = base64.b64encode(batch_script.encode("utf-8")).decode("ascii")
         writer = (
             "import base64, os, pathlib, sys; "
@@ -1526,9 +1766,7 @@ class DashboardService:
             "temporary.write_bytes(base64.b64decode(sys.argv[2], validate=True)); "
             "os.chmod(temporary, 0o700); temporary.replace(path)"
         )
-        return self.runner.cluster(
-            identity, ("python3", "-c", writer, batch_path, encoded), timeout=15
-        )
+        return ("python3", "-c", writer, batch_path, encoded)
 
     @staticmethod
     def _application_batch_script_save_path(application_path: str) -> str:

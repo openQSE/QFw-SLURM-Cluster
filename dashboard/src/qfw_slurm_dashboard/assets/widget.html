@@ -151,6 +151,8 @@
     let camera = { x: 24, y: 24, scale: 1 };
     let pan = null;
     const activeScrollPointers = new Map();
+    const CONTROL_INTERACTION_GRACE_MS = 2500;
+    const recentControlInteractions = new Map();
 
     function publishPresentation(presentation) {
       channel.postMessage({
@@ -424,6 +426,15 @@
           publishPresentation({ [control.dataset.qfwControl]: control.value });
         });
       });
+      output.querySelectorAll("[data-qfw-mode-choice]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const mode = button.dataset.qfwModeChoice === "dry-run"
+            ? "dry-run" : "run";
+          const value = output.querySelector("[data-qfw-control=operation_mode]");
+          if (value) value.value = mode;
+          publishPresentation({ operation_mode: mode });
+        });
+      });
       output.querySelectorAll("[data-qfw-action]").forEach((button) => {
         button.addEventListener("click", async () => {
           const values = Object.fromEntries(
@@ -431,14 +442,15 @@
               .map((control) => [control.dataset.qfwControl, control.value]),
           );
           const action = button.dataset.qfwAction;
+          const dryRun = values.operation_mode === "dry-run";
           const description = action === "abort"
             ? "Abort the current operation?"
             : action === "open-shell"
               ? `Open a shell in ${values.node || "slurmctld"}?`
-              : `Run ${values.operation || action}?`;
+              : `${dryRun ? "Dry-run" : "Run"} ${values.operation || action}?`;
           const danger = action === "abort"
             || ["stop", "restart", "rebuild", "drain"].includes(values.operation);
-          if (values.operation !== "status"
+          if (!dryRun && values.operation !== "status"
               && !await confirmWidgetAction("Confirm operation", description, danger)) return;
           channel.postMessage({ type: "control-action", widget, action, values });
         });
@@ -485,9 +497,48 @@
       const editing = active instanceof Element
         && active.matches("input, textarea, select, [contenteditable=true]")
         && container.contains(active);
+      const expandedSelect = container.querySelector("select[aria-expanded=true]");
+      const expandedDisclosure = container.querySelector("details[open]");
       const scrolling = [...activeScrollPointers.values()].some((target) =>
         container.contains(target));
-      return editing || scrolling || selectionIntersects(container);
+      return Boolean(expandedSelect || expandedDisclosure)
+        || editing
+        || scrolling
+        || recentlyInteractedWithControlInside(container)
+        || selectionIntersects(container);
+    }
+
+    function controlInteractionTarget(event) {
+      return event.composedPath().find((target) =>
+        target instanceof Element
+        && target.matches("input, textarea, select, button, summary, [contenteditable=true]"));
+    }
+
+    function rememberControlInteraction(target) {
+      if (!(target instanceof Element)) return;
+      const expiresAt = Date.now() + CONTROL_INTERACTION_GRACE_MS;
+      recentControlInteractions.set(target, expiresAt);
+      window.setTimeout(() => {
+        if ((recentControlInteractions.get(target) || 0) <= Date.now()) {
+          recentControlInteractions.delete(target);
+        }
+      }, CONTROL_INTERACTION_GRACE_MS + 50);
+    }
+
+    function recentlyInteractedWithControlInside(container) {
+      const now = Date.now();
+      for (const [target, expiresAt] of recentControlInteractions) {
+        if (expiresAt <= now || !target.isConnected) {
+          recentControlInteractions.delete(target);
+        } else if (container.contains(target)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function trackRecentControlInteraction(event) {
+      rememberControlInteraction(controlInteractionTarget(event));
     }
 
     function scrollInteractionTarget(event) {
@@ -507,6 +558,10 @@
       const target = scrollInteractionTarget(event);
       if (target) activeScrollPointers.set(event.pointerId, target);
     }, true);
+    document.addEventListener("pointerdown", trackRecentControlInteraction, true);
+    document.addEventListener("focusin", trackRecentControlInteraction, true);
+    document.addEventListener("input", trackRecentControlInteraction, true);
+    document.addEventListener("change", trackRecentControlInteraction, true);
     ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => {
       document.addEventListener(type, (event) => {
         activeScrollPointers.delete(event.pointerId);

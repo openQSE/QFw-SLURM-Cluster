@@ -32,3 +32,7 @@ docker-compose.override.yml
 /shared-dir/qfw-install/
 /shared-dir/qfw-venv/
 /shared-dir/qfw-site-services/
+
+# MQT Core developer override
+/shared-dir/mqt-core/
+/shared-dir/mqt-cc-venv/

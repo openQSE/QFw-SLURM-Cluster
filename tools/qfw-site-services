@@ -695,6 +695,10 @@ def first_document(text):
     return value if isinstance(value, dict) else None
 
 
+def state_file_missing(output):
+    return "service-plane state not found:" in output.lower()
+
+
 def classify(name, returncode, output):
     if name == "gateway":
         lines = {line.strip().lower() for line in output.splitlines()}
@@ -708,6 +712,12 @@ def classify(name, returncode, output):
 
     document = first_document(output)
     if document is None:
+        if state_file_missing(output):
+            return "DOWN", {
+                "state": "stopped",
+                "return_code": returncode,
+                "output": output,
+            }
         return "UNKNOWN", {
             "state": "unknown", "return_code": returncode, "output": output,
         }

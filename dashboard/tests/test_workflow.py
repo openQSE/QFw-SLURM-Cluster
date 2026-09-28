@@ -86,6 +86,14 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function refreshPackagedExamples(root)" in frontend
     assert "refreshPackagedExamples(root);" in frontend
     assert "control === document.activeElement" in frontend
+    assert 'container.querySelector("select[aria-expanded=true]")' in frontend
+    assert 'container.querySelector("details[open]")' in frontend
+    assert "const SCROLL_INTERACTION_GRACE_MS = 1200;" in frontend
+    assert "const CONTROL_INTERACTION_GRACE_MS = 2500;" in frontend
+    assert "function recentlyScrolledInside(container)" in frontend
+    assert "function recentlyInteractedWithControlInside(container)" in frontend
+    assert 'document.addEventListener("wheel", trackRecentScrollInteraction, true)' in frontend
+    assert 'document.addEventListener("pointerdown", trackRecentControlInteraction, true)' in frontend
     assert frontend.index("if (group.experimentLauncher) renderExperimentForm(grid);") < frontend.index(
         "group.widgets.forEach"
     )
@@ -118,7 +126,7 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert 'previewOutput.dataset.qfwSubmissionOutput = ""' in frontend
     assert "Submitting ${staged.length} applications" in frontend
     assert "qfwSubmitSet" in frontend
-    assert 'const requestPending = batchStatus.status === "requesting";' in frontend
+    assert '["requesting", "dry-running"].includes(batchStatus.status)' in frontend
     assert "submit.disabled = requestPending || editing || entries.length === 0;" in frontend
     assert "submit.disabled = active;" not in frontend
     assert '"Add to Submission Set"' in frontend
@@ -239,8 +247,21 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "const pendingAbortGroups = new Set();" in frontend
     assert "if (pendingOperationGroups.has(group))" in frontend
     assert "if (pendingAbortGroups.delete(group))" in frontend
+    assert "function upsertOperation(operation)" in frontend
     assert "function operationControlState(group)" in frontend
     assert "function applyOperationControlState(container, group)" in frontend
+    assert "function operationMode(widget)" in frontend
+    assert '"Dry-Run"' in frontend
+    assert 'modeValue.dataset.qfwControl = "operation_mode";' in frontend
+    assert "choice.dataset.qfwModeChoice = value;" in frontend
+    assert "dry_run: dryRun" in frontend
+    assert "function submissionMode()" in frontend
+    assert 'submissionModeValue.dataset.qfwControl = "submission_mode";' in frontend
+    assert "qfw-submission-run-split" in frontend
+    assert "function formatSubmissionDryRun(result)" in frontend
+    assert "dry_run: true" in frontend
+    assert "submit_host_command" in frontend
+    assert "write_host_command" in frontend
     assert 'status.setAttribute("aria-live", "polite")' in frontend
     assert 'run.classList.toggle("is-pressed", control.busy)' in frontend
     assert "function renderNodeControl()" in frontend
@@ -254,6 +275,7 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function renderClusterAccess()" in frontend
     assert 'action: `service-${action}`' in frontend
     assert 'message.type === "control-action"' in frontend
+    assert 'operation.dry_run ? "DRY-RUN"' in frontend
     assert "function mountWorkflowPane(" in frontend
     assert "const dashboardMirrors = new Set();" in frontend
     assert "function renderDashboardRoot(root)" in frontend
@@ -291,6 +313,8 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function hydrateWidget()" in popout
     assert 'widget === "topology"' in popout
     assert 'type: "control-action"' in popout
+    assert "[data-qfw-mode-choice]" in popout
+    assert "values.operation_mode === \"dry-run\"" in popout
     assert 'values.operation !== "status"' in popout
     assert "controlWidgets.has(widget)" in popout
     assert "graph.style.width" in popout
@@ -318,7 +342,10 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert 'if (topologyGraph) topologyGraph.style.width = "100%"' in popout
     assert "function selectionIntersects(container)" in popout
     assert "function userIsInteractingWith(container)" in popout
+    assert 'container.querySelector("details[open]")' in popout
     assert "const activeScrollPointers = new Map();" in popout
+    assert "const CONTROL_INTERACTION_GRACE_MS = 2500;" in popout
+    assert "function recentlyInteractedWithControlInside(container)" in popout
     assert "function scrollInteractionTarget(event)" in popout
     assert "if (userIsInteractingWith(output))" in popout
     assert 'output.addEventListener("focusout"' in popout
@@ -405,6 +432,9 @@ def test_dashboard_uses_electroboy_pane_colors() -> None:
     assert "background: #0a2235;" in stylesheet
     assert ".qfw-operation-control" in stylesheet
     assert ".qfw-operation-output" in stylesheet
+    assert ".qfw-operation-run-split" in stylesheet
+    assert ".qfw-operation-mode-toggle" in stylesheet
+    assert ".qfw-operation-mode-menu" in stylesheet
     assert ".qfw-operation-run.is-pressed" in stylesheet
     assert ".qfw-operation-status" in stylesheet
     assert "@keyframes qfw-operation-dot" in stylesheet
