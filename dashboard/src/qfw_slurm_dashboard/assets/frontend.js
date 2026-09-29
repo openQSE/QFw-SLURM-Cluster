@@ -162,6 +162,7 @@
   const activeScrollPointers = new Map();
   const recentScrollInteractions = new Map();
   const recentControlInteractions = new Map();
+  const widgetBodyMarkup = new WeakMap();
   const popupWindows = new Map();
   const activeDashboardDialogs = new Set();
 
@@ -1570,6 +1571,22 @@
     return element("pre", "", JSON.stringify(payload, null, 2));
   }
 
+  function trackedWidgetBody(id, payload) {
+    const body = renderWidgetBody(id, payload);
+    widgetBodyMarkup.set(body, body.outerHTML);
+    return body;
+  }
+
+  function replaceWidgetBodyIfChanged(current, id, payload) {
+    if (!current) return false;
+    const next = renderWidgetBody(id, payload);
+    const nextMarkup = next.outerHTML;
+    if (widgetBodyMarkup.get(current) === nextMarkup) return false;
+    widgetBodyMarkup.set(next, nextMarkup);
+    current.replaceWith(next);
+    return true;
+  }
+
   function openWidget(id, label) {
     const instanceId = `${contextId()}:${id}`;
     const existing = popupWindows.get(instanceId);
@@ -1634,7 +1651,7 @@
       widgetStates[id] = { ...widgetStates[id], filter: filter.value };
       savePresentation();
       const body = details.children[1];
-      body.replaceWith(renderWidgetBody(id, widgetPayload(id)));
+      replaceWidgetBodyIfChanged(body, id, widgetPayload(id));
       publishWidgets();
     });
     const pop = element("button", "qfw-popout", "Pop out");
@@ -1646,7 +1663,7 @@
     });
     if (!NON_FILTERABLE_WIDGETS.has(id)) summary.append(filter);
     summary.append(pop);
-    details.append(summary, renderWidgetBody(id, widgetPayload(id)));
+    details.append(summary, trackedWidgetBody(id, widgetPayload(id)));
     details.addEventListener("toggle", () => {
       widgetStates[id] = { ...widgetStates[id], expanded: details.open };
       savePresentation();
@@ -3763,7 +3780,7 @@
       }
       if (id === "cluster-access") return;
       const body = widget.children[1];
-      if (body) body.replaceWith(renderWidgetBody(id, widgetPayload(id)));
+      replaceWidgetBodyIfChanged(body, id, widgetPayload(id));
     });
     restoreWidgetScrollPositions(root, scrollPositions);
   }

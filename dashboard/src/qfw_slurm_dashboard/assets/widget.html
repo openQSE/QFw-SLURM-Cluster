@@ -146,12 +146,15 @@
     if (controlWidgets.has(widget)) filter.closest("label").hidden = true;
     let lastPayload = null;
     let lastMarkup = "";
+    let renderedMarkup = "";
     let lastUpdate = 0;
     let renderPending = false;
     let camera = { x: 24, y: 24, scale: 1 };
     let pan = null;
     const activeScrollPointers = new Map();
+    const SCROLL_INTERACTION_GRACE_MS = 1200;
     const CONTROL_INTERACTION_GRACE_MS = 2500;
+    const recentScrollInteractions = new Map();
     const recentControlInteractions = new Map();
 
     function publishPresentation(presentation) {
@@ -504,6 +507,7 @@
       return Boolean(expandedSelect || expandedDisclosure)
         || editing
         || scrolling
+        || recentlyScrolledInside(container)
         || recentlyInteractedWithControlInside(container)
         || selectionIntersects(container);
     }
@@ -553,6 +557,36 @@
       }) || null;
     }
 
+    function rememberScrollInteraction(target) {
+      if (!(target instanceof Element)) return;
+      const expiresAt = Date.now() + SCROLL_INTERACTION_GRACE_MS;
+      recentScrollInteractions.set(target, expiresAt);
+      window.setTimeout(() => {
+        if ((recentScrollInteractions.get(target) || 0) <= Date.now()) {
+          recentScrollInteractions.delete(target);
+          if (renderPending) render();
+        }
+      }, SCROLL_INTERACTION_GRACE_MS + 50);
+    }
+
+    function recentlyScrolledInside(container) {
+      const now = Date.now();
+      for (const [target, expiresAt] of recentScrollInteractions) {
+        if (expiresAt <= now || !target.isConnected) {
+          recentScrollInteractions.delete(target);
+        } else if (container.contains(target)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function trackRecentScrollInteraction(event) {
+      const target = scrollInteractionTarget(event)
+        || (event.target instanceof Element ? event.target : null);
+      rememberScrollInteraction(target);
+    }
+
     document.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
       const target = scrollInteractionTarget(event);
@@ -562,6 +596,8 @@
     document.addEventListener("focusin", trackRecentControlInteraction, true);
     document.addEventListener("input", trackRecentControlInteraction, true);
     document.addEventListener("change", trackRecentControlInteraction, true);
+    document.addEventListener("wheel", trackRecentScrollInteraction, true);
+    document.addEventListener("scroll", trackRecentScrollInteraction, true);
     ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => {
       document.addEventListener(type, (event) => {
         activeScrollPointers.delete(event.pointerId);
@@ -569,6 +605,10 @@
     });
 
     function render() {
+      if (lastMarkup && lastMarkup === renderedMarkup) {
+        renderPending = false;
+        return;
+      }
       if (userIsInteractingWith(output)) {
         renderPending = true;
         return;
@@ -584,6 +624,7 @@
       const template = document.createElement("template");
       template.innerHTML = lastMarkup;
       output.replaceChildren(template.content.cloneNode(true));
+      renderedMarkup = lastMarkup;
       hydrateSortableTables();
       hydrateWidget();
       restoreMirrorScrollPositions(scrollPositions);
