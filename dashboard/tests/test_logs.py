@@ -70,6 +70,32 @@ def test_fake_iqm_logs_use_fake_iqm_node() -> None:
     assert diagnostics["logs/defw_out.log"].container == "fake-iqm-head"
 
 
+def test_ibm_logs_and_diagnostics_use_ibm_node() -> None:
+    source = SOURCES["ibm-qpm"]
+    assert source.container == "ibm-156-nh"
+    assert "shim-ibm-156-nh/logs/defw_py.log" in source.path
+
+    diagnostics = {
+        item.name: item
+        for item in SERVICE_DIAGNOSTICS["shim-ibm-156-nh"]
+    }
+    assert diagnostics["logs/defw_py.log"].container == "ibm-156-nh"
+    assert diagnostics["logs/defw_out.log"].container == "ibm-156-nh"
+
+
+def test_aws_logs_and_diagnostics_use_aws_container() -> None:
+    source = SOURCES["aws-qpm"]
+    assert source.container == "aws"
+    assert "shim-aws-qpm/logs/defw_py.log" in source.path
+
+    diagnostics = {
+        item.name: item
+        for item in SERVICE_DIAGNOSTICS["shim-aws-qpm"]
+    }
+    assert diagnostics["logs/defw_py.log"].container == "aws"
+    assert diagnostics["logs/defw_out.log"].container == "aws"
+
+
 def test_application_log_retains_captured_identity() -> None:
     source = LogSource(
         "application", "experiment", "slurmctld", "/tmp/output",

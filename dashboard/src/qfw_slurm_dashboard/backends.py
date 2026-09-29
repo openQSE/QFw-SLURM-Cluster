@@ -66,6 +66,39 @@ BACKENDS = {
         max_shots=256,
         requires_hardware_confirmation=True,
     ),
+    "ibm": BackendSpec(
+        name="ibm",
+        label="IBM",
+        provider="ibm",
+        qpu="ibm-156-nh",
+        service_target="ibm",
+        service_id="shim-ibm-156-nh",
+        max_time_minutes=15,
+        max_shots=256,
+        requires_hardware_confirmation=True,
+    ),
+    "aws-ionq-aria-1": BackendSpec(
+        name="aws-ionq-aria-1",
+        label="AWS IonQ Aria-1",
+        provider="aws",
+        qpu="aws-ionq-aria-1",
+        service_target="aws",
+        service_id="shim-aws-qpm",
+        max_time_minutes=15,
+        max_shots=256,
+        requires_hardware_confirmation=True,
+    ),
+    "aws-rigetti-ankaa": BackendSpec(
+        name="aws-rigetti-ankaa",
+        label="AWS Rigetti Ankaa-3",
+        provider="aws",
+        qpu="aws-rigetti-ankaa",
+        service_target="aws",
+        service_id="shim-aws-qpm",
+        max_time_minutes=15,
+        max_shots=256,
+        requires_hardware_confirmation=True,
+    ),
     "fake-iqm": BackendSpec(
         name="fake-iqm",
         label="Fake IQM",
@@ -78,7 +111,10 @@ BACKENDS = {
     ),
 }
 
-BACKEND_ORDER = ("nwqsim", "iqm", "shim", "fake-iqm")
+BACKEND_ORDER = (
+    "nwqsim", "iqm", "shim", "ibm", "aws-ionq-aria-1",
+    "aws-rigetti-ankaa", "fake-iqm",
+)
 
 
 def backend_spec(name: str) -> BackendSpec:

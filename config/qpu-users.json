@@ -9,6 +9,32 @@
         },
         "fake-iqm-20q": {
           "enabled": true
+        },
+        "ibm-156-nh": {
+          "enabled": true,
+          "api_key": "",
+          "service_crn": ""
+        },
+        "aws": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "aws-ionq-aria-1": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "aws-rigetti-ankaa": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
         }
       }
     },
@@ -21,6 +47,32 @@
         },
         "fake-iqm-20q": {
           "enabled": true
+        },
+        "ibm-156-nh": {
+          "enabled": true,
+          "api_key": "",
+          "service_crn": ""
+        },
+        "aws": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "aws-ionq-aria-1": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "aws-rigetti-ankaa": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
         }
       }
     },
@@ -33,6 +85,32 @@
         },
         "fake-iqm-20q": {
           "enabled": true
+        },
+        "ibm-156-nh": {
+          "enabled": true,
+          "api_key": "",
+          "service_crn": ""
+        },
+        "aws": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "aws-ionq-aria-1": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "aws-rigetti-ankaa": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
         }
       }
     }

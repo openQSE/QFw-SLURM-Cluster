@@ -96,10 +96,11 @@ Provider credentials are never exported to application users.
 
 ## Site Configuration
 
-The cluster provisions three site-owned configuration files:
+The cluster provisions four site-owned configuration files:
 
 ```text
 /etc/openqse/qfw/site.yaml
+/etc/openqse/qfw/services/site-services.yaml
 /etc/openqse/qfw/device/device-access.yaml
 /etc/openqse/qfw/device/qpu-users.json
 ```
@@ -110,7 +111,7 @@ device-access file, and common QPM policy. Its device-access setting is:
 
 ```yaml
 service:
-  manifest: ${QFW_PREFIX}/share/qfw/config/services/site-services.yaml
+  manifest: /etc/openqse/qfw/services/site-services.yaml
   device-access-config: /etc/openqse/qfw/device/device-access.yaml
 ```
 
@@ -131,8 +132,10 @@ or credential database.
 
 ## Device Access
 
-`device-access.yaml` maps the logical service-manifest device ID to the IQM
-provider endpoint and credential database. The installed configuration is:
+`device-access.yaml` maps each logical service-manifest device ID to its
+provider endpoint, QRMI resource type when needed, and credential database.
+IQM, IBM, and AWS user credentials can coexist in the same database under
+separate device entries. The installed hardware configuration includes:
 
 ```yaml
 qpus:
@@ -141,7 +144,25 @@ qpus:
     provider-device-id: default
     url: https://qccsw.ccs.ornl.gov/
     credential-db: qpu-users.json
+  ibm-156-nh:
+    provider: ibm
+    provider-device-id: ibm_156_nh
+    resource-type: IBMQiskitRuntimeService
+    url: https://quantum.cloud.ibm.com/api/v1
+    credential-db: qpu-users.json
+    libraries: [qrmi]
+  aws:
+    provider: aws
+    provider-device-id: aws
+    url: https://braket.us-east-1.amazonaws.com
+    credential-db: qpu-users.json
+    libraries: [qdmi]
 ```
+
+The AWS service is an aggregate QPM. Both `aws-ionq-aria-1` and
+`aws-rigetti-ankaa` map to `shim-aws-qpm`. Multi-target dispatch still
+requires the shim to bind the reservation target to the corresponding AWS-QDMI
+device session.
 
 The relative credential path resolves beside `device-access.yaml` as
 `/etc/openqse/qfw/device/qpu-users.json`.
@@ -200,6 +221,7 @@ The expected permissions are:
 | --- | --- | ---: | --- |
 | `/etc/openqse/qfw` | `root:root` | `0755` | All users |
 | `/etc/openqse/qfw/site.yaml` | `root:root` | `0644` | All users |
+| `/etc/openqse/qfw/services/site-services.yaml` | `root:root` | `0644` | All users |
 | `/etc/openqse/qfw/device` | `root:root` | `0700` | Root only |
 | `device-access.yaml` | `root:root` | `0600` | Root only |
 | `qpu-users.json` | `root:root` | `0600` | Root only |
@@ -227,8 +249,8 @@ The startup workflow performs these operations:
    container.
 2. Create or validate the Linux groups and users in every QFw container.
 3. Initialize shared homes and login environments without replacing user data.
-4. Install missing site configuration and empty credential defaults without
-   replacing an existing credential database.
+4. Install missing site and service-manifest configuration and empty credential
+   defaults without replacing an existing credential database.
 5. Create or validate the Slurm test account and user associations.
 
 Adding the shared-home mount requires Docker Compose to recreate the affected
@@ -246,9 +268,10 @@ selects a regular account, the matching home directory, and the correct `HOME`:
 ## Operational Flow
 
 The operator enters the controller as root, activates QFw, and starts the site
-directory and long-running QPM. CI injects IQM credentials before the hardware
-QPM starts. A regular user then enters through `do_ssh.sh --user`, requests a
-Slurm allocation, activates QFw, and runs an example in site service mode.
+directory and long-running QPM. CI injects IQM and IBM credentials before the
+hardware QPMs start. A regular user then enters through `do_ssh.sh --user`,
+requests a Slurm allocation, activates QFw, and runs an example in site service
+mode.
 
 The cluster provides one root command for the complete site service plane:
 
@@ -258,9 +281,9 @@ qfw-site-services status
 ```
 
 Startup creates the directory on `slurmctld`, starts one PRTE DVM across the
-three NWQSim hosts, and starts the NWQSim and IQM QPMs. The command waits for
-manager readiness and gateway connectivity. Run `man 8 qfw-site-services` for
-its configuration and failure behavior.
+three NWQSim hosts, and starts the NWQSim, IQM, IQM shim, IBM shim, and fake
+IQM QPMs. The command waits for manager readiness and gateway connectivity.
+Run `man 8 qfw-site-services` for its configuration and failure behavior.
 
 ```bash
 cd "${QFW_SHARE_DIR}/examples"

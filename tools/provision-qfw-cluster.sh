@@ -6,6 +6,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 user_file="${script_dir}/config/qfw-users.conf"
 profile_file="${script_dir}/config/qfw-user-profile.sh"
 site_file="${script_dir}/config/site.yaml"
+service_file="${script_dir}/config/site-services.yaml"
 nwqsim_runtime_file="${script_dir}/config/nwqsim-site-runtime.yaml"
 device_file="${script_dir}/config/device-access.yaml"
 credential_file="${script_dir}/config/qpu-users.json"
@@ -14,7 +15,7 @@ containers=(
 	slurmdbd slurmctld slurmrestd
 	c1 c2 c3 c4 c5 c6 c7 c8
 	nwqsim-head nwqsim-worker-1 nwqsim-worker-2
-	iqm-head shim-head fake-iqm-head
+	iqm-head shim-head ibm-156-nh aws fake-iqm-head
 )
 
 die() {
@@ -23,6 +24,7 @@ die() {
 }
 
 for path in "${user_file}" "${profile_file}" "${site_file}" \
+		"${service_file}" \
 		"${nwqsim_runtime_file}" \
 		"${device_file}" "${credential_file}"; do
 	[[ -r "${path}" ]] || die "required file is not readable: ${path}"
@@ -115,6 +117,7 @@ EOF
 
 	declare -a files=(
 		"${site_file}:/etc/openqse/qfw/site.yaml:0644"
+		"${service_file}:/etc/openqse/qfw/services/site-services.yaml:0644"
 		"${nwqsim_runtime_file}:/etc/openqse/qfw/nwqsim-site-runtime.yaml:0644"
 		"${device_file}:/etc/openqse/qfw/device/device-access.yaml:0600"
 		"${credential_file}:/etc/openqse/qfw/device/qpu-users.json:0600"
@@ -132,6 +135,7 @@ destination="$2"
 mode="$3"
 
 install -d -o root -g root -m 0755 /etc/openqse/qfw
+install -d -o root -g root -m 0755 /etc/openqse/qfw/services
 install -d -o root -g root -m 0700 /etc/openqse/qfw/device
 if [[ ! -e "${destination}" ]]; then
 	install -o root -g root -m "${mode}" "${temporary}" "${destination}"

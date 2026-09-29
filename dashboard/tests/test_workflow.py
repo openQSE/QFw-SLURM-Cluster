@@ -240,6 +240,17 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function combinedServiceRecords(catalog, managed)" in frontend
     assert "combinedServiceRecords(services.records, servicePlane.records)" in frontend
     assert "function renderServiceControl()" in frontend
+    assert 'name: "ibm", label: "IBM", provider: "ibm", qpu: "ibm-156-nh"' in frontend
+    assert 'service_target: "ibm", service_id: "shim-ibm-156-nh"' in frontend
+    assert '"shim-ibm-156-nh": "ibm-qpm"' in frontend
+    assert '"shim-ibm-156-nh",' in frontend
+    assert '"ibm-qpm", "ibm-provider"' in frontend
+    assert 'name: "aws-ionq-aria-1", label: "AWS IonQ Aria-1", provider: "aws"' in frontend
+    assert 'name: "aws-rigetti-ankaa", label: "AWS Rigetti Ankaa-3", provider: "aws"' in frontend
+    assert '["aws", "AWS"]' in frontend
+    assert 'service_id: "shim-aws-qpm"' in frontend
+    assert '"shim-aws-qpm": "aws-qpm"' in frontend
+    assert '"aws-qpm", "aws-provider"' in frontend
     assert '["status", "Status"]' in frontend
     assert 'action !== "status"' in frontend
     assert '`created=${operation.created_at || "unknown"}' in frontend
@@ -281,6 +292,10 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function renderDashboardRoot(root)" in frontend
     assert "function refreshDashboardDataRoot(root)" in frontend
     assert "function refreshOperationWidget(widget, group)" in frontend
+    assert "function trackedWidgetBody(id, payload)" in frontend
+    assert "function replaceWidgetBodyIfChanged(current, id, payload)" in frontend
+    assert "widgetBodyMarkup.get(current) === nextMarkup" in frontend
+    assert 'body.replaceWith(renderWidgetBody(id, widgetPayload(id)))' not in frontend
     assert "function selectionIntersects(container)" in frontend
     assert "function userIsInteractingWith(container)" in frontend
     assert 'active.matches("input, textarea, select, [contenteditable=true]")' in frontend
@@ -344,10 +359,14 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function userIsInteractingWith(container)" in popout
     assert 'container.querySelector("details[open]")' in popout
     assert "const activeScrollPointers = new Map();" in popout
+    assert "const SCROLL_INTERACTION_GRACE_MS = 1200;" in popout
     assert "const CONTROL_INTERACTION_GRACE_MS = 2500;" in popout
+    assert "function recentlyScrolledInside(container)" in popout
+    assert 'document.addEventListener("wheel", trackRecentScrollInteraction, true)' in popout
     assert "function recentlyInteractedWithControlInside(container)" in popout
     assert "function scrollInteractionTarget(event)" in popout
     assert "if (userIsInteractingWith(output))" in popout
+    assert "lastMarkup === renderedMarkup" in popout
     assert 'output.addEventListener("focusout"' in popout
     assert "function confirmWidgetAction(" in popout
     assert 'output.classList.toggle("has-error", message.operation_failed === true)' in popout

@@ -10,7 +10,8 @@ qfw-site-services \- manage the virtual cluster QFw service plane
 .SH DESCRIPTION
 .B qfw-site-services
 starts and stops the administrator-owned site directory, NWQSim DVM and QPM,
-IQM QPM, shim QPM, and QFw Slurm gateway used by the virtual cluster.
+IQM QPM, IQM shim QPM, IBM shim QPM, AWS QPM, fake IQM QPM, and QFw Slurm
+gateway used by the virtual cluster.
 The command runs on
 .B slurmctld
 as root and invokes the installed QFw service managers on their assigned
@@ -21,10 +22,12 @@ service nodes.
 Start the selected target.  The default
 .B all
 target starts the directory service, NWQSim service, IQM service, shim service,
-and gateway in dependency order.  Partial aggregate startup failure removes only
-components created by that invocation.  A target that is not ready is stopped
-to clean retained runtime state before it is started.  A ready target is left
-running.  Starting a QPM or gateway target requires a ready directory service.
+IBM shim service, AWS service, fake IQM service, and gateway in dependency
+order.  Partial aggregate startup failure removes only components created by
+that invocation.
+A target that is not ready is stopped to clean retained runtime state before it
+is started.  A ready target is left running.  Starting a QPM or gateway target
+requires a ready directory service.
 .TP
 .B status
 Check the selected service managers and gateway endpoint, then print a concise
@@ -37,8 +40,9 @@ for diagnosis.
 .TP
 .B stop
 Stop the selected target.  The default aggregate action stops the gateway,
-shim QPM, IQM QPM, NWQSim QPM and DVM, then the directory service.  A targeted
-directory stop is rejected while the gateway or a managed QPM remains ready.
+fake IQM QPM, AWS QPM, IBM shim QPM, IQM shim QPM, IQM QPM, NWQSim QPM and DVM,
+then the directory service.  A targeted directory stop is rejected while the
+gateway or a managed QPM remains ready.
 .TP
 .B restart
 Stop and then start the selected target.  A stop failure prevents startup.
@@ -53,9 +57,11 @@ Select
 .BR all ,
 .BR directory ,
 .BR nwqsim ,
-or
 .BR iqm ,
 .BR shim ,
+.BR ibm ,
+.BR aws ,
+.BR fake-iqm ,
 or
 .BR gateway .
 The default is
@@ -80,6 +86,9 @@ The command accepts administrator overrides through
 .BR QFW_NWQSIM_NODE ,
 .BR QFW_IQM_NODE ,
 .BR QFW_SHIM_NODE ,
+.BR QFW_IBM_NODE ,
+.BR QFW_AWS_NODE ,
+.BR QFW_FAKE_IQM_NODE ,
 .BR QFW_SIMULATOR_NODES ,
 .BR QFW_GATEWAY_HOST ,
 .BR QFW_GATEWAY_PORT ,
@@ -110,7 +119,8 @@ qfw-site-services start
 qfw-site-services status --target nwqsim
 qfw-site-services restart --target gateway
 qfw-site-services recover --target shim
-qfw-site-services recover --target iqm
+qfw-site-services recover --target ibm
+qfw-site-services recover --target aws
 qfw-site-services stop --target all
 .fi
 .SH SECURITY

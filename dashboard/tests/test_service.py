@@ -322,11 +322,14 @@ def test_running_experiments_include_active_submission_thread(tmp_path) -> None:
     assert dashboard._running_experiments([experiment], []) == [experiment]
 
 
-def test_hardware_submission_requires_confirmation(tmp_path) -> None:
+@pytest.mark.parametrize(
+    "backend", ("iqm", "ibm", "aws-ionq-aria-1", "aws-rigetti-ankaa")
+)
+def test_hardware_submission_requires_confirmation(tmp_path, backend) -> None:
     with pytest.raises(PermissionError, match="confirmation"):
         service(tmp_path).submit_experiment({
             "identity": "user-a",
-            "backend": "iqm",
+            "backend": backend,
             "example": "qiskit-simple",
         })
 
@@ -424,6 +427,30 @@ def test_backend_catalog_drives_batch_script_qpu_and_provider(tmp_path) -> None:
     })
     assert "#SBATCH --qpu=fake-iqm-20q" in fake_iqm_preview
     assert "--backend fake-iqm" in fake_iqm_preview
+
+    ibm_preview = service(tmp_path).command_preview({
+        "identity": "user-a",
+        "backend": "ibm",
+        "submit_real_hardware": True,
+    })
+    assert "#SBATCH --qpu=ibm-156-nh" in ibm_preview
+    assert "--backend ibm" in ibm_preview
+
+    aria_preview = service(tmp_path).command_preview({
+        "identity": "user-a",
+        "backend": "aws-ionq-aria-1",
+        "submit_real_hardware": True,
+    })
+    assert "#SBATCH --qpu=aws-ionq-aria-1" in aria_preview
+    assert "--backend aws" in aria_preview
+
+    ankaa_preview = service(tmp_path).command_preview({
+        "identity": "user-a",
+        "backend": "aws-rigetti-ankaa",
+        "submit_real_hardware": True,
+    })
+    assert "#SBATCH --qpu=aws-rigetti-ankaa" in ankaa_preview
+    assert "--backend aws" in ankaa_preview
 
 
 def test_submission_writes_and_submits_batch_file(tmp_path) -> None:
@@ -775,6 +802,32 @@ def test_individual_qpm_action_runs_on_service_node(tmp_path) -> None:
     argv = host.call_args.args[0]
     assert "slurmctld" in argv
     assert "qfw-site-services start --target nwqsim" in argv[-1]
+    assert operation.status == "succeeded"
+
+
+def test_ibm_service_action_uses_site_service_target(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    with patch("qfw_slurm_dashboard.service.threading.Thread", ImmediateThread):
+        with patch.object(dashboard.runner, "stream_host") as host:
+            host.return_value = CommandResult(("docker",), 0, "ready", "")
+            operation = dashboard.submit_action(
+                "service-start", "root", target="ibm"
+            )
+    argv = host.call_args.args[0]
+    assert "qfw-site-services start --target ibm" in argv[-1]
+    assert operation.status == "succeeded"
+
+
+def test_aws_service_action_uses_site_service_target(tmp_path) -> None:
+    dashboard = service(tmp_path)
+    with patch("qfw_slurm_dashboard.service.threading.Thread", ImmediateThread):
+        with patch.object(dashboard.runner, "stream_host") as host:
+            host.return_value = CommandResult(("docker",), 0, "ready", "")
+            operation = dashboard.submit_action(
+                "service-start", "root", target="aws"
+            )
+    argv = host.call_args.args[0]
+    assert "qfw-site-services start --target aws" in argv[-1]
     assert operation.status == "succeeded"
 
 
