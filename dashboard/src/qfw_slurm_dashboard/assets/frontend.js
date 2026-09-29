@@ -101,7 +101,16 @@
     "iqm-ornl-20q",
     "shim-ornl-20q",
     "shim-ibm-156-nh",
+    "shim-aws-qpm",
     "fake-iqm",
+  ]);
+  const SERVICE_TARGET_LABELS = new Map([
+    ["nwqsim", "NWQSim"],
+    ["iqm", "IQM"],
+    ["shim", "IQM shim"],
+    ["ibm", "IBM"],
+    ["aws", "AWS"],
+    ["fake-iqm", "Fake IQM"],
   ]);
   const FALLBACK_BACKENDS = [
     {
@@ -126,6 +135,18 @@
       name: "ibm", label: "IBM", provider: "ibm", qpu: "ibm-156-nh",
       service_target: "ibm", service_id: "shim-ibm-156-nh",
       max_time_minutes: 15, max_shots: 256,
+      requires_hardware_confirmation: true,
+    },
+    {
+      name: "aws-ionq-aria-1", label: "AWS IonQ Aria-1", provider: "aws",
+      qpu: "aws-ionq-aria-1", service_target: "aws",
+      service_id: "shim-aws-qpm", max_time_minutes: 15, max_shots: 256,
+      requires_hardware_confirmation: true,
+    },
+    {
+      name: "aws-rigetti-ankaa", label: "AWS Rigetti Ankaa-3", provider: "aws",
+      qpu: "aws-rigetti-ankaa", service_target: "aws",
+      service_id: "shim-aws-qpm", max_time_minutes: 15, max_shots: 256,
       requires_hardware_confirmation: true,
     },
     {
@@ -204,7 +225,8 @@
     backendCatalog().forEach((backend) => {
       const target = backend.service_target;
       if (!target || seen.has(target)) return;
-      choices.push([target, backend.label || target]);
+      choices.push([target, SERVICE_TARGET_LABELS.get(target)
+        || backend.label || target]);
       seen.add(target);
     });
     choices.push(["gateway", "Gateway"]);
@@ -1195,6 +1217,7 @@
                 "iqm-ornl-20q": "iqm-qpm",
                 "shim-ornl-20q": "shim-qpm",
                 "shim-ibm-156-nh": "ibm-qpm",
+                "shim-aws-qpm": "aws-qpm",
                 "fake-iqm": "fake-iqm-qpm",
               }[item.service_id || item.name] || "",
               jobs: [...(qpmJobs.get(item.service_id || item.name)?.values() || [])],
@@ -2303,13 +2326,14 @@
     shellTarget.dataset.qfwControl = "node";
     ["slurmctld", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8",
       "nwqsim-head", "nwqsim-worker-1", "nwqsim-worker-2", "iqm-head",
-      "shim-head", "ibm-156-nh", "fake-iqm-head"]
+      "shim-head", "ibm-156-nh", "aws", "fake-iqm-head"]
       .forEach((name) => {
         const option = element("option", "", name);
         option.value = name;
         option.disabled = activeIdentity !== "root"
           && (name.startsWith("nwqsim-") || name === "iqm-head"
             || name === "shim-head" || name === "ibm-156-nh"
+            || name === "aws"
             || name === "fake-iqm-head");
         shellTarget.append(option);
       });
@@ -3986,6 +4010,7 @@
     ["application", "slurm", "gateway", "directory", "nwqsim-qpm",
       "nwqsim-dvm", "nwqsim-simulator", "iqm-qpm", "iqm-provider",
       "shim-qpm", "shim-provider", "ibm-qpm", "ibm-provider",
+      "aws-qpm", "aws-provider",
       "fake-iqm-qpm", "fake-iqm-provider"]
       .forEach((name) => {
         const option = element("option", "", name);

@@ -165,6 +165,7 @@ def test_service_plane_reports_each_component_independently() -> None:
     "iqm":{"state":"up","detail":{"components":{"qpm:iqm-ornl-20q":{"node":"iqm-head","ready":true,"state":"ready"}}}},
     "shim":{"state":"up","detail":{"components":{"qpm:shim-ornl-20q":{"node":"shim-head","ready":true,"state":"ready"}}}},
     "ibm":{"state":"up","detail":{"components":{"qpm:shim-ibm-156-nh":{"node":"ibm-156-nh","ready":true,"state":"ready"}}}},
+    "aws":{"state":"up","detail":{"components":{"qpm:shim-aws-qpm":{"node":"aws","ready":true,"state":"ready"}}}},
     "fake-iqm":{"state":"up","detail":{"components":{"qpm:fake-iqm":{"node":"fake-iqm-head","ready":true,"state":"ready"}}}},
     "gateway":{"state":"up","detail":{"state":"ready"}}
   }
@@ -183,6 +184,9 @@ def test_service_plane_reports_each_component_independently() -> None:
     assert records["ibm"]["state"] == "ready"
     assert records["ibm"]["service_id"] == "shim-ibm-156-nh"
     assert records["ibm"]["node"] == "ibm-156-nh"
+    assert records["aws"]["state"] == "ready"
+    assert records["aws"]["service_id"] == "shim-aws-qpm"
+    assert records["aws"]["node"] == "aws"
     assert records["fake-iqm"]["state"] == "ready"
     assert records["gateway"]["state"] == "ready"
 

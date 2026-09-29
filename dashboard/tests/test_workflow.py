@@ -245,6 +245,12 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert '"shim-ibm-156-nh": "ibm-qpm"' in frontend
     assert '"shim-ibm-156-nh",' in frontend
     assert '"ibm-qpm", "ibm-provider"' in frontend
+    assert 'name: "aws-ionq-aria-1", label: "AWS IonQ Aria-1", provider: "aws"' in frontend
+    assert 'name: "aws-rigetti-ankaa", label: "AWS Rigetti Ankaa-3", provider: "aws"' in frontend
+    assert '["aws", "AWS"]' in frontend
+    assert 'service_id: "shim-aws-qpm"' in frontend
+    assert '"shim-aws-qpm": "aws-qpm"' in frontend
+    assert '"aws-qpm", "aws-provider"' in frontend
     assert '["status", "Status"]' in frontend
     assert 'action !== "status"' in frontend
     assert '`created=${operation.created_at || "unknown"}' in frontend

@@ -84,6 +84,16 @@ SOURCES = {
         "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
         "shim-ibm-156-nh/logs/defw_py.log",
     ),
+    "aws-qpm": LogSource(
+        "qpmd", "shim-aws-qpm", "aws",
+        "/var/lib/qfw-site-services/qpm/shim-aws-qpm/services/"
+        "shim-aws-qpm/logs/defw_py.log",
+    ),
+    "aws-provider": LogSource(
+        "provider", "aws-qdmi", "aws",
+        "/var/lib/qfw-site-services/qpm/shim-aws-qpm/services/"
+        "shim-aws-qpm/logs/defw_py.log",
+    ),
     "fake-iqm-qpm": LogSource(
         "qpmd", "fake-iqm", "fake-iqm-head",
         "/var/lib/qfw-site-services/qpm/fake-iqm/services/"
@@ -219,6 +229,29 @@ SERVICE_DIAGNOSTICS = {
                        "shim-ibm-156-nh/service-ready.json"),
         DiagnosticFile("state/service-plane.json", "ibm-156-nh",
                        "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/state/"
+                       "service-plane.json"),
+    ),
+    "shim-aws-qpm": (
+        DiagnosticFile("logs/defw_py.log", "aws",
+                       "/var/lib/qfw-site-services/qpm/shim-aws-qpm/services/"
+                       "shim-aws-qpm/logs/defw_py.log"),
+        DiagnosticFile("logs/defw_out.log", "aws",
+                       "/var/lib/qfw-site-services/qpm/shim-aws-qpm/services/"
+                       "shim-aws-qpm/logs/defw_out.log"),
+        DiagnosticFile("logs/stdout.log", "aws",
+                       "/var/lib/qfw-site-services/qpm/shim-aws-qpm/services/"
+                       "shim-aws-qpm/logs/shim-aws-qpm.stdout.log"),
+        DiagnosticFile("logs/stderr.log", "aws",
+                       "/var/lib/qfw-site-services/qpm/shim-aws-qpm/services/"
+                       "shim-aws-qpm/logs/shim-aws-qpm.stderr.log"),
+        DiagnosticFile("state/ready.json", "aws",
+                       "/var/lib/qfw-site-services/qpm/shim-aws-qpm/services/"
+                       "shim-aws-qpm/ready.json"),
+        DiagnosticFile("state/service-ready.json", "aws",
+                       "/var/lib/qfw-site-services/qpm/shim-aws-qpm/services/"
+                       "shim-aws-qpm/service-ready.json"),
+        DiagnosticFile("state/service-plane.json", "aws",
+                       "/var/lib/qfw-site-services/qpm/shim-aws-qpm/state/"
                        "service-plane.json"),
     ),
     "fake-iqm": (
