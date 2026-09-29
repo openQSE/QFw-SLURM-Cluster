@@ -214,7 +214,7 @@ def service_plane_status(runner: CommandRunner) -> SourceState:
     services = payload.get("services") or {}
     records: list[dict[str, Any]] = []
     for component in (
-        "directory", "nwqsim", "iqm", "shim", "fake-iqm", "gateway",
+        "directory", "nwqsim", "iqm", "shim", "ibm", "fake-iqm", "gateway",
     ):
         entry = services.get(component) or {}
         document = entry.get("detail") if isinstance(entry, dict) else {}
@@ -224,6 +224,7 @@ def service_plane_status(runner: CommandRunner) -> SourceState:
             "nwqsim": "qpm:nwqsim",
             "iqm": "qpm:iqm-ornl-20q",
             "shim": "qpm:shim-ornl-20q",
+            "ibm": "qpm:shim-ibm-156-nh",
             "fake-iqm": "qpm:fake-iqm",
         }.get(component)
         managed = document.get("components", {}).get(component_key, {}) \
@@ -244,6 +245,7 @@ def service_plane_status(runner: CommandRunner) -> SourceState:
                 "nwqsim": "nwqsim",
                 "iqm": "iqm-ornl-20q",
                 "shim": "shim-ornl-20q",
+                "ibm": "shim-ibm-156-nh",
                 "fake-iqm": "fake-iqm",
                 "gateway": "qfw-slurm-gateway",
             }[component],
@@ -256,6 +258,7 @@ def service_plane_status(runner: CommandRunner) -> SourceState:
                 "nwqsim": "NWQSim",
                 "iqm": "IQM",
                 "shim": "Shim",
+                "ibm": "IBM",
                 "fake-iqm": "Fake IQM",
                 "gateway": "QSGP",
             }[component],
@@ -299,7 +302,7 @@ def reconcile_qpm_registration(
     for original in service_plane.records:
         record = dict(original)
         if record.get("component") not in {
-            "nwqsim", "iqm", "shim", "fake-iqm",
+            "nwqsim", "iqm", "shim", "ibm", "fake-iqm",
         }:
             records.append(record)
             continue
@@ -368,6 +371,7 @@ def service_health_summary(
         "nwqsim": "NWQSim",
         "iqm": "IQM",
         "shim": "Shim",
+        "ibm": "IBM",
         "fake-iqm": "Fake IQM",
         "gateway": "Gateway",
     }
@@ -465,6 +469,13 @@ def diagnostics(runner: CommandRunner) -> SourceState:
             ),
         ),
         (
+            "ibm-credential-readiness", "ibm-156-nh",
+            (
+                "bash", "-lc",
+                "test -r /etc/openqse/qfw/device/qpu-users.json",
+            ),
+        ),
+        (
             "fake-iqm-device-readiness", "fake-iqm-head",
             (
                 "bash", "-lc",
@@ -519,7 +530,8 @@ def diagnostics(runner: CommandRunner) -> SourceState:
         )
     clock_values = []
     for container in (
-        "c1", "nwqsim-head", "iqm-head", "shim-head", "fake-iqm-head",
+        "c1", "nwqsim-head", "iqm-head", "shim-head", "ibm-156-nh",
+        "fake-iqm-head",
     ):
         try:
             result = runner.cluster("root", (

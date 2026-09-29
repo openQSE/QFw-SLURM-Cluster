@@ -240,6 +240,11 @@ def test_frontend_declares_exact_pane_catalog_and_fixed_widgets() -> None:
     assert "function combinedServiceRecords(catalog, managed)" in frontend
     assert "combinedServiceRecords(services.records, servicePlane.records)" in frontend
     assert "function renderServiceControl()" in frontend
+    assert 'name: "ibm", label: "IBM", provider: "ibm", qpu: "ibm-156-nh"' in frontend
+    assert 'service_target: "ibm", service_id: "shim-ibm-156-nh"' in frontend
+    assert '"shim-ibm-156-nh": "ibm-qpm"' in frontend
+    assert '"shim-ibm-156-nh",' in frontend
+    assert '"ibm-qpm", "ibm-provider"' in frontend
     assert '["status", "Status"]' in frontend
     assert 'action !== "status"' in frontend
     assert '`created=${operation.created_at || "unknown"}' in frontend

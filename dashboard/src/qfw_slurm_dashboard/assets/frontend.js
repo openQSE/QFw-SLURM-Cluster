@@ -100,6 +100,7 @@
     "nwqsim-dvm",
     "iqm-ornl-20q",
     "shim-ornl-20q",
+    "shim-ibm-156-nh",
     "fake-iqm",
   ]);
   const FALLBACK_BACKENDS = [
@@ -119,6 +120,12 @@
       name: "shim", label: "IQM shim", provider: "shim",
       qpu: "ornl-shim-20q", service_target: "shim",
       service_id: "shim-ornl-20q", max_time_minutes: 15, max_shots: 256,
+      requires_hardware_confirmation: true,
+    },
+    {
+      name: "ibm", label: "IBM", provider: "ibm", qpu: "ibm-156-nh",
+      service_target: "ibm", service_id: "shim-ibm-156-nh",
+      max_time_minutes: 15, max_shots: 256,
       requires_hardware_confirmation: true,
     },
     {
@@ -1187,6 +1194,7 @@
                 nwqsim: "nwqsim-qpm",
                 "iqm-ornl-20q": "iqm-qpm",
                 "shim-ornl-20q": "shim-qpm",
+                "shim-ibm-156-nh": "ibm-qpm",
                 "fake-iqm": "fake-iqm-qpm",
               }[item.service_id || item.name] || "",
               jobs: [...(qpmJobs.get(item.service_id || item.name)?.values() || [])],
@@ -2295,13 +2303,14 @@
     shellTarget.dataset.qfwControl = "node";
     ["slurmctld", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8",
       "nwqsim-head", "nwqsim-worker-1", "nwqsim-worker-2", "iqm-head",
-      "shim-head", "fake-iqm-head"]
+      "shim-head", "ibm-156-nh", "fake-iqm-head"]
       .forEach((name) => {
         const option = element("option", "", name);
         option.value = name;
         option.disabled = activeIdentity !== "root"
           && (name.startsWith("nwqsim-") || name === "iqm-head"
-            || name === "shim-head" || name === "fake-iqm-head");
+            || name === "shim-head" || name === "ibm-156-nh"
+            || name === "fake-iqm-head");
         shellTarget.append(option);
       });
     shellTarget.value = controlValue(widget, "node", "slurmctld");
@@ -3976,7 +3985,8 @@
     source.dataset.qfwFilter = "source";
     ["application", "slurm", "gateway", "directory", "nwqsim-qpm",
       "nwqsim-dvm", "nwqsim-simulator", "iqm-qpm", "iqm-provider",
-      "shim-qpm", "shim-provider", "fake-iqm-qpm", "fake-iqm-provider"]
+      "shim-qpm", "shim-provider", "ibm-qpm", "ibm-provider",
+      "fake-iqm-qpm", "fake-iqm-provider"]
       .forEach((name) => {
         const option = element("option", "", name);
         option.value = name;

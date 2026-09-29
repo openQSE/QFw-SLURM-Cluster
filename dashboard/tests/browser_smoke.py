@@ -80,6 +80,7 @@ def main() -> int:
             ">Submission Set<",
             ">Add to Submission Set<",
             ">Submit All (0)<",
+            '<option value="ibm">IBM</option>',
         )
         missing = [value for value in required if value not in html]
         forbidden = (

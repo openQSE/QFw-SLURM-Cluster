@@ -66,6 +66,17 @@ BACKENDS = {
         max_shots=256,
         requires_hardware_confirmation=True,
     ),
+    "ibm": BackendSpec(
+        name="ibm",
+        label="IBM",
+        provider="ibm",
+        qpu="ibm-156-nh",
+        service_target="ibm",
+        service_id="shim-ibm-156-nh",
+        max_time_minutes=15,
+        max_shots=256,
+        requires_hardware_confirmation=True,
+    ),
     "fake-iqm": BackendSpec(
         name="fake-iqm",
         label="Fake IQM",
@@ -78,7 +89,7 @@ BACKENDS = {
     ),
 }
 
-BACKEND_ORDER = ("nwqsim", "iqm", "shim", "fake-iqm")
+BACKEND_ORDER = ("nwqsim", "iqm", "shim", "ibm", "fake-iqm")
 
 
 def backend_spec(name: str) -> BackendSpec:

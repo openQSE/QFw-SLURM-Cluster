@@ -1888,7 +1888,7 @@ class DashboardService:
         if not _SAFE_NAME.fullmatch(target):
             raise ValueError("invalid shell target")
         service_nodes = {
-            "iqm-head", "shim-head", "fake-iqm-head",
+            "iqm-head", "shim-head", "ibm-156-nh", "fake-iqm-head",
             "nwqsim-head", "nwqsim-worker-1", "nwqsim-worker-2",
             "slurmdbd", "slurmrestd", "mysql",
         }

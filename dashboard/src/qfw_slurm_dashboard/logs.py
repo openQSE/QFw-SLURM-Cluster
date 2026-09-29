@@ -74,6 +74,16 @@ SOURCES = {
         "/var/lib/qfw-site-services/qpm/shim-ornl-20q/services/"
         "shim-ornl-20q/logs/defw_py.log",
     ),
+    "ibm-qpm": LogSource(
+        "qpmd", "shim-ibm-156-nh", "ibm-156-nh",
+        "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
+        "shim-ibm-156-nh/logs/defw_py.log",
+    ),
+    "ibm-provider": LogSource(
+        "provider", "ibm-qrmi", "ibm-156-nh",
+        "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
+        "shim-ibm-156-nh/logs/defw_py.log",
+    ),
     "fake-iqm-qpm": LogSource(
         "qpmd", "fake-iqm", "fake-iqm-head",
         "/var/lib/qfw-site-services/qpm/fake-iqm/services/"
@@ -186,6 +196,29 @@ SERVICE_DIAGNOSTICS = {
                        "shim-ornl-20q/service-ready.json"),
         DiagnosticFile("state/service-plane.json", "shim-head",
                        "/var/lib/qfw-site-services/qpm/shim-ornl-20q/state/"
+                       "service-plane.json"),
+    ),
+    "shim-ibm-156-nh": (
+        DiagnosticFile("logs/defw_py.log", "ibm-156-nh",
+                       "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
+                       "shim-ibm-156-nh/logs/defw_py.log"),
+        DiagnosticFile("logs/defw_out.log", "ibm-156-nh",
+                       "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
+                       "shim-ibm-156-nh/logs/defw_out.log"),
+        DiagnosticFile("logs/stdout.log", "ibm-156-nh",
+                       "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
+                       "shim-ibm-156-nh/logs/shim-ibm-156-nh.stdout.log"),
+        DiagnosticFile("logs/stderr.log", "ibm-156-nh",
+                       "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
+                       "shim-ibm-156-nh/logs/shim-ibm-156-nh.stderr.log"),
+        DiagnosticFile("state/ready.json", "ibm-156-nh",
+                       "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
+                       "shim-ibm-156-nh/ready.json"),
+        DiagnosticFile("state/service-ready.json", "ibm-156-nh",
+                       "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/services/"
+                       "shim-ibm-156-nh/service-ready.json"),
+        DiagnosticFile("state/service-plane.json", "ibm-156-nh",
+                       "/var/lib/qfw-site-services/qpm/shim-ibm-156-nh/state/"
                        "service-plane.json"),
     ),
     "fake-iqm": (
