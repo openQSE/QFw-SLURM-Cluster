@@ -91,6 +91,12 @@ QFW_CONTAINER_NAME="${QFW_CONTAINER_NAME:-slurmctld}"
 MQT_CORE_SRC="${QFW_BASE}/mqt-core"
 export MLIR_DIR="${MLIR_DIR:-/opt/llvm-23.1.1/lib/cmake/mlir}"
 
+# DEFw finds libfabric through pkg-config, and nothing in the image puts
+# libfabric's .pc file on the search path. Without it DEFw builds a TCP-only
+# transport, and a run that asks for DEFW_TRANSPORT=ofi carries on over tcp.
+LIBFABRIC_PREFIX="${LIBFABRIC_PREFIX:-/opt/qfw/libfabric}"
+export PKG_CONFIG_PATH="${LIBFABRIC_PREFIX}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+
 jobs="${QFW_BUILD_JOBS_OVERRIDE:-}"
 [ -n "${jobs}" ] || jobs="$(nproc)"
 
@@ -195,6 +201,14 @@ cmake --build "${QFW_BUILD}" -j "${jobs}"
 
 echo "== cmake install"
 cmake --install "${QFW_BUILD}"
+
+# A DEFw without libfabric still builds and runs, and says so in a single
+# configure line, so check the library that was installed.
+if ! ldd "${QFW_PREFIX}/lib/libdefw.so" 2>/dev/null | grep -q libfabric; then
+    echo "${QFW_PREFIX}/lib/libdefw.so is missing or does not link libfabric." >&2
+    echo "DEFw looks for ${LIBFABRIC_PREFIX}/lib/pkgconfig/libfabric.pc." >&2
+    exit 1
+fi
 
 if [ "${QFW_SKIP_VENV}" != "true" ]; then
     # Build mqt-cc from the mounted checkout, apart from QFw's SDK dependencies.

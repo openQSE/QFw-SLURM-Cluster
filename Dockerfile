@@ -394,6 +394,9 @@ RUN set -ex \
 # Keep the QFw shim's Python dependencies aligned with do_qfw_build.sh.
 # Its QDMI driver needs mqt.core.qdmi.driver and the IQM device library;
 # setup/requirements.txt supplies Qiskit.
+# DEFw finds libfabric through pkg-config. Without libfabric's .pc file on the
+# search path it still builds, as a TCP-only transport, so the last check makes
+# sure the installed library links libfabric.
 RUN set -ex \
     && uv venv --python python3 "${QFW_IMAGE_VENV}" \
     && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
@@ -405,6 +408,7 @@ RUN set -ex \
         'iqm-qdmi>=1.4' \
         'mqt-core==3.9.2' \
         'jsonschema>=4' \
+    && export PKG_CONFIG_PATH="${LIBFABRIC_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
     && PATH="${QFW_IMAGE_VENV}/bin:${PATH}" cmake \
         -S "${QFW_IMAGE_SOURCE}" \
         -B "${QFW_IMAGE_BUILD}" \
@@ -415,6 +419,7 @@ RUN set -ex \
         --parallel "${QFW_BUILD_JOBS}" \
     && cmake --install "${QFW_IMAGE_BUILD}" \
     && test -x "${QFW_IMAGE_PREFIX}/bin/qfw-activate" \
+    && ldd "${QFW_IMAGE_PREFIX}/lib/libdefw.so" | grep -q libfabric \
     && rm -rf "${QFW_IMAGE_SOURCE}" "${QFW_IMAGE_BUILD}" \
         "${SIMULATOR_WORK_ROOT}"
 
