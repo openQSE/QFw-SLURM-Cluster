@@ -12,6 +12,7 @@ QFW_NWQSIM_NODE="${QFW_NWQSIM_NODE:-nwqsim-head}"
 QFW_IQM_NODE="${QFW_IQM_NODE:-iqm-head}"
 QFW_SHIM_NODE="${QFW_SHIM_NODE:-shim-head}"
 QFW_IBM_NODE="${QFW_IBM_NODE:-ibm-156-nh}"
+QFW_AWS_NODE="${QFW_AWS_NODE:-aws}"
 QFW_FAKE_IQM_NODE="${QFW_FAKE_IQM_NODE:-fake-iqm-head}"
 QFW_SIMULATOR_NODES="${QFW_SIMULATOR_NODES:-nwqsim-head,nwqsim-worker-1,nwqsim-worker-2}"
 QFW_GATEWAY_HOST="${QFW_GATEWAY_HOST:-slurmctld}"
@@ -26,6 +27,7 @@ nwqsim_run_dir="${QFW_SITE_RUN_ROOT}/qpm/nwqsim"
 iqm_run_dir="${QFW_SITE_RUN_ROOT}/qpm/iqm-ornl-20q"
 shim_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-ornl-20q"
 ibm_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-ibm-156-nh"
+aws_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-aws-qpm"
 fake_iqm_run_dir="${QFW_SITE_RUN_ROOT}/qpm/fake-iqm"
 gateway_run_dir="${QFW_SITE_RUN_ROOT}/gateway"
 gateway_pid_file="${gateway_run_dir}/supervisor.pid"
@@ -49,7 +51,8 @@ Actions:
 
 Options:
   --target TARGET
-             Select all, directory, nwqsim, iqm, shim, ibm, fake-iqm, or gateway
+             Select all, directory, nwqsim, iqm, shim, ibm, aws, fake-iqm,
+             or gateway
              (default: all)
   --json     Emit one machine-readable status document
   --dry-run  Print the commands without executing them
@@ -315,6 +318,11 @@ stop_ibm() {
 		--run-dir "${ibm_run_dir}"
 }
 
+stop_aws() {
+	run_qfw "${QFW_AWS_NODE}" qfw-qpm-svc stop \
+		--run-dir "${aws_run_dir}"
+}
+
 stop_fake_iqm() {
 	run_qfw "${QFW_FAKE_IQM_NODE}" qfw-qpm-svc stop \
 		--run-dir "${fake_iqm_run_dir}"
@@ -366,6 +374,11 @@ ibm_ready() {
 		--run-dir "${ibm_run_dir}"
 }
 
+aws_ready() {
+	run_qfw "${QFW_AWS_NODE}" qfw-qpm-svc status \
+		--run-dir "${aws_run_dir}"
+}
+
 fake_iqm_ready() {
 	run_qfw "${QFW_FAKE_IQM_NODE}" qfw-qpm-svc status \
 		--run-dir "${fake_iqm_run_dir}"
@@ -396,6 +409,9 @@ require_directory_dependents_stopped() {
 	fi
 	if ibm_ready >/dev/null 2>&1; then
 		active+=(ibm)
+	fi
+	if aws_ready >/dev/null 2>&1; then
+		active+=(aws)
 	fi
 	if fake_iqm_ready >/dev/null 2>&1; then
 		active+=(fake-iqm)
@@ -493,6 +509,19 @@ start_ibm() {
 		--timeout "${QFW_SITE_START_TIMEOUT}"
 }
 
+start_aws() {
+	require_directory || return 1
+	if prepare_component_start "AWS" aws_ready stop_aws; then
+		return 0
+	fi
+	run_qfw "${QFW_AWS_NODE}" qfw-qpm-svc start \
+		--scope site \
+		--run-dir "${aws_run_dir}" \
+		--site-config "${QFW_SITE_CONFIG}" \
+		--service-id shim-aws-qpm \
+		--timeout "${QFW_SITE_START_TIMEOUT}"
+}
+
 start_fake_iqm() {
 	require_directory || return 1
 	if prepare_component_start \
@@ -513,12 +542,14 @@ start_services() {
 	local iqm_started=false
 	local shim_started=false
 	local ibm_started=false
+	local aws_started=false
 	local fake_iqm_started=false
 	local directory_was_ready=false
 	local nwqsim_was_ready=false
 	local iqm_was_ready=false
 	local shim_was_ready=false
 	local ibm_was_ready=false
+	local aws_was_ready=false
 	local fake_iqm_was_ready=false
 	local gateway_was_ready=false
 
@@ -530,6 +561,7 @@ start_services() {
 		iqm_ready >/dev/null 2>&1 && iqm_was_ready=true
 		shim_ready >/dev/null 2>&1 && shim_was_ready=true
 		ibm_ready >/dev/null 2>&1 && ibm_was_ready=true
+		aws_ready >/dev/null 2>&1 && aws_was_ready=true
 		fake_iqm_ready >/dev/null 2>&1 && fake_iqm_was_ready=true
 		gateway_managed_ready >/dev/null 2>&1 && gateway_was_ready=true
 
@@ -544,6 +576,10 @@ start_services() {
 			if ${fake_iqm_was_ready}; then
 				stop_fake_iqm || return 1
 				fake_iqm_was_ready=false
+			fi
+			if ${aws_was_ready}; then
+				stop_aws || return 1
+				aws_was_ready=false
 			fi
 			if ${ibm_was_ready}; then
 				stop_ibm || return 1
@@ -599,7 +635,18 @@ start_services() {
 	fi
 	${ibm_was_ready} || ibm_started=true
 
+	if ! start_aws; then
+		${ibm_started} && stop_ibm >/dev/null 2>&1 || true
+		${shim_started} && stop_shim >/dev/null 2>&1 || true
+		${iqm_started} && stop_iqm >/dev/null 2>&1 || true
+		${nwqsim_started} && stop_nwqsim >/dev/null 2>&1 || true
+		${directory_started} && stop_directory >/dev/null 2>&1 || true
+		return 1
+	fi
+	${aws_was_ready} || aws_started=true
+
 	if ! start_fake_iqm; then
+		${aws_started} && stop_aws >/dev/null 2>&1 || true
 		${ibm_started} && stop_ibm >/dev/null 2>&1 || true
 		${shim_started} && stop_shim >/dev/null 2>&1 || true
 		${iqm_started} && stop_iqm >/dev/null 2>&1 || true
@@ -611,6 +658,7 @@ start_services() {
 
 	if ! start_gateway; then
 		${fake_iqm_started} && stop_fake_iqm >/dev/null 2>&1 || true
+		${aws_started} && stop_aws >/dev/null 2>&1 || true
 		${ibm_started} && stop_ibm >/dev/null 2>&1 || true
 		${shim_started} && stop_shim >/dev/null 2>&1 || true
 		${iqm_started} && stop_iqm >/dev/null 2>&1 || true
@@ -627,6 +675,7 @@ service_status() {
 	local iqm_output="" iqm_status=-1
 	local shim_output="" shim_status=-1
 	local ibm_output="" ibm_status=-1
+	local aws_output="" aws_status=-1
 	local fake_iqm_output="" fake_iqm_status=-1
 	local gateway_output="" gateway_status=-1
 
@@ -645,6 +694,9 @@ service_status() {
 		esac
 		case "${target}" in
 		all|ibm) ibm_ready ;;
+		esac
+		case "${target}" in
+		all|aws) aws_ready ;;
 		esac
 		case "${target}" in
 		all|fake-iqm) fake_iqm_ready ;;
@@ -701,6 +753,15 @@ service_status() {
 		;;
 	esac
 	case "${target}" in
+	all|aws)
+		if aws_output="$(aws_ready 2>&1)"; then
+			aws_status=0
+		else
+			aws_status=$?
+		fi
+		;;
+	esac
+	case "${target}" in
 	all|fake-iqm)
 		if fake_iqm_output="$(fake_iqm_ready 2>&1)"; then
 			fake_iqm_status=0
@@ -726,6 +787,7 @@ service_status() {
 		"${iqm_status}" "${iqm_output}" \
 		"${shim_status}" "${shim_output}" \
 		"${ibm_status}" "${ibm_output}" \
+		"${aws_status}" "${aws_output}" \
 		"${fake_iqm_status}" "${fake_iqm_output}" \
 		"${gateway_status}" "${gateway_output}" <<'PY'
 import json
@@ -739,8 +801,9 @@ values = {
     "iqm": ("IQM", int(sys.argv[7]), sys.argv[8]),
     "shim": ("Shim", int(sys.argv[9]), sys.argv[10]),
     "ibm": ("IBM", int(sys.argv[11]), sys.argv[12]),
-    "fake-iqm": ("Fake IQM", int(sys.argv[13]), sys.argv[14]),
-    "gateway": ("Gateway", int(sys.argv[15]), sys.argv[16]),
+    "aws": ("AWS", int(sys.argv[13]), sys.argv[14]),
+    "fake-iqm": ("Fake IQM", int(sys.argv[15]), sys.argv[16]),
+    "gateway": ("Gateway", int(sys.argv[17]), sys.argv[18]),
 }
 selected = list(values) if target == "all" else [target]
 
@@ -831,6 +894,7 @@ stop_services() {
 
 	stop_gateway || status=1
 	stop_fake_iqm || status=1
+	stop_aws || status=1
 	stop_ibm || status=1
 	stop_shim || status=1
 	stop_iqm || status=1
@@ -851,6 +915,7 @@ start_target() {
 	iqm) start_iqm ;;
 	shim) start_shim ;;
 	ibm) start_ibm ;;
+	aws) start_aws ;;
 	fake-iqm) start_fake_iqm ;;
 	gateway) start_gateway ;;
 	esac
@@ -867,6 +932,7 @@ stop_target() {
 	iqm) stop_iqm ;;
 	shim) stop_shim ;;
 	ibm) stop_ibm ;;
+	aws) stop_aws ;;
 	fake-iqm) stop_fake_iqm ;;
 	gateway) stop_gateway ;;
 	esac
@@ -929,7 +995,7 @@ main() {
 		return 2
 	}
 	case "${target}" in
-	all|directory|nwqsim|iqm|shim|ibm|fake-iqm|gateway) ;;
+	all|directory|nwqsim|iqm|shim|ibm|aws|fake-iqm|gateway) ;;
 	*) die "unknown target: ${target}" ;;
 	esac
 	if ! ${dry_run} && [[ ${EUID} -ne 0 ]]; then

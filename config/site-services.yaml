@@ -63,3 +63,14 @@ services:
     telnet-port: 8691
     provider-launch:
       type: qrmi-qdmi
+
+  - name: shim-aws-qpm
+    credential-mode: required
+    module: svc_lib_qpm
+    load-modules: svc_lib_qpm,api_launcher
+    agent-prefix: qpm_shim_aws
+    device-id: aws
+    listen-port: 8790
+    telnet-port: 8791
+    provider-launch:
+      type: qrmi-qdmi

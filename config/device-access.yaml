@@ -21,3 +21,42 @@ qpus:
       run_circuit: [qrmi]
       get_task_timing: [qrmi]
       get_task_metadata: [qrmi]
+  aws:
+    provider: aws
+    provider-device-id: aws
+    url: https://braket.us-east-1.amazonaws.com
+    credential-db: qpu-users.json
+    libraries:
+      - qdmi
+    preference: qdmi
+    execution-owner: qdmi
+    caps:
+      run_circuit: [qdmi]
+      get_task_timing: [qdmi]
+      get_task_metadata: [qdmi]
+  aws-ionq-aria-1:
+    provider: aws
+    provider-device-id: arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1
+    url: https://braket.us-east-1.amazonaws.com
+    credential-db: qpu-users.json
+    libraries:
+      - qdmi
+    preference: qdmi
+    execution-owner: qdmi
+    caps:
+      run_circuit: [qdmi]
+      get_task_timing: [qdmi]
+      get_task_metadata: [qdmi]
+  aws-rigetti-ankaa:
+    provider: aws
+    provider-device-id: arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3
+    url: https://braket.us-west-1.amazonaws.com
+    credential-db: qpu-users.json
+    libraries:
+      - qdmi
+    preference: qdmi
+    execution-owner: qdmi
+    caps:
+      run_circuit: [qdmi]
+      get_task_timing: [qdmi]
+      get_task_metadata: [qdmi]

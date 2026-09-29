@@ -15,7 +15,7 @@ containers=(
 	slurmdbd slurmctld slurmrestd
 	c1 c2 c3 c4 c5 c6 c7 c8
 	nwqsim-head nwqsim-worker-1 nwqsim-worker-2
-	iqm-head shim-head ibm-156-nh fake-iqm-head
+	iqm-head shim-head ibm-156-nh aws fake-iqm-head
 )
 
 die() {

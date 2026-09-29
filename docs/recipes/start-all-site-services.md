@@ -2,17 +2,22 @@
 
 This is the canonical administrator workflow. It starts the directory service
 on `slurmctld`, a three-node NWQSim DVM and QPMd, the IQM QPMd, IQM shim QPMd,
-IBM shim QPMd, fake IQM QPMd, and QFw Slurm gateway. The QPMd service nodes
-remain outside application allocations.
+IBM shim QPMd, AWS QPMd, fake IQM QPMd, and QFw Slurm gateway. The QPMd
+service nodes remain outside application allocations.
 
 ## Prerequisites
 
 - Complete [Build and start the cluster](build-and-start-cluster.md).
 - Run as root in `slurmctld`.
-- Before accepting real-device reservations, populate the IQM and IBM entries
+- Before accepting real-device reservations, populate the IQM, IBM, and AWS entries
   in `/etc/openqse/qfw/device/qpu-users.json` on their QPM nodes through the
   approved secret-management workflow. IBM entries require an API key and
-  service CRN. Keep the file owned by `root:root` with mode `0600`.
+  service CRN. AWS entries require the credentials expected by AWS QDMI. Keep
+  the file owned by `root:root` with mode `0600`.
+- Do not accept AWS reservations until the shim can bind the reservation's
+  selected target to an AWS-QDMI device session. The cluster advertises
+  `aws-ionq-aria-1` and `aws-rigetti-ankaa`, but the current shim remains
+  single-target.
 
 The packaged credential file intentionally contains empty API keys. Never put
 a real key in the repository, image, shell command line, or application
@@ -35,9 +40,9 @@ qfw-site-services status
 ```
 
 Run `man 8 qfw-site-services` for command details. Startup is dependency
-ordered and failure-safe: directory, NWQSim, IQM, IQM shim, IBM shim, fake IQM,
-then gateway. If a component fails to start, the command removes only
-components started by that invocation.
+ordered and failure-safe: directory, NWQSim, IQM, IQM shim, IBM shim, AWS,
+fake IQM, then gateway. If a component fails to start, the command removes
+only components started by that invocation.
 
 ## Verify
 

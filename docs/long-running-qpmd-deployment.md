@@ -134,8 +134,8 @@ or credential database.
 
 `device-access.yaml` maps each logical service-manifest device ID to its
 provider endpoint, QRMI resource type when needed, and credential database.
-IQM and IBM user credentials can coexist in the same database under separate
-device entries. The installed hardware configuration includes:
+IQM, IBM, and AWS user credentials can coexist in the same database under
+separate device entries. The installed hardware configuration includes:
 
 ```yaml
 qpus:
@@ -151,7 +151,18 @@ qpus:
     url: https://quantum.cloud.ibm.com/api/v1
     credential-db: qpu-users.json
     libraries: [qrmi]
+  aws:
+    provider: aws
+    provider-device-id: aws
+    url: https://braket.us-east-1.amazonaws.com
+    credential-db: qpu-users.json
+    libraries: [qdmi]
 ```
+
+The AWS service is an aggregate QPM. Both `aws-ionq-aria-1` and
+`aws-rigetti-ankaa` map to `shim-aws-qpm`. Multi-target dispatch still
+requires the shim to bind the reservation target to the corresponding AWS-QDMI
+device session.
 
 The relative credential path resolves beside `device-access.yaml` as
 `/etc/openqse/qfw/device/qpu-users.json`.
