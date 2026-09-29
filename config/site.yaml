@@ -12,7 +12,7 @@ directory-service:
 
 # Provider secrets remain in the root-readable device configuration.
 service:
-  manifest: ${QFW_PREFIX}/share/qfw/config/services/site-services.yaml
+  manifest: /etc/openqse/qfw/services/site-services.yaml
   device-access-config: /etc/openqse/qfw/device/device-access.yaml
 
 qpm:

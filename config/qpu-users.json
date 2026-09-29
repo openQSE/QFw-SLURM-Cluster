@@ -9,6 +9,11 @@
         },
         "fake-iqm-20q": {
           "enabled": true
+        },
+        "ibm-156-nh": {
+          "enabled": true,
+          "api_key": "",
+          "service_crn": ""
         }
       }
     },
@@ -21,6 +26,11 @@
         },
         "fake-iqm-20q": {
           "enabled": true
+        },
+        "ibm-156-nh": {
+          "enabled": true,
+          "api_key": "",
+          "service_crn": ""
         }
       }
     },
@@ -33,6 +43,11 @@
         },
         "fake-iqm-20q": {
           "enabled": true
+        },
+        "ibm-156-nh": {
+          "enabled": true,
+          "api_key": "",
+          "service_crn": ""
         }
       }
     }

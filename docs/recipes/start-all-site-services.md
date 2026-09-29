@@ -1,16 +1,18 @@
 # Start All Site-owned QFw Services
 
 This is the canonical administrator workflow. It starts the directory service
-on `slurmctld`, a three-node NWQSim DVM and QPMd, the IQM QPMd, and the QFw
-Slurm gateway. The QPMd service nodes remain outside application allocations.
+on `slurmctld`, a three-node NWQSim DVM and QPMd, the IQM QPMd, IQM shim QPMd,
+IBM shim QPMd, fake IQM QPMd, and QFw Slurm gateway. The QPMd service nodes
+remain outside application allocations.
 
 ## Prerequisites
 
 - Complete [Build and start the cluster](build-and-start-cluster.md).
 - Run as root in `slurmctld`.
-- Before accepting real-IQM reservations, populate
-  `/etc/openqse/qfw/device/qpu-users.json` on `iqm-head` through the approved
-  secret-management workflow. Keep it owned by `root:root` with mode `0600`.
+- Before accepting real-device reservations, populate the IQM and IBM entries
+  in `/etc/openqse/qfw/device/qpu-users.json` on their QPM nodes through the
+  approved secret-management workflow. IBM entries require an API key and
+  service CRN. Keep the file owned by `root:root` with mode `0600`.
 
 The packaged credential file intentionally contains empty API keys. Never put
 a real key in the repository, image, shell command line, or application
@@ -33,8 +35,9 @@ qfw-site-services status
 ```
 
 Run `man 8 qfw-site-services` for command details. Startup is dependency
-ordered and failure-safe: directory, NWQSim, IQM, then gateway. If a component
-fails to start, the command removes only components started by that invocation.
+ordered and failure-safe: directory, NWQSim, IQM, IQM shim, IBM shim, fake IQM,
+then gateway. If a component fails to start, the command removes only
+components started by that invocation.
 
 ## Verify
 
@@ -50,9 +53,9 @@ qfw-sinfo --json
 qfw-deactivate
 ```
 
-Run `man 1 qfw-sinfo` for the service columns. NWQSim and IQM should report
-`IDLE`; NWQSim should identify all three assigned simulator hosts and a ready
-DVM.
+Run `man 1 qfw-sinfo` for the service columns. Configured services should
+report `IDLE`; NWQSim should identify all three assigned simulator hosts and a
+ready DVM.
 
 ## Stop
 
@@ -61,5 +64,5 @@ qfw-site-services stop
 ```
 
 The stop action first closes the gateway to new reservations, then removes the
-IQM QPM, NWQSim QPM and DVM, and directory service. It does not stop the Slurm
+managed QPMs, NWQSim DVM, and directory service. It does not stop the Slurm
 cluster.

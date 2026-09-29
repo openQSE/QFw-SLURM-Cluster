@@ -7,3 +7,17 @@ qpus:
   fake-iqm-20q:
     provider: fake-iqm
     provider-device-id: fake-iqm-20q
+  ibm-156-nh:
+    provider: ibm
+    provider-device-id: ibm_156_nh
+    resource-type: IBMQiskitRuntimeService
+    url: https://quantum.cloud.ibm.com/api/v1
+    credential-db: qpu-users.json
+    libraries:
+      - qrmi
+    preference: qrmi
+    execution-owner: qrmi
+    caps:
+      run_circuit: [qrmi]
+      get_task_timing: [qrmi]
+      get_task_metadata: [qrmi]
