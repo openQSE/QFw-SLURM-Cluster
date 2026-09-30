@@ -2,17 +2,22 @@
 
 This describes how to validate the QFw QRMI/QDMI front-end
 (`services/svc_lib_qpm`) and the MQT Compiler Collection (`mqt-cc`) in the
-containerized Slurm cluster. The shim has two test tiers:
+containerized Slurm cluster. The shim has three test tiers:
 
 1. **Local smoke:** routing and `qhw` normalization, with no credentials and no
    network access. This is the everyday check.
 2. **Hardware introspection:** real device introspection through both QDMI and
    QRMI against an IQM system, confirming they return the same `qhw` shape.
    Requires IQM credentials.
+3. **Through the site service plane:** a circuit run the way a user runs one,
+   through a reservation to an administrator-started QPM service. The only tier
+   that exercises the service path, where configuration is the sole input
+   because no environment survives the hop.
 
-The shim test vehicle is `shared-dir/shim-smoke.sbatch`. It needs no Slurm
-allocation and reads no Slurm environment, so both tiers run it directly inside
-`slurmctld`.
+Tiers 1 and 2 share one vehicle, `shared-dir/shim-smoke.sbatch`. It needs no
+Slurm allocation and reads no Slurm environment, so both run it directly inside
+`slurmctld`. Tier 3 is a different setup in every respect and is described
+separately below.
 
 ## Build the cluster
 
@@ -189,6 +194,95 @@ the `spank_qrmi` plugin. If QRMI still fails, the leg prints:
 That wording predates the shim supplying the environment itself. Treat it as a
 QRMI failure and read the exception name in the parentheses. The run still
 passes on the QDMI leg.
+
+## Tier 3: through the site service plane
+
+Tiers 1 and 2 import the front-end and call it in the same process. Tier 3 runs
+a circuit the way a user does, through a reservation to a QPM service the
+administrator started with `qfw-site-services`. It is the only tier that
+exercises the service path, and it is worth running before trusting a shim
+change in a real deployment, because a site service reads none of the
+environment the first two tiers rely on.
+
+That is the thing to understand before starting. Nothing a user or a job
+exports reaches a site service, so `QFW_QC_URL`, `QFW_API_KEY` and the
+`QFW_IBM_*` variables all stop working here. Configuration is the only input.
+A device that works in tier 1 through environment variables alone will fail in
+tier 3 until the same values are in the device entry.
+
+Three things point somewhere other than where the first two tiers put them, and
+each one fails quietly by testing something other than what you meant.
+
+**The installation.** `qfw-site-services` defaults to `/opt/openqse/qfw` and
+`/opt/openqse/qfw-venv`, the image-baked QFw, so by default tier 3 tests the
+image and not your override, however recently you ran `do_qfw_build.sh`.
+
+It names the prefix differently from the smoke, which is worth knowing before
+you set anything. The smoke reads `QFW_PREFIX`; `qfw-site-services` reads
+`QFW_INSTALL_PREFIX` and does not look at `QFW_PREFIX` at all. Both read
+`QFW_VENV`, with different defaults. So exporting the pair the smoke wants
+gives you a half override, the image's QFw running against your override's
+venv, which is worse than either. Set the two it actually reads:
+
+```bash
+docker exec \
+  -e QFW_INSTALL_PREFIX=/workspace/qfw-container-base/qfw-install \
+  -e QFW_VENV=/workspace/qfw-container-base/qfw-venv \
+  slurmctld /bin/bash -lc 'qfw-site-services restart --target all'
+```
+
+`qfw-site-services` forwards both over SSH to each node, and the shared mount is
+present on all of them, so the override resolves everywhere.
+
+**The device configuration.** Site services read
+`/etc/openqse/qfw/device/device-access.yaml`, provisioned from
+`config/device-access.yaml` by `do_startup.sh`. They do not read
+`shared-dir/iqm-device-access.yaml`, which reaches the smoke only because
+`shim-smoke.sbatch` sets `QFW_DEVICE_ACCESS_CFG`. A device you added for tier 1
+is simply absent here.
+
+**The credentials.** Site credentials come from
+`/etc/openqse/qfw/device/qpu-users.json`, resolved relative to the device
+configuration through each device's `credential-db` key. The per-device entry
+key is `api_key`; `token` is accepted in a reservation credential but not in
+this database, so spelling it `token` reads as no credential at all. Both the
+user record and the device record also need `"enabled": true`.
+
+To test a device of your own, edit an existing entry in place rather than
+adding one, keeping its key so
+`/etc/openqse/qfw/services/site-services.yaml` still names a device that
+exists. Each service's node is what matters: `shim-ibm-156-nh` runs on
+`ibm-156-nh`, so that container is the one whose configuration it reads.
+
+Then drive it through a reservation rather than by calling the front-end. The
+examples install alongside the QFw they came from, under
+`<prefix>/share/qfw/examples`, which `qfw-activate` exports as
+`QFW_SHARE_DIR`. Reaching them through that variable rather than a literal path
+keeps the example and the installation you are testing in step:
+
+```bash
+docker exec slurmctld /bin/bash -lc \
+  'source /opt/openqse/qfw/bin/qfw-activate --venv /opt/openqse/qfw-venv \
+   && "${QFW_SHARE_DIR}/examples/qfw_ghz.sh"'
+```
+
+Substitute your override's prefix and venv to run its copy instead.
+`qfw_ghz.sh` is the pattern to copy, through
+`qfw_example_srun_with_backend_reservation`. The shim services declare
+`credential-mode: required`, so they expect a credential to arrive with the
+reservation.
+
+Two things to know when it goes wrong. `qfw-site-services status` distinguishes
+the two failures: `DOWN` means the service is not running, while `UNKNOWN`
+means its status could not be read at all, so something went wrong before the
+service was ever reached. `UNKNOWN` is the case that carries a reason, and
+`--json` returns the captured output as each service's `detail.output`, which
+is where to look first. And edits under `/etc/openqse/qfw/` live in the
+container, so
+they are lost when containers are recreated. `provision-qfw-cluster.sh`
+installs those files only when they do not already exist, so to make a change
+durable, edit `config/` on the host and delete the installed copy so the next
+`do_startup.sh` re-provisions it.
 
 ## `mqt-cc` smoke test (no credentials)
 
