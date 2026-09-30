@@ -579,6 +579,31 @@ RUN set -x \
 RUN set -x \
     &&  useradd -r -g users --uid=1010 -m -c "Solomon Grundy" sgrundy
 
+# pam_loginuid cannot work in a container, and it is `required`, so a failing
+# session module makes every `ssh host command` exit 254 without running the
+# command. That breaks the whole service plane, because qfw-site-services
+# drives all eight components over `ssh root@<node> /bin/bash -s`, so every
+# status check and every start fails identically and reports UNKNOWN.
+#
+# The module writes /proc/self/loginuid, which the kernel allows only with
+# CAP_AUDIT_CONTROL while the audit subsystem is active. Neither holds here: we
+# grant no capabilities in docker-compose.yml. It goes unnoticed on Docker
+# Desktop, whose VM runs no audit subsystem, so the write succeeds as a no-op;
+# on a Fedora host with audit enabled and podman's default capability set it
+# fails, and root-to-root SSH stops carrying commands.
+#
+# `optional` rather than removed, so the stack still matches the distribution's
+# and the module applies wherever it can. `UsePAM no` is not an alternative:
+# Rocky builds OpenSSH with PAM mandatory and sshd warns that disabling it "is
+# not supported in this build". Adding CAP_AUDIT_CONTROL to all nineteen
+# containers is the other way, and buys nothing we use.
+RUN set -ex \
+    && test -f /etc/pam.d/sshd \
+    && sed -i 's/^\(session[[:space:]]\+\)required\([[:space:]]\+pam_loginuid\.so\)/\1optional\2/' \
+        /etc/pam.d/sshd \
+    && ! grep -qE '^session[[:space:]]+required[[:space:]]+pam_loginuid\.so' \
+        /etc/pam.d/sshd
+
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY tools/qfw-site-services /usr/local/sbin/qfw-site-services
 COPY man/man8/qfw-site-services.8 /usr/local/share/man/man8/qfw-site-services.8
