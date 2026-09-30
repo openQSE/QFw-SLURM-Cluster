@@ -666,6 +666,15 @@ start_services() {
 		${directory_started} && stop_directory >/dev/null 2>&1 || true
 		return 1
 	fi
+	if ${dry_run}; then
+		# A dry run starts nothing and checks nothing: every step above
+		# short-circuits and reports success, so claiming the plane is ready
+		# would be a claim about a plane that was never touched. It printed
+		# that even with SSH to the nodes completely broken, which reads as
+		# progress to anyone working through a startup failure.
+		echo "Dry run: printed the startup plan, started nothing."
+		return 0
+	fi
 	echo "QFw site services are ready."
 }
 
@@ -823,6 +832,14 @@ def state_file_missing(output):
     return "service-plane state not found:" in output.lower()
 
 
+def _first_line(output):
+    for line in (output or "").splitlines():
+        line = line.strip()
+        if line:
+            return line
+    return ""
+
+
 def classify(name, returncode, output):
     if name == "gateway":
         lines = {line.strip().lower() for line in output.splitlines()}
@@ -884,6 +901,16 @@ else:
     print()
     for item in services.values():
         print(f'{item["label"]}: {item["state"].upper()}')
+        if item["state"] != "unknown":
+            continue
+        # UNKNOWN means the status output could not be read at all, so the
+        # captured output is the only thing that says why. It reaches --json as
+        # detail.output and had nowhere to go here, which left the one state
+        # that carries a reason as the one state that showed none. A service
+        # that is merely stopped reports DOWN and needs no explaining.
+        reason = _first_line(item["detail"].get("output"))
+        if reason:
+            print(f"  {reason}")
 
 raise SystemExit(1 if inspection_failed else 0)
 PY
