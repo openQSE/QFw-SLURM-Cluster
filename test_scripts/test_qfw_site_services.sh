@@ -31,7 +31,14 @@ grep -q '^fake-iqm-head: qfw-qpm-svc start ' "${temporary}/start.out"
 grep -q '^slurmctld: qfw gateway start$' "${temporary}/start.out"
 grep -q 'nwqsim-head,nwqsim-worker-1,nwqsim-worker-2' \
 	"${temporary}/start.out"
-grep -q 'QFw site services are ready' "${temporary}/start.out"
+# A dry run starts nothing and checks nothing, so it must not report the plane
+# ready. It used to, even with SSH to the nodes completely broken.
+grep -q '^Dry run: printed the startup plan, started nothing\.$' \
+	"${temporary}/start.out"
+if grep -q 'QFw site services are ready' "${temporary}/start.out"; then
+	echo "a dry run must not claim the service plane is ready" >&2
+	exit 1
+fi
 
 "${command}" --dry-run status >"${temporary}/status.out"
 grep -q '^slurmctld: qfw-dir-svc status ' "${temporary}/status.out"
@@ -427,5 +434,34 @@ if grep -q '^stop-directory$' "${temporary}/rollback.events"; then
 	echo "rollback stopped a pre-existing directory" >&2
 	exit 1
 fi
+
+# UNKNOWN is the one state that carries a reason, because it means the status
+# output could not be read at all, and it was the one state that printed none.
+# A broken SSH path reported eight bare UNKNOWNs and the captured error, which
+# named the cause outright, reached only --json.
+(
+	source "${command}"
+	dry_run=false
+	json_status=false
+	target=all
+	directory_ready() {
+		echo "ssh: connect to host slurmctld port 22: Connection refused" >&2
+		return 255
+	}
+	nwqsim_ready() { echo '{"state": "ready"}'; }
+	iqm_ready() { echo '{"state": "ready"}'; }
+	shim_ready() { echo '{"state": "ready"}'; }
+	ibm_ready() { echo '{"state": "ready"}'; }
+	aws_ready() { echo '{"state": "ready"}'; }
+	fake_iqm_ready() { echo '{"state": "ready"}'; }
+	gateway_managed_ready() { echo ready; }
+	service_status
+) >"${temporary}/unknown-reason.out" 2>&1 || true
+grep -q '^Directory: UNKNOWN$' "${temporary}/unknown-reason.out"
+grep -q '^  ssh: connect to host slurmctld port 22: Connection refused$' \
+	"${temporary}/unknown-reason.out"
+# A service that is merely stopped reports DOWN and needs no explaining, so the
+# reason line belongs to UNKNOWN alone.
+grep -q '^NWQSim: UP$' "${temporary}/unknown-reason.out"
 
 echo "qfw-site-services dry-run lifecycle passed"
