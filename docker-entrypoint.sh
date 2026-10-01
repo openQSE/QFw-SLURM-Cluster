@@ -5,9 +5,12 @@ set -e
 ensure_root_ssh() {
     install -d -m 0700 /root/.ssh
 
-    if [ ! -f /root/.ssh/id_ed25519 ]; then
-        ssh-keygen -q -t ed25519 -N "" -f /root/.ssh/id_ed25519
-    fi
+    (
+        flock 9
+        if [ ! -f /root/.ssh/id_ed25519 ]; then
+            ssh-keygen -q -t ed25519 -N "" -f /root/.ssh/id_ed25519
+        fi
+    ) 9>/root/.ssh/.keygen.lock
 
     cat > /root/.ssh/config <<'EOF'
 Host *
@@ -49,9 +52,12 @@ ensure_munge_key() {
     install -d -o munge -g munge -m 0755 /run/munge
     install -d -o munge -g munge -m 0700 /var/log/munge
 
-    if [ ! -f /etc/munge/munge.key ]; then
-        dd if=/dev/urandom bs=1 count=1024 of=/etc/munge/munge.key status=none
-    fi
+    (
+        flock 9
+        if [ ! -f /etc/munge/munge.key ]; then
+            dd if=/dev/urandom bs=1 count=1024 of=/etc/munge/munge.key status=none
+        fi
+    ) 9>/etc/munge/.keygen.lock
 
     chown -R munge:munge /etc/munge
     chmod 0700 /etc/munge
