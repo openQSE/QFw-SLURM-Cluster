@@ -7,6 +7,8 @@ user_file="${script_dir}/config/qfw-users.conf"
 profile_file="${script_dir}/config/qfw-user-profile.sh"
 site_file="${script_dir}/config/site.yaml"
 service_file="${script_dir}/config/site-services.yaml"
+defw2_site_file="${script_dir}/config/site-defw2.yaml"
+defw2_service_file="${script_dir}/config/site-services-defw2.yaml"
 nwqsim_runtime_file="${script_dir}/config/nwqsim-site-runtime.yaml"
 device_file="${script_dir}/config/device-access.yaml"
 credential_file="${script_dir}/config/qpu-users.json"
@@ -24,7 +26,7 @@ die() {
 }
 
 for path in "${user_file}" "${profile_file}" "${site_file}" \
-		"${service_file}" \
+		"${service_file}" "${defw2_site_file}" "${defw2_service_file}" \
 		"${nwqsim_runtime_file}" \
 		"${device_file}" "${credential_file}"; do
 	[[ -r "${path}" ]] || die "required file is not readable: ${path}"
@@ -118,6 +120,8 @@ EOF
 	declare -a files=(
 		"${site_file}:/etc/openqse/qfw/site.yaml:0644"
 		"${service_file}:/etc/openqse/qfw/services/site-services.yaml:0644"
+		"${defw2_site_file}:/etc/openqse/qfw/site-defw2.yaml:0644"
+		"${defw2_service_file}:/etc/openqse/qfw/services/site-services-defw2.yaml:0644"
 		"${nwqsim_runtime_file}:/etc/openqse/qfw/nwqsim-site-runtime.yaml:0644"
 		"${device_file}:/etc/openqse/qfw/device/device-access.yaml:0600"
 		"${credential_file}:/etc/openqse/qfw/device/qpu-users.json:0600"

@@ -2,11 +2,27 @@
 
 set -uo pipefail
 
+# Which DEFw the plane runs on: unset or 1 for v1, 2 for the DEFw v2
+# prototype. The v2 plane runs beside the v1 plane, so it has a site
+# configuration and a run root of its own. It runs the directory and the
+# two QPMs that have been tried on v2. The hardware QPMs have not, and the
+# gateway is a DEFw v1 client. ssh hands a remote command a bare
+# environment, so the version is forwarded explicitly, like the settings
+# below.
+QFW_DEFW_VERSION="${QFW_DEFW_VERSION:-}"
+if [[ "${QFW_DEFW_VERSION}" == 2 ]]; then
+	plane_suffix=-defw2
+	plane_components="directory nwqsim fake-iqm"
+else
+	plane_suffix=
+	plane_components="directory nwqsim iqm shim ibm aws fake-iqm gateway"
+fi
+
 QFW_INSTALL_PREFIX="${QFW_INSTALL_PREFIX:-/opt/openqse/qfw}"
 QFW_VENV="${QFW_VENV:-/opt/openqse/qfw-venv}"
 QFW_SHARED_ROOT="${QFW_SHARED_ROOT:-/workspace/qfw-container-base}"
-QFW_SITE_CONFIG="${QFW_SITE_CONFIG:-/etc/openqse/qfw/site.yaml}"
-QFW_SITE_RUN_ROOT="${QFW_SITE_RUN_ROOT:-/var/lib/qfw-site-services}"
+QFW_SITE_CONFIG="${QFW_SITE_CONFIG:-/etc/openqse/qfw/site${plane_suffix}.yaml}"
+QFW_SITE_RUN_ROOT="${QFW_SITE_RUN_ROOT:-/var/lib/qfw-site-services${plane_suffix}}"
 QFW_DIR_NODE="${QFW_DIR_NODE:-slurmctld}"
 QFW_NWQSIM_NODE="${QFW_NWQSIM_NODE:-nwqsim-head}"
 QFW_IQM_NODE="${QFW_IQM_NODE:-iqm-head}"
@@ -56,12 +72,30 @@ Options:
              (default: all)
   --json     Emit one machine-readable status document
   --dry-run  Print the commands without executing them
+
+With QFW_DEFW_VERSION=2, manage the DEFw v2 prototype's plane instead. It
+runs beside the v1 plane, from /etc/openqse/qfw/site-defw2.yaml, and its
+targets are all, directory, nwqsim and fake-iqm.
 EOF
 }
 
 die() {
 	echo "qfw-site-services: $*" >&2
 	exit 1
+}
+
+# Whether the plane in use has COMPONENT.
+in_plane() {
+	[[ " ${plane_components} " == *" $1 "* ]]
+}
+
+# Whether the selected target covers COMPONENT. all covers the whole plane.
+selects() {
+	if [[ "${target}" == all ]]; then
+		in_plane "$1"
+	else
+		[[ "${target}" == "$1" ]]
+	fi
 }
 
 quote_command() {
@@ -85,6 +119,7 @@ run_qfw() {
 		"${QFW_SHARED_ROOT}" \
 		"${QFW_SITE_CONFIG}" \
 		"${QFW_SIMULATOR_NODES}" \
+		"${QFW_DEFW_VERSION}" \
 		"$@" <<'EOF'
 set -uo pipefail
 
@@ -93,11 +128,15 @@ qfw_venv="$2"
 qfw_shared_root="$3"
 qfw_site_config="$4"
 qfw_simulator_nodes="$5"
-shift 5
+qfw_defw_version="$6"
+shift 6
 
 export QFW_SHARED_ROOT="${qfw_shared_root}"
 export QFW_SITE_CONFIG="${qfw_site_config}"
 export QFW_SIMULATOR_NODES="${qfw_simulator_nodes}"
+if [[ -n "${qfw_defw_version}" ]]; then
+	export QFW_DEFW_VERSION="${qfw_defw_version}"
+fi
 
 source "${qfw_prefix}/bin/qfw-activate" --venv "${qfw_venv}"
 "$@"
@@ -401,22 +440,22 @@ require_directory_dependents_stopped() {
 	if nwqsim_ready >/dev/null 2>&1; then
 		active+=(nwqsim)
 	fi
-	if iqm_ready >/dev/null 2>&1; then
+	if in_plane iqm && iqm_ready >/dev/null 2>&1; then
 		active+=(iqm)
 	fi
-	if shim_ready >/dev/null 2>&1; then
+	if in_plane shim && shim_ready >/dev/null 2>&1; then
 		active+=(shim)
 	fi
-	if ibm_ready >/dev/null 2>&1; then
+	if in_plane ibm && ibm_ready >/dev/null 2>&1; then
 		active+=(ibm)
 	fi
-	if aws_ready >/dev/null 2>&1; then
+	if in_plane aws && aws_ready >/dev/null 2>&1; then
 		active+=(aws)
 	fi
 	if fake_iqm_ready >/dev/null 2>&1; then
 		active+=(fake-iqm)
 	fi
-	if gateway_managed_ready >/dev/null 2>&1; then
+	if in_plane gateway && gateway_managed_ready >/dev/null 2>&1; then
 		active+=(gateway)
 	fi
 	if (( ${#active[@]} == 0 )); then
@@ -678,6 +717,57 @@ start_services() {
 	echo "QFw site services are ready."
 }
 
+# start_services for the DEFw v2 plane, which has no gateway and only the
+# QPMs that run on v2. The rules are the same. A directory that was not
+# ready means a new directory incarnation, so live QPMs are stopped first,
+# and a failure stops only what this invocation started.
+start_defw2_services() {
+	local directory_started=false
+	local nwqsim_started=false
+	local directory_was_ready=false
+	local nwqsim_was_ready=false
+	local fake_iqm_was_ready=false
+
+	if ${dry_run}; then
+		echo "NWQSim simulator nodes: ${QFW_SIMULATOR_NODES}"
+	else
+		directory_ready >/dev/null 2>&1 && directory_was_ready=true
+		nwqsim_ready >/dev/null 2>&1 && nwqsim_was_ready=true
+		fake_iqm_ready >/dev/null 2>&1 && fake_iqm_was_ready=true
+		if ! ${directory_was_ready}; then
+			if ${fake_iqm_was_ready}; then
+				stop_fake_iqm || return 1
+			fi
+			if ${nwqsim_was_ready}; then
+				stop_nwqsim || return 1
+				nwqsim_was_ready=false
+			fi
+		fi
+	fi
+
+	if ! start_directory; then
+		return 1
+	fi
+	${directory_was_ready} || directory_started=true
+
+	if ! start_nwqsim; then
+		${directory_started} && stop_directory >/dev/null 2>&1 || true
+		return 1
+	fi
+	${nwqsim_was_ready} || nwqsim_started=true
+
+	if ! start_fake_iqm; then
+		${nwqsim_started} && stop_nwqsim >/dev/null 2>&1 || true
+		${directory_started} && stop_directory >/dev/null 2>&1 || true
+		return 1
+	fi
+	if ${dry_run}; then
+		echo "Dry run: printed the startup plan, started nothing."
+		return 0
+	fi
+	echo "QFw site services are ready."
+}
+
 service_status() {
 	local directory_output="" directory_status=-1
 	local nwqsim_output="" nwqsim_status=-1
@@ -687,110 +777,80 @@ service_status() {
 	local aws_output="" aws_status=-1
 	local fake_iqm_output="" fake_iqm_status=-1
 	local gateway_output="" gateway_status=-1
+	local selected="${target}"
 
+	[[ "${target}" == all ]] && selected="${plane_components}"
 	if ${dry_run}; then
-		case "${target}" in
-		all|directory) directory_ready ;;
-		esac
-		case "${target}" in
-		all|nwqsim) nwqsim_ready ;;
-		esac
-		case "${target}" in
-		all|iqm) iqm_ready ;;
-		esac
-		case "${target}" in
-		all|shim) shim_ready ;;
-		esac
-		case "${target}" in
-		all|ibm) ibm_ready ;;
-		esac
-		case "${target}" in
-		all|aws) aws_ready ;;
-		esac
-		case "${target}" in
-		all|fake-iqm) fake_iqm_ready ;;
-		esac
-		case "${target}" in
-		all|gateway) gateway_managed_ready ;;
-		esac
+		selects directory && directory_ready
+		selects nwqsim && nwqsim_ready
+		selects iqm && iqm_ready
+		selects shim && shim_ready
+		selects ibm && ibm_ready
+		selects aws && aws_ready
+		selects fake-iqm && fake_iqm_ready
+		selects gateway && gateway_managed_ready
 		return 0
 	fi
 
-	case "${target}" in
-	all|directory)
+	if selects directory; then
 		if directory_output="$(directory_ready 2>&1)"; then
 			directory_status=0
 		else
 			directory_status=$?
 		fi
-		;;
-	esac
-	case "${target}" in
-	all|nwqsim)
+	fi
+	if selects nwqsim; then
 		if nwqsim_output="$(nwqsim_ready 2>&1)"; then
 			nwqsim_status=0
 		else
 			nwqsim_status=$?
 		fi
-		;;
-	esac
-	case "${target}" in
-	all|iqm)
+	fi
+	if selects iqm; then
 		if iqm_output="$(iqm_ready 2>&1)"; then
 			iqm_status=0
 		else
 			iqm_status=$?
 		fi
-		;;
-	esac
-	case "${target}" in
-	all|shim)
+	fi
+	if selects shim; then
 		if shim_output="$(shim_ready 2>&1)"; then
 			shim_status=0
 		else
 			shim_status=$?
 		fi
-		;;
-	esac
-	case "${target}" in
-	all|ibm)
+	fi
+	if selects ibm; then
 		if ibm_output="$(ibm_ready 2>&1)"; then
 			ibm_status=0
 		else
 			ibm_status=$?
 		fi
-		;;
-	esac
-	case "${target}" in
-	all|aws)
+	fi
+	if selects aws; then
 		if aws_output="$(aws_ready 2>&1)"; then
 			aws_status=0
 		else
 			aws_status=$?
 		fi
-		;;
-	esac
-	case "${target}" in
-	all|fake-iqm)
+	fi
+	if selects fake-iqm; then
 		if fake_iqm_output="$(fake_iqm_ready 2>&1)"; then
 			fake_iqm_status=0
 		else
 			fake_iqm_status=$?
 		fi
-		;;
-	esac
-	case "${target}" in
-	all|gateway)
+	fi
+	if selects gateway; then
 		if gateway_output="$(gateway_managed_ready 2>&1)"; then
 			gateway_status=0
 		else
 			gateway_status=$?
 		fi
-		;;
-	esac
+	fi
 
 	python3 - \
-		"${json_status}" "${target}" \
+		"${json_status}" "${selected}" \
 		"${directory_status}" "${directory_output}" \
 		"${nwqsim_status}" "${nwqsim_output}" \
 		"${iqm_status}" "${iqm_output}" \
@@ -803,7 +863,7 @@ import json
 import sys
 
 json_output = sys.argv[1] == "true"
-target = sys.argv[2]
+selected = sys.argv[2].split()
 values = {
     "directory": ("Directory", int(sys.argv[3]), sys.argv[4]),
     "nwqsim": ("NWQSim", int(sys.argv[5]), sys.argv[6]),
@@ -814,7 +874,6 @@ values = {
     "fake-iqm": ("Fake IQM", int(sys.argv[15]), sys.argv[16]),
     "gateway": ("Gateway", int(sys.argv[17]), sys.argv[18]),
 }
-selected = list(values) if target == "all" else [target]
 
 
 def first_document(text):
@@ -930,13 +989,28 @@ stop_services() {
 	return "${status}"
 }
 
+stop_defw2_services() {
+	local status=0
+
+	stop_fake_iqm || status=1
+	stop_nwqsim || status=1
+	stop_directory || status=1
+	return "${status}"
+}
+
 target_status() {
 	service_status
 }
 
 start_target() {
 	case "${target}" in
-	all) start_services ;;
+	all)
+		if [[ "${QFW_DEFW_VERSION}" == 2 ]]; then
+			start_defw2_services
+		else
+			start_services
+		fi
+		;;
 	directory) start_directory ;;
 	nwqsim) start_nwqsim ;;
 	iqm) start_iqm ;;
@@ -950,7 +1024,13 @@ start_target() {
 
 stop_target() {
 	case "${target}" in
-	all) stop_services ;;
+	all)
+		if [[ "${QFW_DEFW_VERSION}" == 2 ]]; then
+			stop_defw2_services
+		else
+			stop_services
+		fi
+		;;
 	directory)
 		require_directory_dependents_stopped || return 1
 		stop_directory
@@ -1021,10 +1101,18 @@ main() {
 		usage >&2
 		return 2
 	}
+	case "${QFW_DEFW_VERSION}" in
+	""|1|2) ;;
+	*) die "QFW_DEFW_VERSION must be 1 or 2, not ${QFW_DEFW_VERSION}" ;;
+	esac
 	case "${target}" in
 	all|directory|nwqsim|iqm|shim|ibm|aws|fake-iqm|gateway) ;;
 	*) die "unknown target: ${target}" ;;
 	esac
+	if [[ "${target}" != all ]] && ! in_plane "${target}"; then
+		die "the DEFw v2 plane has no ${target}." \
+			"Its targets are all, ${plane_components// /, }."
+	fi
 	if ! ${dry_run} && [[ ${EUID} -ne 0 ]]; then
 		die "must run as root"
 	fi

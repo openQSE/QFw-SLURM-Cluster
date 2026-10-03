@@ -6,6 +6,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 command="${script_dir}/tools/qfw-site-services"
 temporary="$(mktemp -d)"
 trap 'rm -rf "${temporary}"' EXIT
+# The tests below check the v1 plane's defaults unless they ask for v2.
+unset QFW_DEFW_VERSION QFW_SITE_CONFIG QFW_SITE_RUN_ROOT
 
 grep -q '/etc/openqse/qfw-slurm/gateway.yaml' "${command}"
 grep -q '/etc/openqse/qfw-slurm/plugin.conf' \
@@ -463,5 +465,176 @@ grep -q '^  ssh: connect to host slurmctld port 22: Connection refused$' \
 # A service that is merely stopped reports DOWN and needs no explaining, so the
 # reason line belongs to UNKNOWN alone.
 grep -q '^NWQSim: UP$' "${temporary}/unknown-reason.out"
+
+# QFW_DEFW_VERSION=2 selects the DEFw v2 plane. It runs beside the v1 plane,
+# from a site configuration and a run root of its own, and has only the
+# directory and the QPMs that run on v2.
+QFW_DEFW_VERSION=2 "${command}" --dry-run start >"${temporary}/v2-start.out"
+cat >"${temporary}/v2-start.expected" <<'EOF'
+NWQSim simulator nodes: nwqsim-head,nwqsim-worker-1,nwqsim-worker-2
+slurmctld: qfw-dir-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/directory --site-config /etc/openqse/qfw/site-defw2.yaml --timeout 300 
+nwqsim-head: qfw-qpm-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/qpm/nwqsim --site-config /etc/openqse/qfw/site-defw2.yaml --service-id nwqsim --timeout 300 
+fake-iqm-head: qfw-qpm-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/qpm/fake-iqm --site-config /etc/openqse/qfw/site-defw2.yaml --service-id fake-iqm --timeout 300 
+Dry run: printed the startup plan, started nothing.
+EOF
+cmp "${temporary}/v2-start.expected" "${temporary}/v2-start.out"
+
+QFW_DEFW_VERSION=2 "${command}" --dry-run stop >"${temporary}/v2-stop.out"
+cat >"${temporary}/v2-stop.expected" <<'EOF'
+fake-iqm-head: qfw-qpm-svc stop --run-dir /var/lib/qfw-site-services-defw2/qpm/fake-iqm 
+nwqsim-head: qfw-qpm-svc stop --run-dir /var/lib/qfw-site-services-defw2/qpm/nwqsim 
+slurmctld: qfw-dir-svc stop --run-dir /var/lib/qfw-site-services-defw2/directory 
+EOF
+cmp "${temporary}/v2-stop.expected" "${temporary}/v2-stop.out"
+
+QFW_DEFW_VERSION=2 "${command}" --dry-run status >"${temporary}/v2-status.out"
+cat >"${temporary}/v2-status.expected" <<'EOF'
+slurmctld: qfw-dir-svc status --run-dir /var/lib/qfw-site-services-defw2/directory 
+nwqsim-head: qfw-qpm-svc status --run-dir /var/lib/qfw-site-services-defw2/qpm/nwqsim 
+fake-iqm-head: qfw-qpm-svc status --run-dir /var/lib/qfw-site-services-defw2/qpm/fake-iqm 
+EOF
+cmp "${temporary}/v2-status.expected" "${temporary}/v2-status.out"
+
+for target in iqm shim ibm aws gateway; do
+	if QFW_DEFW_VERSION=2 "${command}" --dry-run start --target "${target}" \
+		>/dev/null 2>"${temporary}/v2-${target}.err"; then
+		echo "the v2 plane unexpectedly accepted ${target}" >&2
+		exit 1
+	fi
+	grep -q "the DEFw v2 plane has no ${target}\." \
+		"${temporary}/v2-${target}.err"
+done
+if QFW_DEFW_VERSION=3 "${command}" --dry-run status >/dev/null 2>&1; then
+	echo "an unknown DEFw version unexpectedly succeeded" >&2
+	exit 1
+fi
+
+# ssh hands the remote command a bare environment, so the version reaches a
+# node only because run_qfw forwards it. Run the remote side here, with a
+# stand-in for qfw-activate, to see what it exports.
+mkdir -p "${temporary}/prefix/bin"
+echo 'qfw-deactivate() { :; }' >"${temporary}/prefix/bin/qfw-activate"
+for version in "" 2; do
+	(
+		QFW_DEFW_VERSION="${version}"
+		source "${command}"
+		QFW_INSTALL_PREFIX="${temporary}/prefix"
+		ssh() {
+			while [[ "$1" != /bin/bash ]]; do
+				shift
+			done
+			shift
+			bash "$@"
+		}
+		run_qfw nwqsim-head bash -c \
+			'echo "version=${QFW_DEFW_VERSION-unset} site=${QFW_SITE_CONFIG}"'
+	) >"${temporary}/forwarded-${version:-1}.out"
+done
+grep -q '^version=unset site=/etc/openqse/qfw/site.yaml$' \
+	"${temporary}/forwarded-1.out"
+grep -q '^version=2 site=/etc/openqse/qfw/site-defw2.yaml$' \
+	"${temporary}/forwarded-2.out"
+
+# A v2 status reports the v2 plane alone, and asks nothing of the components
+# it does not have.
+: >"${temporary}/v2-asked.calls"
+(
+	QFW_DEFW_VERSION=2
+	source "${command}"
+	dry_run=false
+	target=all
+	json_status=true
+	directory_ready() { echo '{"state":"ready"}'; }
+	nwqsim_ready() { echo '{"state":"ready"}'; }
+	fake_iqm_ready() { echo '{"state":"ready"}'; }
+	iqm_ready() { echo iqm >>"${temporary}/v2-asked.calls"; }
+	shim_ready() { echo shim >>"${temporary}/v2-asked.calls"; }
+	ibm_ready() { echo ibm >>"${temporary}/v2-asked.calls"; }
+	aws_ready() { echo aws >>"${temporary}/v2-asked.calls"; }
+	gateway_managed_ready() { echo gateway >>"${temporary}/v2-asked.calls"; }
+	service_status
+) >"${temporary}/v2-health.json"
+python3 - "${temporary}/v2-health.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    status = json.load(stream)
+assert status["state"] == "up"
+assert list(status["services"]) == ["directory", "fake-iqm", "nwqsim"]
+PY
+[[ ! -s "${temporary}/v2-asked.calls" ]]
+
+# Nor does a live v1 QPM or gateway hold up a v2 directory stop.
+(
+	QFW_DEFW_VERSION=2
+	source "${command}"
+	dry_run=false
+	nwqsim_ready() { return 1; }
+	fake_iqm_ready() { return 1; }
+	iqm_ready() { return 0; }
+	shim_ready() { return 0; }
+	ibm_ready() { return 0; }
+	aws_ready() { return 0; }
+	gateway_managed_ready() { return 0; }
+	require_directory_dependents_stopped
+)
+
+# The v2 start follows the v1 rules. A directory that was not ready is a new
+# incarnation, so live QPMs are stopped and started again after it.
+(
+	QFW_DEFW_VERSION=2
+	source "${command}"
+	dry_run=false
+	directory_up=false
+	nwqsim_up=true
+	fake_iqm_up=true
+	directory_ready() { ${directory_up}; }
+	nwqsim_ready() { ${nwqsim_up}; }
+	fake_iqm_ready() { ${fake_iqm_up}; }
+	stop_fake_iqm() { echo stop-fake-iqm; fake_iqm_up=false; }
+	stop_nwqsim() { echo stop-nwqsim; nwqsim_up=false; }
+	stop_directory() { echo stop-directory; directory_up=false; }
+	start_directory() { echo start-directory; directory_up=true; }
+	start_nwqsim() { echo start-nwqsim; nwqsim_up=true; }
+	start_fake_iqm() { echo start-fake-iqm; fake_iqm_up=true; }
+	start_target
+) >"${temporary}/v2-partial-state.out"
+cat >"${temporary}/v2-partial-state.expected" <<'EOF'
+stop-fake-iqm
+stop-nwqsim
+start-directory
+start-nwqsim
+start-fake-iqm
+QFw site services are ready.
+EOF
+cmp "${temporary}/v2-partial-state.expected" \
+	"${temporary}/v2-partial-state.out"
+
+# A failure stops only what this invocation started. The rollback silences
+# the stops, so the stand-ins record them in a file.
+: >"${temporary}/v2-rollback.out"
+(
+	QFW_DEFW_VERSION=2
+	source "${command}"
+	dry_run=false
+	events="${temporary}/v2-rollback.out"
+	directory_ready() { return 0; }
+	nwqsim_ready() { return 1; }
+	fake_iqm_ready() { return 1; }
+	start_directory() { echo start-directory >>"${events}"; }
+	start_nwqsim() { echo start-nwqsim >>"${events}"; }
+	start_fake_iqm() { echo fail-fake-iqm >>"${events}"; return 1; }
+	stop_nwqsim() { echo stop-nwqsim >>"${events}"; }
+	stop_directory() { echo stop-directory >>"${events}"; }
+	! start_target
+)
+cat >"${temporary}/v2-rollback.expected" <<'EOF'
+start-directory
+start-nwqsim
+fail-fake-iqm
+stop-nwqsim
+EOF
+cmp "${temporary}/v2-rollback.expected" "${temporary}/v2-rollback.out"
 
 echo "qfw-site-services dry-run lifecycle passed"
