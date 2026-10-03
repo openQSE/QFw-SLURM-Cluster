@@ -13,6 +13,7 @@ using the virtual QFw Slurm cluster.
 | Run a guarded real-IQM application job | [Run an IQM job](run-iqm-job.md) |
 | Run a heterogeneous application job | [Run a heterogeneous NWQSim job](run-heterogeneous-nwqsim-job.md) |
 | Inspect and recover the cluster | [Inspect and recover services](inspect-and-recover-services.md) |
+| Run QFw on the DEFw v2 prototype beside v1 | [Run QFw on DEFw v2](run-qfw-on-defw2.md) |
 
 The commands assume the image-contained installations:
 

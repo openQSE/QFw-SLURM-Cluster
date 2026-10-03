@@ -1,4 +1,4 @@
-.TH QFW-SITE-SERVICES 8 "September 2026" "QFw Slurm Cluster" "Administration"
+.TH QFW-SITE-SERVICES 8 "October 2026" "QFw Slurm Cluster" "Administration"
 .SH NAME
 qfw-site-services \- manage the virtual cluster QFw service plane
 .SH SYNOPSIS
@@ -16,6 +16,15 @@ The command runs on
 .B slurmctld
 as root and invokes the installed QFw service managers on their assigned
 service nodes.
+.PP
+With
+.B QFW_DEFW_VERSION=2
+the command manages the DEFw v2 prototype's service plane instead.  It runs
+beside the v1 plane, with a site configuration, ports, and a run root of its
+own, and has only the directory service, the NWQSim QPM, and the fake IQM QPM.
+Its
+.B all
+target is those three, and the other targets are rejected.
 .SH ACTIONS
 .TP
 .B start
@@ -97,16 +106,34 @@ The command accepts administrator overrides through
 .BR QFW_GATEWAY_LOG_DIR ,
 and
 .BR QFW_SITE_START_TIMEOUT .
+.TP
+.B QFW_DEFW_VERSION
+Unset or
+.B 1
+for the v1 service plane,
+.B 2
+for the DEFw v2 prototype's plane.  It changes the defaults of
+.B QFW_SITE_CONFIG
+and
+.BR QFW_SITE_RUN_ROOT ,
+and is forwarded to every service host, where it selects the DEFw the
+service managers start.
 .SH FILES
 .TP
 .I /etc/openqse/qfw/site.yaml
 Default QFw site configuration.
+.TP
+.I /etc/openqse/qfw/site-defw2.yaml
+Default QFw site configuration for the DEFw v2 plane.
 .TP
 .I /etc/openqse/qfw-slurm/gateway.yaml
 Default QFw Slurm gateway configuration.
 .TP
 .I /var/lib/qfw-site-services
 Default administrator-owned manager state root on each service host.
+.TP
+.I /var/lib/qfw-site-services-defw2
+Default manager state root of the DEFw v2 plane.
 .TP
 .I /var/lib/qfw-site-services/gateway/supervisor.pid
 Default gateway-supervisor PID record.
@@ -122,6 +149,7 @@ qfw-site-services recover --target shim
 qfw-site-services recover --target ibm
 qfw-site-services recover --target aws
 qfw-site-services stop --target all
+QFW_DEFW_VERSION=2 qfw-site-services start
 .fi
 .SH SECURITY
 The command requires root for live actions.  It passes protected configuration
