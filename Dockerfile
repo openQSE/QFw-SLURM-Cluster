@@ -488,6 +488,12 @@ RUN set -ex \
 # DEFw finds libfabric through pkg-config. Without libfabric's .pc file on the
 # search path it still builds, as a TCP-only transport, so the last check makes
 # sure the installed library links libfabric.
+# QFW_BUILD_DEFW2=ON also builds the DEFw v2 prototype into the install, for
+# QFW_DEFW_VERSION=2. It needs a QFW_REF that has v2, such as QFw's
+# defw2-prototype branch. v2 finds Margo through pkg-config too, and builds
+# its Python binding only when cffi is there to build it, so a v2 image
+# checks that the binding imports.
+ARG QFW_BUILD_DEFW2=OFF
 RUN set -ex \
     && uv venv --python python3 "${QFW_IMAGE_VENV}" \
     && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
@@ -499,18 +505,28 @@ RUN set -ex \
         'iqm-qdmi>=1.4' \
         'mqt-core==3.9.2' \
         'jsonschema>=4' \
-    && export PKG_CONFIG_PATH="${LIBFABRIC_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
+    && if [ "${QFW_BUILD_DEFW2}" = ON ]; then \
+        uv pip install --python "${QFW_IMAGE_VENV}" cffi; \
+       fi \
+    && export PKG_CONFIG_PATH="${MOCHI_PREFIX}/lib/pkgconfig:${LIBFABRIC_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
     && PATH="${QFW_IMAGE_VENV}/bin:${PATH}" cmake \
         -S "${QFW_IMAGE_SOURCE}" \
         -B "${QFW_IMAGE_BUILD}" \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DCMAKE_INSTALL_PREFIX="${QFW_IMAGE_PREFIX}" \
         -DQFW_BUILD_BUNDLED_DEFW=ON \
+        -DQFW_BUILD_DEFW2="${QFW_BUILD_DEFW2}" \
     && cmake --build "${QFW_IMAGE_BUILD}" \
         --parallel "${QFW_BUILD_JOBS}" \
     && cmake --install "${QFW_IMAGE_BUILD}" \
     && test -x "${QFW_IMAGE_PREFIX}/bin/qfw-activate" \
     && ldd "${QFW_IMAGE_PREFIX}/lib/libdefw.so" | grep -q libfabric \
+    && if [ "${QFW_BUILD_DEFW2}" = ON ]; then \
+        test -x "${QFW_IMAGE_PREFIX}/bin/defw2-python" \
+        && test -x "${QFW_IMAGE_PREFIX}/bin/defw2-dirsvc" \
+        && PYTHONPATH="$(echo "${QFW_IMAGE_PREFIX}"/lib/python3*/site-packages)" \
+            "${QFW_IMAGE_VENV}/bin/python" -c 'import defw2'; \
+       fi \
     && rm -rf "${QFW_IMAGE_SOURCE}" "${QFW_IMAGE_BUILD}" \
         "${SIMULATOR_WORK_ROOT}"
 

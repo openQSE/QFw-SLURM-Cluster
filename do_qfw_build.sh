@@ -6,7 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [--jobs N] [--clean] [--skip-venv] [--container NAME]
+Usage: $(basename "$0") [--jobs N] [--clean] [--skip-venv] [--defw2]
+                         [--container NAME]
 
 Build and install QFw + DEFw and MQT Core developer overrides inside the
 running cluster from checkouts on the shared mount. The cluster image's official
@@ -30,6 +31,9 @@ Options:
   --jobs N          Parallel build jobs (default: nproc in the container)
   --clean           Remove the QFw build and install trees first
   --skip-venv       Reuse the existing venv, skip Python installs
+  --defw2           Also build the DEFw v2 prototype, which QFW_DEFW_VERSION=2
+                    runs QFw on. The checkout's DEFw must have v2. A build
+                    tree keeps it on until --clean
   --container NAME  Container to build in (default: slurmctld)
   -h, --help        Show this help
 EOF
@@ -38,6 +42,7 @@ EOF
 JOBS=""
 CLEAN=false
 SKIP_VENV=false
+DEFW2=false
 CONTAINER=slurmctld
 
 while [ "$#" -gt 0 ]; do
@@ -47,6 +52,7 @@ while [ "$#" -gt 0 ]; do
             JOBS="$2"; shift 2 ;;
         --clean)   CLEAN=true; shift ;;
         --skip-venv) SKIP_VENV=true; shift ;;
+        --defw2)   DEFW2=true; shift ;;
         --container)
             [ "$#" -ge 2 ] || { echo "--container requires a name" >&2; exit 2; }
             CONTAINER="$2"; shift 2 ;;
@@ -76,6 +82,7 @@ docker exec -i \
     -e QFW_BUILD_JOBS_OVERRIDE="${JOBS}" \
     -e QFW_DO_CLEAN="${CLEAN}" \
     -e QFW_SKIP_VENV="${SKIP_VENV}" \
+    -e QFW_BUILD_DEFW2="${DEFW2}" \
     -e QFW_HOST_BASE="${QFW_HOST_BASE}" \
     -e QFW_CONTAINER_NAME="${CONTAINER}" \
     "${CONTAINER}" bash -s <<'REMOTE'
@@ -96,6 +103,9 @@ export MLIR_DIR="${MLIR_DIR:-/opt/llvm-23.1.1/lib/cmake/mlir}"
 # transport, and a run that asks for DEFW_TRANSPORT=ofi carries on over tcp.
 LIBFABRIC_PREFIX="${LIBFABRIC_PREFIX:-/opt/qfw/libfabric}"
 export PKG_CONFIG_PATH="${LIBFABRIC_PREFIX}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+# DEFw v2 finds Margo the same way.
+MOCHI_PREFIX="${MOCHI_PREFIX:-/opt/qfw/mochi}"
+export PKG_CONFIG_PATH="${MOCHI_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}"
 
 jobs="${QFW_BUILD_JOBS_OVERRIDE:-}"
 [ -n "${jobs}" ] || jobs="$(nproc)"
@@ -185,16 +195,27 @@ if [ "${QFW_SKIP_VENV}" != "true" ]; then
     # dependencies are not resolved. qhw-data needs jsonschema for
     # schema validation, which the shim's qhw record building relies on.
     uv pip install 'jsonschema>=4'
+
+    # DEFw v2 builds its Python binding only when cffi is there to build it.
+    if [ "${QFW_BUILD_DEFW2}" = "true" ]; then
+        uv pip install cffi
+    fi
 else
     # shellcheck disable=SC1091
     source "${QFW_VENV}/bin/activate"
+fi
+
+defw2_option=()
+if [ "${QFW_BUILD_DEFW2}" = "true" ]; then
+    defw2_option=(-DQFW_BUILD_DEFW2=ON)
 fi
 
 echo "== cmake configure"
 cmake -S "${QFW_SRC}" -B "${QFW_BUILD}" \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_INSTALL_PREFIX="${QFW_PREFIX}" \
-    -DQFW_BUILD_BUNDLED_DEFW=ON
+    -DQFW_BUILD_BUNDLED_DEFW=ON \
+    "${defw2_option[@]}"
 
 echo "== cmake build (-j ${jobs})"
 cmake --build "${QFW_BUILD}" -j "${jobs}"
@@ -210,6 +231,17 @@ if ! ldd "${QFW_PREFIX}/lib/libdefw.so" 2>/dev/null | grep -q libfabric; then
     exit 1
 fi
 
+# Without cffi, v2 still builds and installs defw2-python, and every v2 run
+# then fails to import the binding, so check the binding that was installed.
+if [ "${QFW_BUILD_DEFW2}" = "true" ]; then
+    if ! PYTHONPATH="$(echo "${QFW_PREFIX}"/lib/python3*/site-packages)" \
+        python -c 'import defw2'; then
+        echo "The DEFw v2 Python binding in ${QFW_PREFIX} does not import." >&2
+        echo "v2 builds it only when cffi is in ${QFW_VENV}." >&2
+        exit 1
+    fi
+fi
+
 if [ "${QFW_SKIP_VENV}" != "true" ]; then
     # Build mqt-cc from the mounted checkout, apart from QFw's SDK dependencies.
     mqt_cc_venv="${QFW_BASE}/mqt-cc-venv"
@@ -223,4 +255,7 @@ fi
 echo
 echo "QFw installed to ${QFW_PREFIX}"
 echo "Activate with: source ${QFW_PREFIX}/bin/qfw-activate --venv ${QFW_VENV}"
+if [ "${QFW_BUILD_DEFW2}" = "true" ]; then
+    echo "Run on DEFw v2 with: export QFW_DEFW_VERSION=2"
+fi
 REMOTE
