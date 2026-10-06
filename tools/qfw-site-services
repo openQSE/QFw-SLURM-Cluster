@@ -112,15 +112,18 @@ run_qfw() {
 		return 0
 	fi
 
+	# ssh hands the remote shell one command line, so each argument is
+	# quoted for it. Unquoted, an empty argument vanishes and every one
+	# after it moves up a place. QFW_DEFW_VERSION is empty on the v1 plane.
 	ssh -o BatchMode=yes -o ConnectTimeout=10 "root@${node}" \
-		/bin/bash -s -- \
-		"${QFW_INSTALL_PREFIX}" \
-		"${QFW_VENV}" \
-		"${QFW_SHARED_ROOT}" \
-		"${QFW_SITE_CONFIG}" \
-		"${QFW_SIMULATOR_NODES}" \
-		"${QFW_DEFW_VERSION}" \
-		"$@" <<'EOF'
+		"/bin/bash -s -- $(quote_command \
+			"${QFW_INSTALL_PREFIX}" \
+			"${QFW_VENV}" \
+			"${QFW_SHARED_ROOT}" \
+			"${QFW_SITE_CONFIG}" \
+			"${QFW_SIMULATOR_NODES}" \
+			"${QFW_DEFW_VERSION}" \
+			"$@")" <<'EOF'
 set -uo pipefail
 
 qfw_prefix="$1"
@@ -185,21 +188,22 @@ run_gateway() {
 		return 0
 	fi
 
+	# Quoted for the remote shell, as in run_qfw.
 	ssh -o BatchMode=yes -o ConnectTimeout=10 \
 		"root@${QFW_GATEWAY_HOST}" \
-		/bin/bash -s -- \
-		"${gateway_action}" \
-		"${QFW_SITE_RUN_ROOT}" \
-		"${gateway_pid_file}" \
-		"${gateway_log_file}" \
-		"${QFW_GATEWAY_LOG_DIR}" \
-		"${QFW_GATEWAY_USER}" \
-		"${QFW_INSTALL_PREFIX}" \
-		"${QFW_VENV}" \
-		"${QFW_SHARED_ROOT}" \
-		"${QFW_GATEWAY_CONFIG}" \
-		"${QFW_GATEWAY_HOST}" \
-		"${QFW_GATEWAY_PORT}" <<'EOF'
+		"/bin/bash -s -- $(quote_command \
+			"${gateway_action}" \
+			"${QFW_SITE_RUN_ROOT}" \
+			"${gateway_pid_file}" \
+			"${gateway_log_file}" \
+			"${QFW_GATEWAY_LOG_DIR}" \
+			"${QFW_GATEWAY_USER}" \
+			"${QFW_INSTALL_PREFIX}" \
+			"${QFW_VENV}" \
+			"${QFW_SHARED_ROOT}" \
+			"${QFW_GATEWAY_CONFIG}" \
+			"${QFW_GATEWAY_HOST}" \
+			"${QFW_GATEWAY_PORT}")" <<'EOF'
 set -uo pipefail
 
 action="$1"

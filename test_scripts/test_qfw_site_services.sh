@@ -511,7 +511,11 @@ fi
 
 # ssh hands the remote command a bare environment, so the version reaches a
 # node only because run_qfw forwards it. Run the remote side here, with a
-# stand-in for qfw-activate, to see what it exports.
+# stand-in for qfw-activate, to see what it exports. The stand-in for ssh
+# does what ssh does with a command: it joins the words after the host into
+# one line, which the remote shell splits again. The v1 plane's version is
+# empty, and an empty word not quoted for that shell vanishes, moving every
+# word after it up a place.
 mkdir -p "${temporary}/prefix/bin"
 echo 'qfw-deactivate() { :; }' >"${temporary}/prefix/bin/qfw-activate"
 for version in "" 2; do
@@ -520,20 +524,22 @@ for version in "" 2; do
 		source "${command}"
 		QFW_INSTALL_PREFIX="${temporary}/prefix"
 		ssh() {
-			while [[ "$1" != /bin/bash ]]; do
-				shift
+			while [[ "$1" == -o ]]; do
+				shift 2
 			done
 			shift
-			bash "$@"
+			bash -c "$*"
 		}
 		run_qfw nwqsim-head bash -c \
 			'echo "version=${QFW_DEFW_VERSION-unset} site=${QFW_SITE_CONFIG}"'
+		run_qfw nwqsim-head printf '<%s>' 'two words' ''
 	) >"${temporary}/forwarded-${version:-1}.out"
 done
 grep -q '^version=unset site=/etc/openqse/qfw/site.yaml$' \
 	"${temporary}/forwarded-1.out"
 grep -q '^version=2 site=/etc/openqse/qfw/site-defw2.yaml$' \
 	"${temporary}/forwarded-2.out"
+grep -q '^<two words><>$' "${temporary}/forwarded-1.out"
 
 # A v2 status reports the v2 plane alone, and asks nothing of the components
 # it does not have.
