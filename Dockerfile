@@ -1,4 +1,4 @@
-FROM rockylinux/rockylinux:10.1.20251123
+FROM docker.io/rockylinux/rockylinux:10.1.20251123
 
 LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docker-cluster" \
       org.opencontainers.image.title="slurm-docker-cluster" \
@@ -374,7 +374,7 @@ RUN set -ex \
 # NOTE: upstream changed tag convention around the 0.14 release from
 # "vX.Y.Z" to "X.Y.Z" (no leading v). Use the unprefixed form for any
 # release >= 0.14.0; older releases need the "v" prefix.
-# QRMI 0.24.4 with spank-plugins 0.11.0. The plugin links the locally-cloned
+# QRMI 0.26.0 with spank-plugins 0.11.0. The plugin links the locally-cloned
 # QRMI via -DQRMI_ROOT, so it must be built against whatever QRMI_VERSION says.
 # Bumping either ARG invalidates the whole RUN layer below, which rebuilds the
 # plugin from scratch, as QRMI's release announcement asks for.
@@ -389,24 +389,45 @@ RUN set -ex \
 # bridge is level-filtered rather than off by default. WARN passes, DEBUG does
 # not. So the silent no-op is now an announced one.
 #
-# THE HEALTH-STATUS GAP IS STILL OPEN AND STILL DOES NOT AFFECT US. 0.24.3 was
-# announced as fixing is_accessible() against old IQM servers. It fixes one
-# meaning of old, a server that nests health but omits operational, which now
-# defaults to "online". It does NOT fix a server whose response is genuinely
-# flat, because the health field itself is still required with no default and
-# no alias. THE ORNL q20 IS STILL FLAT, verified 2026-09-08:
-#   {"healthy": true, "updated_at": "..."}
-# so is_accessible() still raises there. The error moved rather than went away,
-# from missing field `operational` on 0.24.0 to missing field `health` on
-# 0.24.4. Reported upstream.
+# 0.26.0 is pinned for two upstream fixes we asked for, both reported from
+# here and both released on 2026-10-03.
 #
-# QFw is unaffected because it never calls is_accessible(). That call is absent
-# from QrmiDriver.CAPABILITIES and from services/ entirely. target() was
-# re-verified against the q20 on 0.24.4 and returns 20 qubits normally.
+# THE OBJECT-STORAGE FIX IS THE REASON TO BUMP RATHER THAN WAIT. Through
+# 0.24.4, IBMQuantumSystem read the five S3/AWS settings from the environment
+# inside task_result() and task_logs(), not at construction. The shim resolves
+# the AWS key pair per reservation from the per-user credential DB and writes
+# it to process-wide variables, and QFw's RESOURCE_ENV_LOCK covers only
+# resolve-then-construct, so a second reservation opening a resource would
+# replace the pair that a first reservation's task_result() had yet to read.
+# Driving the real driver with four credentials put three of the four on a
+# fourth user's S3 key. It was unreachable while run_circuit was IQM-only and
+# went live when the IBM execution path landed. 0.26.0 resolves S3 into a
+# struct field in the constructor for the environment path as well as for
+# from_config(), so the existing lock now covers it and no QFw change is
+# needed. Upstream issue #283, fixed by qrmi#288.
 #
-# IF is_accessible() IS EVER WIRED INTO THE SHIM, this pin becomes a live
-# problem until either ORNL's IQM API or QRMI's health model is updated. That
-# is the trigger to revisit.
+# THE HEALTH-STATUS GAP IS CLOSED. Through 0.24.4 the health field was
+# required with no default and no alias, so is_accessible() raised against the
+# ORNL q20, whose response is flat. 0.24.3 had fixed only the other meaning of
+# an old server, one that nests health but omits operational. 0.25 then routed
+# is_accessible() through status(), which also dropped the healthy check and
+# made an online-but-unhealthy device report accessible. 0.26.0 fixes all
+# three: health is nullable, so a device under maintenance parses and reports
+# Paused; a response that nests health under status is accepted; and
+# is_accessible() calls the vendor's own method again, so its pre-0.25 meaning
+# is back. That last point matters beyond the shim, because spank_qrmi gates
+# job admission on qrmi_resource_is_accessible(). Upstream issue #282, fixed
+# by qrmi#287, which carries the reported payloads as regression fixtures.
+#
+# QFw does not call is_accessible() itself. It is absent from
+# QrmiDriver.CAPABILITIES and from services/ entirely, so the health fix
+# removes a trap rather than changing behaviour here.
+#
+# The rest of 0.26.0 is additive for us. ResourceType gains OQTOPUS, the
+# Python exception classes are unchanged, requires-python is still >=3.11, and
+# the pasqal and oqtopus extras are the only packaging changes. QRMI also
+# rolled its own rust-toolchain back from 1.98 to 1.91 in qrmi#292, so
+# RUST_VERSION above stays as it is and no third toolchain is installed.
 #
 # 0.24.0 also added typed errors. The new Python exceptions all subclass
 # RuntimeError, which is what the drivers already catch, so that half is purely
@@ -421,7 +442,7 @@ RUN set -ex \
 # and services/svc_lib_qpm/drivers/qrmi_driver.py unwraps it before handing it
 # to qhw-iqm.
 ARG QRMI_REPO=https://github.com/qiskit-community/qrmi.git
-ARG QRMI_VERSION=0.24.4
+ARG QRMI_VERSION=0.26.0
 ARG QRMI_PREFIX=/opt/qfw/qrmi
 ARG QRMI_SPANK_REPO=https://github.com/qiskit-community/spank-plugins.git
 ARG QRMI_SPANK_REF=0.11.0
