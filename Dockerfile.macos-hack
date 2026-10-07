@@ -1,4 +1,4 @@
-FROM rockylinux/rockylinux:10.1.20251123
+FROM docker.io/rockylinux/rockylinux:10.1.20251123
 
 LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docker-cluster" \
       org.opencontainers.image.title="slurm-docker-cluster" \
