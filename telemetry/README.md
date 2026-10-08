@@ -195,8 +195,40 @@ The first lists the four metric families; the second returns the job's trace.
 - Grafana's port is `QFW_GRAFANA_PORT` (default 3000). The home dashboard is
   QFw Jobs; a second screen can show it from any machine that reaches the
   host.
-- Take a dashboard snapshot (Share, Snapshot) after a rehearsal, as the
-  fallback if the live stack misbehaves on the day.
+- Take the fallback after a rehearsal, below, in case the live stack
+  misbehaves on the day.
+
+## The fallback
+
+`telemetry/fallback.sh` freezes a good window of both dashboards in two
+layers, so a demonstration has something to show whatever fails:
+
+```bash
+./telemetry/fallback.sh --from now-30m --to now        # after a rehearsal
+./telemetry/fallback.sh --from 2026-11-17T16:00:00 --to 2026-11-17T17:00:00
+```
+
+- **Grafana local snapshots** of QFw Jobs and QFw Traces, with the panel
+  data embedded, made through Grafana's API the way Share, Snapshot does in
+  the UI. They render inside Grafana without Prometheus, Tempo or live jobs,
+  the panels still answer to hover, and they live in Grafana's own volume.
+  The script prints their links and keeps them in `snapshots.json`; they are
+  also listed under Dashboards, Snapshots.
+- **Screenshots** of both dashboards by headless Chrome, and an `index.html`
+  that shows them with the snapshot links. That page needs nothing running.
+
+The output goes to `<QFW_CONTAINER_BASE>/qfw-fallback-<timestamp>` unless
+`--out` says otherwise. Chrome or Chromium is found on `PATH` or in
+`/Applications`; `QFW_CHROME` names another binary. Without one the script
+makes the snapshots and the page without images.
+
+A third layer costs nothing: Prometheus keeps 15 days and Tempo 14, so any
+dashboard opened with an absolute time range over a rehearsal shows it, as
+long as the stack is up.
+
+At the booth: if jobs stop or a QPM is unreachable, open a snapshot link,
+or set the time range to the rehearsal; if Grafana itself is down, open
+`index.html` from the fallback directory.
 
 ## Troubleshooting
 
