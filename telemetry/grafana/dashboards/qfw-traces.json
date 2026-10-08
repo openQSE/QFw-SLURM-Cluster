@@ -126,6 +126,15 @@
               {
                 "id": "custom.width",
                 "value": 300
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the trace",
+                    "url": "/d/qfw-trace?var-traceId=${__value.raw}&${__url_time_range}"
+                  }
+                ]
               }
             ]
           },
@@ -260,6 +269,15 @@
               {
                 "id": "custom.width",
                 "value": 300
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the trace",
+                    "url": "/d/qfw-trace?var-traceId=${__value.raw}&${__url_time_range}"
+                  }
+                ]
               }
             ]
           },
@@ -394,6 +412,15 @@
               {
                 "id": "custom.width",
                 "value": 300
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the trace",
+                    "url": "/d/qfw-trace?var-traceId=${__value.raw}&${__url_time_range}"
+                  }
+                ]
               }
             ]
           },

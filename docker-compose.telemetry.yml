@@ -37,6 +37,11 @@ x-qfw-telemetry: &qfw-telemetry
     QFW_TELEMETRY: ${QFW_TELEMETRY:-otlp}
     QFW_TELEMETRY_ENDPOINT: ${QFW_TELEMETRY_ENDPOINT:-http://otel-collector:4318}
     QFW_TELEMETRY_SAMPLE: ${QFW_TELEMETRY_SAMPLE:-always}
+    # The transport extension: the client's run RPC, the QPM's event push
+    # and the way back as spans and a histogram, so the per-hop view adds
+    # up to the client's end to end. A few spans per job; off in QFw unless
+    # asked for, on here because the dashboards are the point.
+    QFW_TELEMETRY_TRANSPORT: ${QFW_TELEMETRY_TRANSPORT:-1}
     OTEL_METRIC_EXPORT_INTERVAL: ${QFW_TELEMETRY_METRIC_INTERVAL_MS:-5000}
     # Deltas since the last export rather than totals since the process
     # started. A client process that lives for one job then exports exactly
@@ -102,6 +107,12 @@ services:
       # Anyone who can reach the port can look; only admin can change things.
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # Deprecated in Grafana, but still the one way in the open-source build
+      # to let the Viewer role open Explore, where the trace links the Tempo
+      # data source adds to every table lead. Without it an anonymous viewer
+      # who clicks one is sent back to the home dashboard. Viewers still
+      # cannot save anything.
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/qfw/qfw-jobs.json
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
