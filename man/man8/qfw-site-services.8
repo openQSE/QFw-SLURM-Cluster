@@ -118,6 +118,20 @@ and
 .BR QFW_SITE_RUN_ROOT ,
 and is forwarded to every service host, where it selects the DEFw the
 service managers start.
+.PP
+The QFw telemetry variables
+.BR QFW_TELEMETRY ,
+.BR QFW_TELEMETRY_ENDPOINT ,
+.BR QFW_TELEMETRY_SAMPLE ,
+.BR QFW_TELEMETRY_DIR ,
+.BR QFW_TELEMETRY_TRANSPORT ,
+.BR OTEL_METRIC_EXPORT_INTERVAL ,
+.BR OTEL_EXPORTER_OTLP_ENDPOINT
+and
+.BR OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+are forwarded to every service host when set, because ssh does not carry the
+container's environment. The telemetry compose overlay sets them; see
+docker-compose.telemetry.yml.
 .SH FILES
 .TP
 .I /etc/openqse/qfw/site.yaml

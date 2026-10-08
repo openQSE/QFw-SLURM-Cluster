@@ -23,6 +23,12 @@ the tree being built is your own shared-dir/QFw checkout:
   mqt-core source     \${QFW_BASE}/mqt-core
   mqt-cc venv         \${QFW_BASE}/mqt-cc-venv
 
+To build a second checkout under the shared mount into its own prefix, set
+QFW_DEV_SRC, QFW_DEV_BUILD and QFW_DEV_PREFIX (and QFW_DEV_VENV to use another
+venv) to container paths, for example
+QFW_DEV_SRC=/workspace/qfw-container-base/QFw-aws. The default install is
+left as it is.
+
 Activate the result inside a container with:
 
   source \${QFW_PREFIX}/bin/qfw-activate --venv \${QFW_VENV}
@@ -77,6 +83,9 @@ QFW_HOST_BASE="$(sed -n 's/^QFW_CONTAINER_BASE=//p' "${SCRIPT_DIR}/qfw-install.e
 
 echo "Building QFw + DEFw inside ${CONTAINER}"
 
+# The QFW_DEV_* overrides let a second checkout under the shared mount build
+# into its own prefix, beside the default one, so two branches can be under
+# test at once. They are read inside the container, so pass them through.
 docker exec -i \
     -e QFW_VERSION_FALLBACK="${QRMI_VERSION_HOST}" \
     -e QFW_BUILD_JOBS_OVERRIDE="${JOBS}" \
@@ -85,6 +94,10 @@ docker exec -i \
     -e QFW_BUILD_DEFW2="${DEFW2}" \
     -e QFW_HOST_BASE="${QFW_HOST_BASE}" \
     -e QFW_CONTAINER_NAME="${CONTAINER}" \
+    -e QFW_DEV_SRC="${QFW_DEV_SRC:-}" \
+    -e QFW_DEV_VENV="${QFW_DEV_VENV:-}" \
+    -e QFW_DEV_BUILD="${QFW_DEV_BUILD:-}" \
+    -e QFW_DEV_PREFIX="${QFW_DEV_PREFIX:-}" \
     "${CONTAINER}" bash -s <<'REMOTE'
 set -euo pipefail
 
@@ -186,6 +199,12 @@ if [ "${QFW_SKIP_VENV}" != "true" ]; then
     # The QFw driver needs the IQM device library, ID, and prefix. Version 1.4
     # also provides the queue properties used with QDMI 1.3.3.
     uv pip install 'iqm-qdmi>=1.4'
+
+    # The same driver reaches Amazon Braket through MQSC's device library.
+    # 1.2.0 is the last release on QDMI 1.3.3, the QDMI iqm-qdmi 1.4 uses, so
+    # it is pinned; its qiskit and pennylane extras need mqt-core 4, so none
+    # are installed.
+    uv pip install 'amazon-braket-qdmi==1.2.0'
 
     # The QFw driver imports mqt.core.qdmi.driver, available since 3.9.
     uv pip install 'mqt-core==3.9.2'
