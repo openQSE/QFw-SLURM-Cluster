@@ -122,7 +122,9 @@ underscores, units become suffixes, and resource attributes become labels:
 | `qfw.backend.duration` | `qfw_backend_duration_seconds_*` | `qfw_backend_op` (`execute`, `acquire`, `submit`, `collect`), `qfw_stack_api_path`, `qfw_device_name`, `qfw_backend_kind`, `qfw_outcome` |
 
 Every series also carries `service_name` (`qfw-client` or `qfw-qpm`),
-`qfw_component_role` and, from a QPM's resource, `qfw_device_name`.
+`qfw_component_role` and, from a QPM's resource, `qfw_device_name`. The
+OpenTelemetry SDK's own name, language and version are dropped on the way,
+so an install on a different SDK release does not split a device's series.
 
 **One series per service and device, not per process.** A Qiskit client is
 one process per Slurm job: it reports a handful of samples and exits, and
@@ -134,6 +136,22 @@ instance id and accumulates the deltas again
 `otel-collector.yaml`), and the overlay asks QFw processes to export deltas
 in the first place. The result is one counter per client population and one
 per QPM device that behaves like a long-lived process's.
+
+## Feeding the dashboards
+
+QFw's `examples/qfw_job_stream.sh` streams Qiskit jobs through one backend:
+a mix of GHZ and random circuits over a range of qubit counts, at an
+interval, from one or more concurrent workers, for a number of jobs or a
+length of time. From `slurmctld`, against the site fake IQM service:
+
+```bash
+./do_ssh.sh slurmctld
+cd $QFW_SHARE_DIR/examples
+./qfw_job_stream.sh --service-mode site --backend fake-iqm --jobs 0 --duration 600 --interval 2
+```
+
+Every job shows on QFw Jobs as it runs. `--workers 3` makes the queue and
+dispatch hops visible, since the jobs then wait for each other at the QPM.
 
 ## Checking that data flows
 

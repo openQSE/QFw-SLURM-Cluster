@@ -31,6 +31,14 @@ processors:
     attributes:
       - key: service.instance.id
         action: delete
+      # The SDK's own version would otherwise be a label too, and two QFw
+      # installs on different SDK releases would split one device's series.
+      - key: telemetry.sdk.version
+        action: delete
+      - key: telemetry.sdk.name
+        action: delete
+      - key: telemetry.sdk.language
+        action: delete
   deltatocumulative:
     max_stale: 168h
 
