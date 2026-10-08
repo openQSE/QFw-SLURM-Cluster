@@ -1,0 +1,65 @@
+# OpenTelemetry Collector for the QFw telemetry stack.
+#
+# QFw processes send OTLP over HTTP to :4318 (QFW_TELEMETRY=otlp with
+# QFW_TELEMETRY_ENDPOINT=http://otel-collector:4318). Traces go on to Tempo;
+# metrics are exposed on :8889 for Prometheus to scrape. The collector is the
+# storage boundary the benchmarking design describes: QFw emits OTLP and
+# stops here, and anything past this file is a deployment choice.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+    timeout: 1s
+  # A Qiskit client is one process per Slurm job: it reports a handful of
+  # samples and exits, and each process is a new service.instance.id. Left
+  # alone, Prometheus would hold one short series per job, and rate() and
+  # increase() see nothing in a series with a single sample. So metrics are
+  # reduced to deltas (a no-op for processes that already export deltas,
+  # which the overlay asks for), the instance id is dropped, and the deltas
+  # are accumulated again into one series per service and device. Order
+  # matters: deltas are taken while the instance id still tells the series
+  # apart, and merged only after it is gone.
+  cumulativetodelta:
+    initial_value: keep
+  resource/merge-instances:
+    attributes:
+      - key: service.instance.id
+        action: delete
+  deltatocumulative:
+    max_stale: 168h
+
+exporters:
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    # Resource attributes become labels on every series, so a QPM's device
+    # (qfw.device.name on its resource) and service.name are there to group
+    # by. QFw keeps resource attributes dimensional for exactly this reason.
+    resource_to_telemetry_conversion:
+      enabled: true
+    # Keep a series on the scrape page through a quiet spell, so the
+    # dashboards' last-five-minutes panels read zero rather than nothing.
+    metric_expiration: 1h
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_grpc/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [cumulativetodelta, resource/merge-instances, deltatocumulative, batch]
+      exporters: [prometheus]

@@ -1,0 +1,160 @@
+# Compose overlay: the optional telemetry stack, a live view of QFw's own
+# spans and metrics (docs/design/benchmarking.md in openQSE/QFw).
+#
+#   ./do_telemetry.sh up        start it beside the running cluster
+#   ./do_telemetry.sh down      remove it, keeping its data
+#
+# Four stock containers on the cluster network. QFw processes export OTLP over
+# HTTP to otel-collector:4318 (QFW_TELEMETRY=otlp). The collector hands traces
+# to Tempo and exposes metrics for Prometheus to scrape. Grafana reads both,
+# with QFw's dashboards provisioned from telemetry/grafana/dashboards.
+#
+# The overlay also sets the QFw telemetry variables on every cluster container
+# that runs QFw code, so a shell opened with do_ssh.sh, a Slurm job and a
+# service started by qfw-site-services all report. Two things follow:
+#
+#   1. Containers take new environment only when they are created. Start the
+#      cluster with the overlay in COMPOSE_FILE (./do_configure.sh --telemetry
+#      writes that), or recreate it with ./do_restart.sh --force-recreate once
+#      the overlay is in place. ./do_telemetry.sh up alone never recreates a
+#      cluster container; it starts only the four below.
+#   2. ssh does not carry a container's environment, so qfw-site-services
+#      forwards these variables to the service hosts itself (tools/qfw-site-services).
+#
+# Leave the overlay out and nothing in QFw changes: with QFW_TELEMETRY unset
+# every instrumentation site is a boolean test.
+#
+# Ports on the host: Grafana on ${QFW_GRAFANA_PORT:-3000}, on every interface
+# so a second screen can show it. Prometheus 9090, Tempo 3200 and the
+# collector's OTLP 4318 bind to localhost only, for inspection and for a
+# process on the host that wants to report too.
+#
+# Images are pinned. Bump them together after checking the release notes:
+# the collector's config format moves between minor versions.
+
+x-qfw-telemetry: &qfw-telemetry
+  environment:
+    QFW_TELEMETRY: ${QFW_TELEMETRY:-otlp}
+    QFW_TELEMETRY_ENDPOINT: ${QFW_TELEMETRY_ENDPOINT:-http://otel-collector:4318}
+    QFW_TELEMETRY_SAMPLE: ${QFW_TELEMETRY_SAMPLE:-always}
+    OTEL_METRIC_EXPORT_INTERVAL: ${QFW_TELEMETRY_METRIC_INTERVAL_MS:-5000}
+    # Deltas since the last export rather than totals since the process
+    # started. A client process that lives for one job then exports exactly
+    # what it did, and the collector adds it to the running totals.
+    OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: delta
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.162.0
+    container_name: otel-collector
+    hostname: otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./telemetry/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    expose:
+      - "4317"
+      - "4318"
+      - "8889"
+    ports:
+      - "127.0.0.1:4318:4318"
+    networks:
+      - slurm-network
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    container_name: prometheus
+    hostname: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - otel-collector
+    networks:
+      - slurm-network
+
+  tempo:
+    image: grafana/tempo:3.1.0
+    container_name: tempo
+    hostname: tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./telemetry/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "127.0.0.1:3200:3200"
+    networks:
+      - slurm-network
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    container_name: grafana
+    hostname: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${QFW_GRAFANA_ADMIN_PASSWORD:-qfw-demo}
+      # Anyone who can reach the port can look; only admin can change things.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/qfw/qfw-jobs.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards/qfw:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${QFW_GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+      - tempo
+    networks:
+      - slurm-network
+
+  # Every container that runs QFw code reports to the collector.
+  slurmctld:
+    <<: *qfw-telemetry
+  c1:
+    <<: *qfw-telemetry
+  c2:
+    <<: *qfw-telemetry
+  c3:
+    <<: *qfw-telemetry
+  c4:
+    <<: *qfw-telemetry
+  c5:
+    <<: *qfw-telemetry
+  c6:
+    <<: *qfw-telemetry
+  c7:
+    <<: *qfw-telemetry
+  c8:
+    <<: *qfw-telemetry
+  nwqsim-head:
+    <<: *qfw-telemetry
+  nwqsim-worker-1:
+    <<: *qfw-telemetry
+  nwqsim-worker-2:
+    <<: *qfw-telemetry
+  iqm-head:
+    <<: *qfw-telemetry
+  shim-head:
+    <<: *qfw-telemetry
+  ibm-156-nh:
+    <<: *qfw-telemetry
+  aws:
+    <<: *qfw-telemetry
+  fake-iqm-head:
+    <<: *qfw-telemetry
+
+volumes:
+  prometheus_data:
+  tempo_data:
+  grafana_data:

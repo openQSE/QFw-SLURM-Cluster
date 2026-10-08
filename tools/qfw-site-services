@@ -103,6 +103,18 @@ quote_command() {
 	printf '\n'
 }
 
+# The QFw telemetry variables set in this environment, forwarded to the
+# service hosts. ssh does not carry the container's environment and
+# qfw-activate does not set these, so without forwarding them the service
+# plane would run with telemetry off while everything else on the cluster
+# reports. See docker-compose.telemetry.yml in the cluster repository.
+QFW_FORWARDED_VARIABLES=(
+	QFW_TELEMETRY QFW_TELEMETRY_ENDPOINT QFW_TELEMETRY_SAMPLE
+	QFW_TELEMETRY_DIR QFW_TELEMETRY_TRANSPORT
+	OTEL_METRIC_EXPORT_INTERVAL OTEL_EXPORTER_OTLP_ENDPOINT
+	OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+)
+
 run_qfw() {
 	local node="$1"
 	shift
@@ -111,6 +123,16 @@ run_qfw() {
 		quote_command "$@"
 		return 0
 	fi
+
+	# The forwarded assignments go over as words of their own, preceded by
+	# how many there are, and quote_command below quotes them with the rest.
+	local -a forwarded=()
+	local name
+	for name in "${QFW_FORWARDED_VARIABLES[@]}"; do
+		if [[ -n "${!name:-}" ]]; then
+			forwarded+=("${name}=${!name}")
+		fi
+	done
 
 	# ssh hands the remote shell one command line, so each argument is
 	# quoted for it. Unquoted, an empty argument vanishes and every one
@@ -123,6 +145,8 @@ run_qfw() {
 			"${QFW_SITE_CONFIG}" \
 			"${QFW_SIMULATOR_NODES}" \
 			"${QFW_DEFW_VERSION}" \
+			"${#forwarded[@]}" \
+			"${forwarded[@]}" \
 			"$@")" <<'EOF'
 set -uo pipefail
 
@@ -132,7 +156,8 @@ qfw_shared_root="$3"
 qfw_site_config="$4"
 qfw_simulator_nodes="$5"
 qfw_defw_version="$6"
-shift 6
+qfw_forwarded_count="$7"
+shift 7
 
 export QFW_SHARED_ROOT="${qfw_shared_root}"
 export QFW_SITE_CONFIG="${qfw_site_config}"
@@ -140,6 +165,11 @@ export QFW_SIMULATOR_NODES="${qfw_simulator_nodes}"
 if [[ -n "${qfw_defw_version}" ]]; then
 	export QFW_DEFW_VERSION="${qfw_defw_version}"
 fi
+while (( qfw_forwarded_count > 0 )); do
+	export "$1"
+	shift
+	qfw_forwarded_count=$((qfw_forwarded_count - 1))
+done
 
 source "${qfw_prefix}/bin/qfw-activate" --venv "${qfw_venv}"
 "$@"
