@@ -102,6 +102,12 @@ services:
       # Anyone who can reach the port can look; only admin can change things.
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # Deprecated in Grafana, but still the one way in the open-source build
+      # to let the Viewer role open Explore, where the trace links the Tempo
+      # data source adds to every table lead. Without it an anonymous viewer
+      # who clicks one is sent back to the home dashboard. Viewers still
+      # cannot save anything.
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/qfw/qfw-jobs.json
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"

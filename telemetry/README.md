@@ -105,9 +105,17 @@ on whatever the trace sampling:
 - the latest job traces, as a list to open.
 
 **QFw Traces** (`/d/qfw-traces`) is trace search over Tempo: recent jobs, the
-slowest provider interactions, and failed or cancelled jobs. Open one for the
-waterfall of a single job: `qfw.app.job` from the client, `qfw.qpm.receive`
-in the QPM across the DEFw RPC, then queue, dispatch and the provider call.
+slowest provider interactions, and failed or cancelled jobs.
+
+**QFw Trace** (`/d/qfw-trace?var-traceId=<id>`) is one job as a waterfall:
+`qfw.app.job` from the client, `qfw.qpm.receive` in the QPM across the DEFw
+RPC, then queue, dispatch and the provider call. A trace ID in any of the
+tables above opens a small menu: **Open the trace** comes here, with the time
+range and links back; **Trace: <id>**, which the Tempo data source adds on
+its own, opens the same trace in Explore. Explore is closed to the Viewer
+role unless `viewers_can_edit` is on, which the overlay sets
+(`GF_USERS_VIEWERS_CAN_EDIT`); without it an anonymous viewer who follows
+that link is sent back to the home dashboard without a word.
 
 ## Metric names
 

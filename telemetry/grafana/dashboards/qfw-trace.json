@@ -1,0 +1,99 @@
+{
+  "uid": "qfw-trace",
+  "title": "QFw Trace",
+  "tags": [
+    "qfw"
+  ],
+  "editable": false,
+  "graphTooltip": 0,
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "links": [
+    {
+      "title": "QFw Jobs",
+      "type": "link",
+      "url": "/d/qfw-jobs",
+      "icon": "external link",
+      "tooltip": "Back to the metrics",
+      "keepTime": true
+    },
+    {
+      "title": "QFw Traces",
+      "type": "link",
+      "url": "/d/qfw-traces",
+      "icon": "external link",
+      "tooltip": "Back to the trace tables",
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "traceId",
+        "label": "Trace ID",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "description": "The trace to show. Filled in by the trace links on QFw Jobs and QFw Traces."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "One QFw job as a waterfall: the client's `qfw.app.job` span, the QPM's receive, queue, transpile and dispatch, and the backend call. Open this page from a trace link on QFw Jobs or QFw Traces, or type a trace ID above."
+      }
+    },
+    {
+      "type": "traces",
+      "title": "Trace ${traceId}",
+      "datasource": {
+        "type": "tempo",
+        "uid": "qfw-tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 24,
+        "h": 26
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "qfw-tempo"
+          },
+          "queryType": "traceql",
+          "query": "${traceId}",
+          "limit": 20,
+          "tableType": "traces",
+          "refId": "A"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ]
+}
