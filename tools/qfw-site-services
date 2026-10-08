@@ -69,6 +69,36 @@ quote_command() {
 	printf '\n'
 }
 
+# The QFw telemetry variables set in this environment, forwarded to the
+# service hosts. ssh does not carry the container's environment and
+# qfw-activate does not set these, so without forwarding them the service
+# plane would run with telemetry off while everything else on the cluster
+# reports. See docker-compose.telemetry.yml in the cluster repository.
+#
+# ssh joins its arguments into one command line that the remote shell parses
+# again, so each assignment goes over as its own shell-quoted word, preceded
+# by how many there are.
+QFW_FORWARDED_VARIABLES=(
+	QFW_TELEMETRY QFW_TELEMETRY_ENDPOINT QFW_TELEMETRY_SAMPLE
+	QFW_TELEMETRY_DIR QFW_TELEMETRY_TRANSPORT
+	OTEL_METRIC_EXPORT_INTERVAL OTEL_EXPORTER_OTLP_ENDPOINT
+	OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+)
+
+forwarded_env_args() {
+	local -a assignments=()
+	local name
+	for name in "${QFW_FORWARDED_VARIABLES[@]}"; do
+		if [[ -n "${!name:-}" ]]; then
+			assignments+=("${name}=${!name}")
+		fi
+	done
+	printf '%s\n' "${#assignments[@]}"
+	if (( ${#assignments[@]} > 0 )); then
+		printf '%q\n' "${assignments[@]}"
+	fi
+}
+
 run_qfw() {
 	local node="$1"
 	shift
@@ -78,6 +108,12 @@ run_qfw() {
 		return 0
 	fi
 
+	local -a forwarded=()
+	local word
+	while IFS= read -r word; do
+		forwarded+=("${word}")
+	done < <(forwarded_env_args)
+
 	ssh -o BatchMode=yes -o ConnectTimeout=10 "root@${node}" \
 		/bin/bash -s -- \
 		"${QFW_INSTALL_PREFIX}" \
@@ -85,6 +121,7 @@ run_qfw() {
 		"${QFW_SHARED_ROOT}" \
 		"${QFW_SITE_CONFIG}" \
 		"${QFW_SIMULATOR_NODES}" \
+		"${forwarded[@]}" \
 		"$@" <<'EOF'
 set -uo pipefail
 
@@ -93,11 +130,17 @@ qfw_venv="$2"
 qfw_shared_root="$3"
 qfw_site_config="$4"
 qfw_simulator_nodes="$5"
-shift 5
+qfw_forwarded_count="$6"
+shift 6
 
 export QFW_SHARED_ROOT="${qfw_shared_root}"
 export QFW_SITE_CONFIG="${qfw_site_config}"
 export QFW_SIMULATOR_NODES="${qfw_simulator_nodes}"
+while (( qfw_forwarded_count > 0 )); do
+	export "$1"
+	shift
+	qfw_forwarded_count=$((qfw_forwarded_count - 1))
+done
 
 source "${qfw_prefix}/bin/qfw-activate" --venv "${qfw_venv}"
 "$@"
