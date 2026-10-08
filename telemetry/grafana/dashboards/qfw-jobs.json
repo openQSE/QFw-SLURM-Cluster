@@ -553,7 +553,7 @@
             "type": "prometheus",
             "uid": "qfw-prometheus"
           },
-          "expr": "sum by (qfw_component_role) (rate(qfw_app_job_duration_seconds_sum{qfw_device_name=~\"$device\"}[5m])) / sum by (qfw_component_role) (rate(qfw_app_job_duration_seconds_count{qfw_device_name=~\"$device\"}[5m]))",
+          "expr": "sum(rate(qfw_app_job_duration_seconds_sum{qfw_device_name=~\"$device\"}[5m])) / sum(rate(qfw_app_job_duration_seconds_count{qfw_device_name=~\"$device\"}[5m]))",
           "legendFormat": "end to end (client)",
           "refId": "A",
           "range": false,
