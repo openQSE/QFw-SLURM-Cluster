@@ -1,0 +1,27 @@
+# Grafana data sources for the QFw telemetry stack. Provisioned, so a fresh
+# Grafana volume comes up wired without anyone clicking through the UI.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: qfw-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 5s
+      httpMethod: POST
+
+  - name: Tempo
+    uid: qfw-tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      nodeGraph:
+        enabled: false
+      tracesToMetrics:
+        datasourceUid: qfw-prometheus

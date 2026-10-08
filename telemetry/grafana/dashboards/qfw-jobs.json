@@ -1,0 +1,870 @@
+{
+  "id": null,
+  "uid": "qfw-jobs",
+  "title": "QFw Jobs",
+  "description": "QFw's job path as the clients and QPMs report it: throughput, end to end latency and where the time goes, per hop. Source: docs/design/benchmarking.md in openQSE/QFw.",
+  "tags": [
+    "qfw"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "templating": {
+    "variables": [],
+    "list": [
+      {
+        "name": "device",
+        "label": "Device",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "qfw-prometheus"
+        },
+        "query": {
+          "query": "label_values(qfw_app_job_count_total, qfw_device_name)",
+          "refId": "devices"
+        },
+        "definition": "label_values(qfw_app_job_count_total, qfw_device_name)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1,
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Jobs completed, last 5 min",
+      "description": "Qiskit jobs that returned a result (qfw.app.job.count, outcome completed).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "(sum(increase(qfw_app_job_count_total{qfw_outcome=\"completed\", qfw_device_name=~\"$device\"}[5m]))) or vector(0)",
+          "legendFormat": "",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Jobs failed, last 5 min",
+      "description": "Jobs that ended failed or cancelled.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "(sum(increase(qfw_app_job_count_total{qfw_outcome!=\"completed\", qfw_device_name=~\"$device\"}[5m]))) or vector(0)",
+          "legendFormat": "",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Jobs per minute",
+      "description": "Throughput seen by the clients.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "(sum(rate(qfw_app_job_count_total{qfw_device_name=~\"$device\"}[1m])) * 60) or vector(0)",
+          "legendFormat": "",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "End to end p50, 5 min",
+      "description": "Median time from submit() to result() in the Qiskit client.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(qfw_app_job_duration_seconds_bucket{qfw_device_name=~\"$device\"}[5m])))",
+          "legendFormat": "",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "purple"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "End to end p95, 5 min",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(qfw_app_job_duration_seconds_bucket{qfw_device_name=~\"$device\"}[5m])))",
+          "legendFormat": "",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Devices reporting",
+      "description": "Distinct qfw.device.name values seen on the job counter.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "(count(count by (qfw_device_name) (qfw_app_job_count_total))) or vector(0)",
+          "legendFormat": "",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Jobs per minute, by device",
+      "description": "qfw.app.job.count per device.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "sum by (qfw_device_name) (rate(qfw_app_job_count_total{qfw_device_name=~\"$device\"}[1m])) * 60",
+          "legendFormat": "{{qfw_device_name}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 60,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "End to end latency, by device",
+      "description": "qfw.app.job.duration quantiles over a five minute window.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le, qfw_device_name) (rate(qfw_app_job_duration_seconds_bucket{qfw_device_name=~\"$device\"}[5m])))",
+          "legendFormat": "{{qfw_device_name}} p50",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, qfw_device_name) (rate(qfw_app_job_duration_seconds_bucket{qfw_device_name=~\"$device\"}[5m])))",
+          "legendFormat": "{{qfw_device_name}} p95",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "drawStyle": "line",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "heatmap",
+      "title": "End to end latency distribution",
+      "description": "The qfw.app.job.duration histogram as it fills in.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "sum by (le) (increase(qfw_app_job_duration_seconds_bucket{qfw_device_name=~\"$device\"}[$__rate_interval]))",
+          "legendFormat": "",
+          "refId": "A",
+          "range": true,
+          "format": "heatmap"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "yAxis": {
+          "unit": "s",
+          "decimals": 2
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "cellGap": 1,
+        "legend": {
+          "show": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "yHistogram": false
+        }
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Where the time goes: mean per hop, 5 min",
+      "description": "Mean duration of each instrumented hop (qfw.qpm.duration by op, qfw.backend.duration by op) against the client's end to end mean. The always-on metrics tier, so this stays live with traces sampled off.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "sum by (qfw_component_role) (rate(qfw_app_job_duration_seconds_sum{qfw_device_name=~\"$device\"}[5m])) / sum by (qfw_component_role) (rate(qfw_app_job_duration_seconds_count{qfw_device_name=~\"$device\"}[5m]))",
+          "legendFormat": "end to end (client)",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "sum by (qfw_qpm_op) (rate(qfw_qpm_duration_seconds_sum{qfw_device_name=~\"$device\"}[5m])) / sum by (qfw_qpm_op) (rate(qfw_qpm_duration_seconds_count{qfw_device_name=~\"$device\"}[5m]))",
+          "legendFormat": "QPM {{qfw_qpm_op}}",
+          "refId": "B",
+          "range": false,
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "sum by (qfw_backend_op) (rate(qfw_backend_duration_seconds_sum{qfw_device_name=~\"$device\"}[5m])) / sum by (qfw_backend_op) (rate(qfw_backend_duration_seconds_count{qfw_device_name=~\"$device\"}[5m]))",
+          "legendFormat": "backend {{qfw_backend_op}}",
+          "refId": "C",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "decimals": 4,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Backend execute p50, by device and API path",
+      "description": "qfw.backend.execute: the run queue's whole provider interaction, labelled native, qrmi, qdmi or simulator.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le, qfw_device_name, qfw_stack_api_path) (rate(qfw_backend_duration_seconds_bucket{qfw_backend_op=\"execute\", qfw_device_name=~\"$device\"}[5m])))",
+          "legendFormat": "{{qfw_device_name}} via {{qfw_stack_api_path}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "drawStyle": "line",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "QPM stages, mean per job",
+      "description": "receive, queue, dispatch and transpile, from qfw.qpm.duration.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qfw-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "expr": "sum by (qfw_qpm_op) (rate(qfw_qpm_duration_seconds_sum{qfw_device_name=~\"$device\"}[1m])) / sum by (qfw_qpm_op) (rate(qfw_qpm_duration_seconds_count{qfw_device_name=~\"$device\"}[1m]))",
+          "legendFormat": "{{qfw_qpm_op}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 40,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "drawStyle": "line",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent jobs",
+      "description": "The latest qfw.app.job traces from Tempo. Open one to see the job's path through the QPM to the device.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "qfw-tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "qfw-tempo"
+          },
+          "queryType": "traceql",
+          "query": "{ name = \"qfw.app.job\" }",
+          "limit": 20,
+          "tableType": "traces",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "traceDuration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "displayName",
+                "value": "Duration"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "startTime"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Start time"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "traceService"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Service"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "traceName"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Root span"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "traceID"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Trace"
+              },
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "nested"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Start time",
+            "desc": true
+          }
+        ]
+      }
+    }
+  ],
+  "links": [
+    {
+      "title": "QFw Traces",
+      "type": "link",
+      "url": "/d/qfw-traces",
+      "icon": "external link",
+      "tooltip": "Browse traces"
+    }
+  ]
+}

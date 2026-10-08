@@ -24,6 +24,7 @@ SLURM SPANK plugin) and [QDMI] (via IQM's `iqm-qdmi` reference implementation).
 - [Operational Recipes](docs/recipes/README.md)
 - [Build And Run QFw](#build-and-run-qfw)
 - [Running Against The IQM QPU](IQM-ACCESS.md) — credentials, remote access, hardware smoke tests
+- [Telemetry Dashboard (Optional)](#telemetry-dashboard-optional)
 - [Design Overview](#design-overview)
 - [Detailed Reference](#detailed-reference)
 - [Troubleshooting](#troubleshooting)
@@ -190,6 +191,32 @@ image:
 </details>
 
 To validate the QRMI/QDMI shim (local routing/normalization and device introspection on IQM hardware) or run the `mqt-cc` smoke test, see [TESTING.md](TESTING.md).
+
+## Telemetry Dashboard (Optional)
+
+QFw's job path emits OpenTelemetry spans and metrics (see
+`docs/design/benchmarking.md` in [QFw]). `docker-compose.telemetry.yml` adds
+the stack that shows them live: an OpenTelemetry Collector, Prometheus, Tempo
+and Grafana, with QFw's dashboards provisioned. On a running cluster:
+
+```bash
+./do_telemetry.sh up
+```
+
+and open Grafana at `http://localhost:3000/`. The cluster's containers only
+report once they carry the QFw telemetry variables, which the overlay sets
+when they are created, so for a deployment that should report from the first
+job configure it in before starting:
+
+```bash
+./do_configure.sh --telemetry ...
+./do_startup.sh
+```
+
+Everything about the stack, what reports and how, the dashboards, the
+Prometheus metric names and troubleshooting is in
+[telemetry/README.md](telemetry/README.md). Without the overlay nothing in
+QFw changes.
 
 ## Build And Run [QFw]
 

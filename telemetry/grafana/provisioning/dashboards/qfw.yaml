@@ -1,0 +1,15 @@
+# QFw's dashboards, loaded from the JSON files mounted beside this provider.
+# Edit the files, not the UI: Grafana re-reads them every ten seconds, and a
+# change made in the UI is lost when the file is next read.
+apiVersion: 1
+
+providers:
+  - name: QFw
+    folder: QFw
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards/qfw
+      foldersFromFilesStructure: false

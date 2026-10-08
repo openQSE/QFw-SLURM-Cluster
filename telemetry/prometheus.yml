@@ -1,0 +1,22 @@
+# Prometheus for the QFw telemetry stack. It scrapes the collector, which
+# turns QFw's OTLP histograms and counters into Prometheus series:
+#
+#   qfw.app.job.duration  (s)  -> qfw_app_job_duration_seconds_{bucket,sum,count}
+#   qfw.app.job.count          -> qfw_app_job_count_total
+#   qfw.qpm.duration      (s)  -> qfw_qpm_duration_seconds_*
+#   qfw.backend.duration  (s)  -> qfw_backend_duration_seconds_*
+#
+# with the attributes as labels, dots replaced by underscores
+# (qfw.qpm.op -> qfw_qpm_op), and the resource attributes beside them
+# (service_name, qfw_device_name, qfw_component_role).
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: qfw
+    static_configs:
+      - targets: ["otel-collector:8889"]
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
