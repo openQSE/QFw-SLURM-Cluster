@@ -928,6 +928,7 @@
       return {
         health: state.health,
         observed_at: state.observed_at,
+        telemetry: telemetryLink(docker),
         sources: Object.values(state.sources || {}).map((source) => ({
           name: source.name,
           status: source.status,
@@ -980,10 +981,36 @@
     return {};
   }
 
+  function telemetryLink(docker) {
+    // The telemetry stack is optional and runs beside the cluster. When its
+    // Grafana container is up, the health widget links to it on the port it
+    // publishes, at the host this page was loaded from.
+    const grafana = (docker.records || []).find((item) =>
+      item.kind === "container" &&
+      (item.service === "grafana" || item.name === "grafana") &&
+      String(item.state || "").toLowerCase() === "running");
+    if (!grafana) return null;
+    const port = (grafana.ports || [])[0] || 3000;
+    return {
+      url: `${window.location.protocol}//${window.location.hostname}:${port}/`,
+      label: "Grafana: QFw jobs, traces and where the time goes",
+    };
+  }
+
   function renderHealth(payload) {
     const root = element("div", "qfw-health");
     root.append(element("strong", `qfw-state qfw-${payload.health}`, payload.health));
     root.append(element("span", "qfw-freshness", payload.observed_at || "not observed"));
+    if (payload.telemetry) {
+      const line = element("span", "qfw-telemetry-link", "Telemetry: ");
+      const anchor = document.createElement("a");
+      anchor.href = payload.telemetry.url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener";
+      anchor.textContent = payload.telemetry.label;
+      line.append(anchor);
+      root.append(line);
+    }
     root.append(table(payload.sources || [], [
       ["name", "Source"], ["status", "State"], ["observed_at", "Observed"],
     ]));

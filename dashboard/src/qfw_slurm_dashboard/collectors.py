@@ -53,10 +53,27 @@ def docker_status(runner: CommandRunner) -> SourceState:
         "state": item.get("State", ""),
         "status": item.get("Status", ""),
         "health": item.get("Health", ""),
+        "ports": _published_ports(item),
     } for item in raw_records]
     running = all(str(item.get("state", "")).lower() == "running" for item in records)
     status = "ready" if records and running else "stopped" if not records else "degraded"
     return SourceState("docker", status, utc_now(), records)
+
+
+def _published_ports(item: dict[str, Any]) -> list[int]:
+    """The host ports a container publishes, so the browser can reach a
+    service beside the cluster, such as Grafana, without any configuration."""
+    ports: list[int] = []
+    for publisher in item.get("Publishers") or []:
+        if not isinstance(publisher, dict):
+            continue
+        try:
+            port = int(publisher.get("PublishedPort") or 0)
+        except (TypeError, ValueError):
+            continue
+        if port > 0 and port not in ports:
+            ports.append(port)
+    return ports
 
 
 def _pipe_records(result: CommandResult, fields: tuple[str, ...]) -> list[dict[str, str]]:
