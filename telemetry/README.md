@@ -63,6 +63,7 @@ The overlay sets these on every container that runs QFw code:
 | `QFW_TELEMETRY` | `otlp` | The deployment profile: ship to a collector |
 | `QFW_TELEMETRY_ENDPOINT` | `http://otel-collector:4318` | The collector's OTLP/HTTP base URL |
 | `QFW_TELEMETRY_SAMPLE` | `always` (`QFW_TELEMETRY_SAMPLE` overrides) | Trace sampling. `always` for a demo or a benchmark; a ratio or `off` for production, where the metrics stay on regardless |
+| `QFW_TELEMETRY_TRANSPORT` | `1` (`QFW_TELEMETRY_TRANSPORT` overrides) | The transport extension: spans and a histogram for the client's run RPC, the QPM's completion-event push and the way back. Off in QFw by default; on here so the per-hop view adds up to the end to end |
 | `OTEL_METRIC_EXPORT_INTERVAL` | `5000` (`QFW_TELEMETRY_METRIC_INTERVAL_MS` overrides) | Milliseconds between metric exports |
 | `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `delta` | Each export carries what happened since the last one, not totals since the process started. See the note on short-lived clients below |
 
@@ -98,16 +99,27 @@ on whatever the trace sampling:
 - jobs per minute by device, and end to end latency p50/p95 by device;
 - the end to end latency distribution as a heatmap, and **where the time
   goes**, the mean of every instrumented hop (QPM receive, queue, dispatch and
-  transpile; backend acquire, submit, collect and the whole execute) against
-  the client's end to end mean;
+  transpile; backend acquire, submit, collect and the whole execute; the
+  transport legs in, out and back) against the client's end to end mean. On
+  a fast job the transport rows are most of it: the QPM's own stages are a
+  few milliseconds of a 27 ms fake-IQM job, and the rest is the run RPC in
+  and the completion event back;
 - backend execute p50 by device and API path (`native`, `qrmi`, `qdmi`,
   `simulator`), and the QPM stages per job;
 - the latest job traces, as a list to open.
 
 **QFw Traces** (`/d/qfw-traces`) is trace search over Tempo: recent jobs, the
-slowest provider interactions, and failed or cancelled jobs. Open one for the
-waterfall of a single job: `qfw.app.job` from the client, `qfw.qpm.receive`
-in the QPM across the DEFw RPC, then queue, dispatch and the provider call.
+slowest provider interactions, and failed or cancelled jobs.
+
+**QFw Trace** (`/d/qfw-trace?var-traceId=<id>`) is one job as a waterfall:
+`qfw.app.job` from the client, `qfw.qpm.receive` in the QPM across the DEFw
+RPC, then queue, dispatch and the provider call. A trace ID in any of the
+tables above opens a small menu: **Open the trace** comes here, with the time
+range and links back; **Trace: <id>**, which the Tempo data source adds on
+its own, opens the same trace in Explore. Explore is closed to the Viewer
+role unless `viewers_can_edit` is on, which the overlay sets
+(`GF_USERS_VIEWERS_CAN_EDIT`); without it an anonymous viewer who follows
+that link is sent back to the home dashboard without a word.
 
 ## Metric names
 
@@ -120,6 +132,7 @@ underscores, units become suffixes, and resource attributes become labels:
 | `qfw.app.job.count` | `qfw_app_job_count_total` | same |
 | `qfw.qpm.duration` | `qfw_qpm_duration_seconds_*` | `qfw_qpm_op` (`receive`, `queue`, `dispatch`, `transpile`), `qfw_qpm_request` on receive |
 | `qfw.backend.duration` | `qfw_backend_duration_seconds_*` | `qfw_backend_op` (`execute`, `acquire`, `submit`, `collect`), `qfw_stack_api_path`, `qfw_device_name`, `qfw_backend_kind`, `qfw_outcome` |
+| `qfw.transport.duration` | `qfw_transport_duration_seconds_*` | `qfw_transport_op` (`submit`, `event`, `return`), `qfw_device_name`, `qfw_backend_kind`; only with `QFW_TELEMETRY_TRANSPORT` on |
 
 Every series also carries `service_name` (`qfw-client` or `qfw-qpm`),
 `qfw_component_role` and, from a QPM's resource, `qfw_device_name`. The
