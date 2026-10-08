@@ -122,7 +122,9 @@ underscores, units become suffixes, and resource attributes become labels:
 | `qfw.backend.duration` | `qfw_backend_duration_seconds_*` | `qfw_backend_op` (`execute`, `acquire`, `submit`, `collect`), `qfw_stack_api_path`, `qfw_device_name`, `qfw_backend_kind`, `qfw_outcome` |
 
 Every series also carries `service_name` (`qfw-client` or `qfw-qpm`),
-`qfw_component_role` and, from a QPM's resource, `qfw_device_name`.
+`qfw_component_role` and, from a QPM's resource, `qfw_device_name`. The
+OpenTelemetry SDK's own name, language and version are dropped on the way,
+so an install on a different SDK release does not split a device's series.
 
 **One series per service and device, not per process.** A Qiskit client is
 one process per Slurm job: it reports a handful of samples and exits, and
@@ -134,6 +136,34 @@ instance id and accumulates the deltas again
 `otel-collector.yaml`), and the overlay asks QFw processes to export deltas
 in the first place. The result is one counter per client population and one
 per QPM device that behaves like a long-lived process's.
+
+## Feeding the dashboards
+
+QFw's `examples/qfw_job_stream.sh` streams Qiskit jobs through one backend:
+a mix of GHZ and random circuits over a range of qubit counts, at an
+interval, from one or more concurrent workers, for a number of jobs or a
+length of time. From `slurmctld`, against the site fake IQM service:
+
+```bash
+./do_ssh.sh slurmctld
+cd $QFW_SHARE_DIR/examples
+./qfw_job_stream.sh --service-mode site --backend fake-iqm --jobs 0 --duration 600 --interval 2
+```
+
+Every job shows on QFw Jobs as it runs. `--workers 3` makes the queue and
+dispatch hops visible, since the jobs then wait for each other at the QPM.
+
+## Measuring what the telemetry costs
+
+`telemetry/overhead-budget.sh` runs the same 300-job stream through the site
+fake IQM service with telemetry off, with metrics only, and with traces on,
+three times each interleaved, restarting the QPM into each state, and prints
+the per-job p50 latency and the client's and the QPM's CPU for each. The
+numbers from 2026-10-08 are the budget in QFw's
+`docs/design/benchmarking.md`; run it again after a change to the
+instrumentation and compare. It needs a QFw with the job stream example at
+`QFW_PREFIX` (QFw#117 or later), the site services up, and about six
+minutes.
 
 ## Checking that data flows
 
@@ -165,8 +195,40 @@ The first lists the four metric families; the second returns the job's trace.
 - Grafana's port is `QFW_GRAFANA_PORT` (default 3000). The home dashboard is
   QFw Jobs; a second screen can show it from any machine that reaches the
   host.
-- Take a dashboard snapshot (Share, Snapshot) after a rehearsal, as the
-  fallback if the live stack misbehaves on the day.
+- Take the fallback after a rehearsal, below, in case the live stack
+  misbehaves on the day.
+
+## The fallback
+
+`telemetry/fallback.sh` freezes a good window of both dashboards in two
+layers, so a demonstration has something to show whatever fails:
+
+```bash
+./telemetry/fallback.sh --from now-30m --to now        # after a rehearsal
+./telemetry/fallback.sh --from 2026-11-17T16:00:00 --to 2026-11-17T17:00:00
+```
+
+- **Grafana local snapshots** of QFw Jobs and QFw Traces, with the panel
+  data embedded, made through Grafana's API the way Share, Snapshot does in
+  the UI. They render inside Grafana without Prometheus, Tempo or live jobs,
+  the panels still answer to hover, and they live in Grafana's own volume.
+  The script prints their links and keeps them in `snapshots.json`; they are
+  also listed under Dashboards, Snapshots.
+- **Screenshots** of both dashboards by headless Chrome, and an `index.html`
+  that shows them with the snapshot links. That page needs nothing running.
+
+The output goes to `<QFW_CONTAINER_BASE>/qfw-fallback-<timestamp>` unless
+`--out` says otherwise. Chrome or Chromium is found on `PATH` or in
+`/Applications`; `QFW_CHROME` names another binary. Without one the script
+makes the snapshots and the page without images.
+
+A third layer costs nothing: Prometheus keeps 15 days and Tempo 14, so any
+dashboard opened with an absolute time range over a rehearsal shows it, as
+long as the stack is up.
+
+At the booth: if jobs stop or a QPM is unreachable, open a snapshot link,
+or set the time range to the rehearsal; if Grafana itself is down, open
+`index.html` from the fallback directory.
 
 ## Troubleshooting
 
