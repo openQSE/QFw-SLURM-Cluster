@@ -153,6 +153,18 @@ cd $QFW_SHARE_DIR/examples
 Every job shows on QFw Jobs as it runs. `--workers 3` makes the queue and
 dispatch hops visible, since the jobs then wait for each other at the QPM.
 
+## Measuring what the telemetry costs
+
+`telemetry/overhead-budget.sh` runs the same 300-job stream through the site
+fake IQM service with telemetry off, with metrics only, and with traces on,
+three times each interleaved, restarting the QPM into each state, and prints
+the per-job p50 latency and the client's and the QPM's CPU for each. The
+numbers from 2026-10-08 are the budget in QFw's
+`docs/design/benchmarking.md`; run it again after a change to the
+instrumentation and compare. It needs a QFw with the job stream example at
+`QFW_PREFIX` (QFw#117 or later), the site services up, and about six
+minutes.
+
 ## Checking that data flows
 
 From `slurmctld`, with the stack up and the variables exported, run any
