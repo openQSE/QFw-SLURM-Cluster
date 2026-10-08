@@ -536,7 +536,7 @@
     {
       "type": "bargauge",
       "title": "Where the time goes: mean per hop, 5 min",
-      "description": "Mean duration of each instrumented hop (qfw.qpm.duration by op, qfw.backend.duration by op) against the client's end to end mean. The always-on metrics tier, so this stays live with traces sampled off.",
+      "description": "Mean duration of each instrumented hop (qfw.qpm.duration by op, qfw.backend.duration by op) against the client's end to end mean. The always-on metrics tier, so this stays live with traces sampled off. The transport rows are the two legs between the client and the QPM and the way back; with them the hops add up to the client's end to end. They appear when QFW_TELEMETRY_TRANSPORT is on.",
       "datasource": {
         "type": "prometheus",
         "uid": "qfw-prometheus"
@@ -580,6 +580,17 @@
           "refId": "C",
           "range": false,
           "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "range": false,
+          "instant": true,
+          "refId": "D",
+          "legendFormat": "transport {{qfw_transport_op}}",
+          "expr": "sum by (qfw_transport_op) (rate(qfw_transport_duration_seconds_sum{qfw_device_name=~\"$device\"}[5m])) / sum by (qfw_transport_op) (rate(qfw_transport_duration_seconds_count{qfw_device_name=~\"$device\"}[5m]))"
         }
       ],
       "fieldConfig": {
