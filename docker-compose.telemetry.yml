@@ -42,6 +42,12 @@ x-qfw-telemetry: &qfw-telemetry
     # up to the client's end to end. A few spans per job; off in QFw unless
     # asked for, on here because the dashboards are the point.
     QFW_TELEMETRY_TRANSPORT: ${QFW_TELEMETRY_TRANSPORT:-1}
+    # The logs tier: what QFw's processes log, stitched to the job's trace
+    # and kept in Loki. QFw writes a job's story at debug, so "debug" is
+    # the tier that puts lines under the waterfall; DEFw's transport
+    # internals come only with "all", and "error" is the production
+    # setting. Whatever a process logs at the chosen level leaves it.
+    QFW_TELEMETRY_LOGS: ${QFW_TELEMETRY_LOGS:-debug}
     OTEL_METRIC_EXPORT_INTERVAL: ${QFW_TELEMETRY_METRIC_INTERVAL_MS:-5000}
     # Deltas since the last export rather than totals since the process
     # started. A client process that lives for one job then exports exactly
@@ -97,6 +103,19 @@ services:
     networks:
       - slurm-network
 
+  loki:
+    image: grafana/loki:3.7.8
+    container_name: loki
+    hostname: loki
+    command: ["-config.file=/etc/loki.yaml"]
+    volumes:
+      - ./telemetry/loki.yaml:/etc/loki.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks:
+      - slurm-network
+
   grafana:
     image: grafana/grafana:13.2.3
     container_name: grafana
@@ -126,6 +145,7 @@ services:
     depends_on:
       - prometheus
       - tempo
+      - loki
     networks:
       - slurm-network
 
@@ -168,4 +188,5 @@ services:
 volumes:
   prometheus_data:
   tempo_data:
+  loki_data:
   grafana_data:
