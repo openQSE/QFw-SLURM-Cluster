@@ -928,6 +928,7 @@
       return {
         health: state.health,
         observed_at: state.observed_at,
+        telemetry: telemetryLink(docker),
         sources: Object.values(state.sources || {}).map((source) => ({
           name: source.name,
           status: source.status,
@@ -980,10 +981,45 @@
     return {};
   }
 
+  function telemetryLink(docker) {
+    // The telemetry stack is optional and runs beside the cluster. When its
+    // Grafana container is up, the health widget links to it on the port it
+    // publishes, at the host this page was loaded from.
+    const grafana = (docker.records || []).find((item) =>
+      item.kind === "container" &&
+      (item.service === "grafana" || item.name === "grafana") &&
+      String(item.state || "").toLowerCase() === "running");
+    if (!grafana) return null;
+    const port = (grafana.ports || [])[0] || 3000;
+    return {
+      url: `${window.location.protocol}//${window.location.hostname}:${port}/`,
+      label: "Grafana: QFw jobs, traces and where the time goes",
+    };
+  }
+
+  function syncTelemetryAnchor(anchor) {
+    const telemetry = telemetryLink(selectedSource("docker"));
+    anchor.hidden = !telemetry;
+    if (telemetry) {
+      anchor.href = telemetry.url;
+      anchor.title = telemetry.label;
+    }
+  }
+
   function renderHealth(payload) {
     const root = element("div", "qfw-health");
     root.append(element("strong", `qfw-state qfw-${payload.health}`, payload.health));
     root.append(element("span", "qfw-freshness", payload.observed_at || "not observed"));
+    if (payload.telemetry) {
+      const line = element("span", "qfw-telemetry-link", "Telemetry: ");
+      const anchor = document.createElement("a");
+      anchor.href = payload.telemetry.url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener";
+      anchor.textContent = payload.telemetry.label;
+      line.append(anchor);
+      root.append(line);
+    }
     root.append(table(payload.sources || [], [
       ["name", "Source"], ["status", "State"], ["observed_at", "Observed"],
     ]));
@@ -3768,6 +3804,17 @@
       element("span", "qfw-canvas-hint", "Wheel zoom · middle-drag pan"),
       zoomSlider, zoomLabel, reset, clear, clearStatus,
     );
+    // The same link the health widget carries, here where it is always in
+    // view: the health widget sits at the far end of the canvas. The header
+    // is built before the first state arrives, so the anchor is always
+    // present and the data refresh shows or hides it.
+    const telemetryAnchor = document.createElement("a");
+    telemetryAnchor.className = "qfw-telemetry-link qfw-telemetry-link-header";
+    telemetryAnchor.target = "_blank";
+    telemetryAnchor.rel = "noopener";
+    telemetryAnchor.textContent = "Grafana";
+    syncTelemetryAnchor(telemetryAnchor);
+    viewControls.append(telemetryAnchor);
     header.append(viewControls, identityLabel);
     root.append(header);
     const viewport = element("div", "qfw-canvas-viewport");
@@ -3803,6 +3850,7 @@
     const scrollPositions = captureWidgetScrollPositions(root);
     refreshPackagedExamples(root);
     refreshExperimentSubmissionStatus(root);
+    root.querySelectorAll(".qfw-telemetry-link-header").forEach(syncTelemetryAnchor);
     WIDGETS.forEach(([id]) => {
       const widget = root.querySelector(`.qfw-widget[data-widget="${id}"]`);
       if (!widget) return;
