@@ -1,8 +1,9 @@
 # OpenTelemetry Collector for the QFw telemetry stack.
 #
 # QFw processes send OTLP over HTTP to :4318 (QFW_TELEMETRY=otlp with
-# QFW_TELEMETRY_ENDPOINT=http://otel-collector:4318). Traces go on to Tempo;
-# metrics are exposed on :8889 for Prometheus to scrape. The collector is the
+# QFW_TELEMETRY_ENDPOINT=http://otel-collector:4318). Traces go on to Tempo,
+# logs to Loki over its own OTLP endpoint, and metrics are exposed on :8889
+# for Prometheus to scrape. The collector is the
 # storage boundary the benchmarking design describes: QFw emits OTLP and
 # stops here, and anything past this file is a deployment choice.
 receivers:
@@ -47,6 +48,11 @@ exporters:
     endpoint: tempo:4317
     tls:
       insecure: true
+  # Loki takes OTLP directly; the exporter appends /v1/logs itself.
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
   prometheus:
     endpoint: 0.0.0.0:8889
     # Resource attributes become labels on every series, so a QPM's device
@@ -71,3 +77,9 @@ service:
       receivers: [otlp]
       processors: [cumulativetodelta, resource/merge-instances, deltatocumulative, batch]
       exporters: [prometheus]
+    # The same resource trimming as for metrics: Loki would otherwise index
+    # one stream per client process on service.instance.id.
+    logs:
+      receivers: [otlp]
+      processors: [resource/merge-instances, batch]
+      exporters: [otlphttp/loki]

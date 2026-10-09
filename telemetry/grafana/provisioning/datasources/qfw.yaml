@@ -25,3 +25,33 @@ datasources:
         enabled: false
       tracesToMetrics:
         datasourceUid: qfw-prometheus
+      # A span's "Logs for this span" button: every line of the trace, from
+      # the client and the QPM alike, by the trace id Loki keeps as
+      # structured metadata. The span's own service is deliberately not a
+      # filter, so the client's lines show under a QPM span too.
+      tracesToLogsV2:
+        datasourceUid: qfw-loki
+        spanStartTimeShift: "-10m"
+        spanEndTimeShift: "10m"
+        filterByTraceID: false
+        filterBySpanID: false
+        customQuery: true
+        # Grafana expands $VAR in provisioning files, so the span variable
+        # the query needs at run time is written with a doubled dollar.
+        query: '{service_name=~"qfw-.+"} | trace_id="$${__span.traceId}"'
+
+  - name: Loki
+    uid: qfw-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      # The way back: a log line's trace id opens its trace in Tempo.
+      derivedFields:
+        - name: TraceID
+          datasourceUid: qfw-tempo
+          matcherType: label
+          matcherRegex: trace_id
+          url: "$${__value.raw}"
+          urlDisplayLabel: Open the trace
