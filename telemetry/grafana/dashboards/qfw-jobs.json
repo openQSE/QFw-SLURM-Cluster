@@ -898,7 +898,7 @@
             "uid": "qfw-loki"
           },
           "refId": "A",
-          "expr": "{service_name=~\"qfw-.+\"} | severity_text=~\"WARN.*|ERROR|CRITICAL\"",
+          "expr": "{service_name=~\"qfw-.+\"} | severity_text=~\"WARN.*|ERROR|CRITICAL\" | line_format \"[{{.qfw_component_role}}{{if .qfw_device_name}} {{.qfw_device_name}}{{end}}] {{__line__}}\"",
           "queryType": "range"
         }
       ],

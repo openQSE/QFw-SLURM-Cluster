@@ -38,7 +38,7 @@ datasources:
         customQuery: true
         # Grafana expands $VAR in provisioning files, so the span variable
         # the query needs at run time is written with a doubled dollar.
-        query: '{service_name=~"qfw-.+"} | trace_id="$${__span.traceId}"'
+        query: '{service_name=~"qfw-.+"} | trace_id="$${__span.traceId}" | line_format "[{{.qfw_component_role}}{{if .qfw_device_name}} {{.qfw_device_name}}{{end}}] {{__line__}}"'
 
   - name: Loki
     uid: qfw-loki
