@@ -172,6 +172,11 @@ So a job's lines are one query away, from the client and the QPM alike:
 {service_name="qfw-qpm", qfw_device_name="fake-iqm-20q"} | severity_text=~"ERROR|CRITICAL"
 ```
 
+On the dashboards, and in the hop from a span to its logs, each line starts
+with the component that wrote it, `[client]` or `[qpm fake-iqm-20q]`: the
+panels show a line's body, not its labels, and a job's story has two
+writers. The labels are still there in a line's details.
+
 Three links tie the signals together: the QFw Trace dashboard shows a job's
 lines under its waterfall; a span's **Logs for this span** button in Explore
 runs the first query for its trace; and a log line's `trace_id` opens its

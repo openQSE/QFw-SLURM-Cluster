@@ -116,7 +116,7 @@
             "uid": "qfw-loki"
           },
           "refId": "A",
-          "expr": "{service_name=~\"qfw-.+\"} | trace_id=\"${traceId}\"",
+          "expr": "{service_name=~\"qfw-.+\"} | trace_id=\"${traceId}\" | line_format \"[{{.qfw_component_role}}{{if .qfw_device_name}} {{.qfw_device_name}}{{end}}] {{__line__}}\"",
           "queryType": "range"
         }
       ],
