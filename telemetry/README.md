@@ -14,13 +14,14 @@ the collector is a deployment choice made here with stock components.
                  └ QFW_TELEMETRY=otlp
 ```
 
-Four containers on the cluster network, pinned in the overlay:
+Five containers on the cluster network, pinned in the overlay:
 
 | Container | Image | Role | Host port |
 | --- | --- | --- | --- |
 | `otel-collector` | `otel/opentelemetry-collector-contrib` | Receives OTLP from QFw, forwards traces to Tempo, exposes metrics for Prometheus | `127.0.0.1:4318` |
 | `prometheus` | `prom/prometheus` | Scrapes the collector every 5 s, keeps 15 days | `127.0.0.1:9090` |
 | `tempo` | `grafana/tempo` | Stores traces, 14 days | `127.0.0.1:3200` |
+| `loki` | `grafana/loki` | Stores log lines, 14 days, with the trace id each carries | `127.0.0.1:3100` |
 | `grafana` | `grafana/grafana` | The dashboards, provisioned from this directory | `${QFW_GRAFANA_PORT:-3000}` on every interface |
 
 Nothing in QFw changes when the stack is absent: with `QFW_TELEMETRY` unset,
@@ -64,6 +65,7 @@ The overlay sets these on every container that runs QFw code:
 | `QFW_TELEMETRY_ENDPOINT` | `http://otel-collector:4318` | The collector's OTLP/HTTP base URL |
 | `QFW_TELEMETRY_SAMPLE` | `always` (`QFW_TELEMETRY_SAMPLE` overrides) | Trace sampling. `always` for a demo or a benchmark; a ratio or `off` for production, where the metrics stay on regardless |
 | `QFW_TELEMETRY_TRANSPORT` | `1` (`QFW_TELEMETRY_TRANSPORT` overrides) | The transport extension: spans and a histogram for the client's run RPC, the QPM's completion-event push and the way back. Off in QFw by default; on here so the per-hop view adds up to the end to end |
+| `QFW_TELEMETRY_LOGS` | `debug` (`QFW_TELEMETRY_LOGS` overrides) | The logs tier: what QFw's processes log at that level or above, each line with the trace and span ids current when it was written, kept in Loki. `error` for production, `all` to include DEFw's transport internals. See [Logs](#logs) |
 | `OTEL_METRIC_EXPORT_INTERVAL` | `5000` (`QFW_TELEMETRY_METRIC_INTERVAL_MS` overrides) | Milliseconds between metric exports |
 | `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `delta` | Each export carries what happened since the last one, not totals since the process started. See the note on short-lived clients below |
 
@@ -106,15 +108,17 @@ on whatever the trace sampling:
   and the completion event back;
 - backend execute p50 by device and API path (`native`, `qrmi`, `qdmi`,
   `simulator`), and the QPM stages per job;
-- the latest job traces, as a list to open.
+- the latest job traces, as a list to open;
+- the recent warnings and errors from every QFw process, newest first.
 
 **QFw Traces** (`/d/qfw-traces`) is trace search over Tempo: recent jobs, the
 slowest provider interactions, and failed or cancelled jobs.
 
 **QFw Trace** (`/d/qfw-trace?var-traceId=<id>`) is one job as a waterfall:
 `qfw.app.job` from the client, `qfw.qpm.receive` in the QPM across the DEFw
-RPC, then queue, dispatch and the provider call. A trace ID in any of the
-tables above opens a small menu: **Open the trace** comes here, with the time
+RPC, then queue, dispatch and the provider call, with every log line any
+QFw process wrote while that trace was current underneath. A trace ID in any
+of the tables above opens a small menu: **Open the trace** comes here, with the time
 range and links back; **Trace: <id>**, which the Tempo data source adds on
 its own, opens the same trace in Explore. Explore is closed to the Viewer
 role unless `viewers_can_edit` is on, which the overlay sets
@@ -149,6 +153,53 @@ instance id and accumulates the deltas again
 `otel-collector.yaml`), and the overlay asks QFw processes to export deltas
 in the first place. The result is one counter per client population and one
 per QPM device that behaves like a long-lived process's.
+
+## Logs
+
+QFw's logs tier (`QFW_TELEMETRY_LOGS` in QFw's `backends/qfw_telemetry`)
+puts an OpenTelemetry handler on each process's root logger, so what the
+process logs at the chosen level or above leaves as OTLP log records on the
+same resource as its spans, each stamped with the trace and span ids current
+when it was written. The collector forwards them to Loki, which keeps
+`service_name`, `qfw_component_role` and `qfw_device_name` as stream labels
+and the rest, `trace_id`, `span_id` and `severity_text` among them, as
+structured metadata on the line.
+
+So a job's lines are one query away, from the client and the QPM alike:
+
+```logql
+{service_name=~"qfw-.+"} | trace_id="<trace id>"
+{service_name="qfw-qpm", qfw_device_name="fake-iqm-20q"} | severity_text=~"ERROR|CRITICAL"
+```
+
+On the dashboards, and in the hop from a span to its logs, each line starts
+with the component that wrote it, `[client]` or `[qpm fake-iqm-20q]`: the
+panels show a line's body, not its labels, and a job's story has two
+writers. The labels are still there in a line's details.
+
+Three links tie the signals together: the QFw Trace dashboard shows a job's
+lines under its waterfall; a span's **Logs for this span** button in Explore
+runs the first query for its trace; and a log line's `trace_id` opens its
+trace in Tempo. Lines written outside any span, DEFw's transport internals
+for instance, carry no trace id and show only in a plain query.
+
+What arrives depends on the tier. QFw writes a job's story at `debug`: a
+QPM's device query, the circuit's qubit cap, a driver's progress. So
+`debug`, the overlay's default, is what puts a job's lines under its
+waterfall, about twenty per job on the fake IQM, and real errors go through
+at every tier. DEFw's own levels are categories, and its work-request and
+RPC chatter, hundreds of lines per job, stays local unless the tier is
+`all`. `error` is the production setting. Whatever a process logs at the
+chosen tier leaves it, so review a service's log before raising the tier on
+a shared collector. A process's own logging level still gates everything
+outside QFw's `qfw.*` loggers, which the tier opens to its level: a Qiskit
+client out of the box, root logger at Python's default `WARNING`, sends its
+story lines and the warnings and errors of everything else, nothing more.
+The site services report
+once the image carries a QFw with the tier and `qfw-site-services` has
+forwarded the variable to them.
+
+Loki keeps 14 days, like Tempo, in its own volume.
 
 ## Feeding the dashboards
 
@@ -197,6 +248,14 @@ curl -s 'localhost:3200/api/search?q=%7B%20name%20%3D%20%22qfw.app.job%22%20%7D'
 ```
 
 The first lists the four metric families; the second returns the job's trace.
+For the logs tier:
+
+```bash
+curl -s -G 'localhost:3100/loki/api/v1/query_range' --data-urlencode 'query={service_name=~"qfw-.+"}' --data-urlencode 'limit=5'
+```
+
+returns the latest lines, each with its `trace_id` in the structured
+metadata when it was written inside a span.
 
 ## Notes for a demo
 
@@ -235,7 +294,7 @@ The output goes to `<QFW_CONTAINER_BASE>/qfw-fallback-<timestamp>` unless
 `/Applications`; `QFW_CHROME` names another binary. Without one the script
 makes the snapshots and the page without images.
 
-A third layer costs nothing: Prometheus keeps 15 days and Tempo 14, so any
+A third layer costs nothing: Prometheus keeps 15 days, Tempo and Loki 14, so any
 dashboard opened with an absolute time range over a rehearsal shows it, as
 long as the stack is up.
 
@@ -252,6 +311,11 @@ or set the time range to the rehearsal; if Grafana itself is down, open
 - **Metrics but no traces, or the reverse.** Prometheus and Tempo are fed by
   separate collector pipelines; `docker logs tempo` and the Prometheus targets
   page (`localhost:9090/targets`) show which side is unhappy.
+- **No log lines.** The process needs `QFW_TELEMETRY_LOGS` (the overlay
+  sets it; site services get it from `qfw-site-services`) and a QFw with the
+  logs tier; `docker logs loki` and `./do_telemetry.sh logs otel-collector`
+  show the hop. A line written outside any span has no trace id and does
+  not appear under a trace.
 - **Port 3000 is taken.** Set `QFW_GRAFANA_PORT` in `qfw-install.env`.
 - **Dashboard edits vanish.** They are provisioned from files; edit the JSON
   in `grafana/dashboards` instead.

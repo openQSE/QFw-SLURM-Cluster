@@ -1,0 +1,65 @@
+# Loki for the QFw telemetry stack: a single binary with local storage.
+# The collector forwards QFw's log records here over OTLP; Grafana queries
+# :3100. Loki keeps a few resource attributes as index labels and the rest,
+# the trace and span ids among them, as structured metadata on each line.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  log_level: info
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: "2024-01-01"
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # OTLP ingestion needs structured metadata; that is where trace_id,
+  # span_id and severity_text live, so a query can select by them.
+  allow_structured_metadata: true
+  # Grafana's log-volume histogram over a query.
+  volume_enabled: true
+  # Two weeks, like Tempo, so a rehearsal's lines stay next to its traces.
+  retention_period: 336h
+  otlp_config:
+    resource_attributes:
+      attributes_config:
+        # Low-cardinality facts about the process become stream labels;
+        # everything else on the resource stays structured metadata. The
+        # collector has already dropped service.instance.id, which would
+        # otherwise be one stream per client process.
+        - action: index_label
+          attributes:
+            - service.name
+            - qfw.component.role
+            - qfw.device.name
+
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+
+analytics:
+  reporting_enabled: false

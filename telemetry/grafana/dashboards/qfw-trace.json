@@ -94,6 +94,46 @@
         "defaults": {},
         "overrides": []
       }
+    },
+    {
+      "type": "logs",
+      "title": "Log lines of this job",
+      "datasource": {
+        "type": "loki",
+        "uid": "qfw-loki"
+      },
+      "description": "Every line any QFw process wrote while this job's trace was current: the client's and the QPM's. From Loki, by the trace id each record carries.",
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "qfw-loki"
+          },
+          "refId": "A",
+          "expr": "{service_name=~\"qfw-.+\"} | trace_id=\"${traceId}\" | line_format \"[{{.qfw_component_role}}{{if .qfw_device_name}} {{.qfw_device_name}}{{end}}] {{__line__}}\"",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Ascending"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
     }
   ]
 }
