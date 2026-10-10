@@ -186,8 +186,11 @@ at every tier. DEFw's own levels are categories, and its work-request and
 RPC chatter, hundreds of lines per job, stays local unless the tier is
 `all`. `error` is the production setting. Whatever a process logs at the
 chosen tier leaves it, so review a service's log before raising the tier on
-a shared collector. A process whose DEFw log level selects nothing exports
-nothing: a Qiskit client out of the box, for one. The site services report
+a shared collector. A process's own logging level still gates everything
+outside QFw's `qfw.*` loggers, which the tier opens to its level: a Qiskit
+client out of the box, root logger at Python's default `WARNING`, sends its
+story lines and the warnings and errors of everything else, nothing more.
+The site services report
 once the image carries a QFw with the tier and `qfw-site-services` has
 forwarded the variable to them.
 
