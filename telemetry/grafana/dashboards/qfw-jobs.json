@@ -876,6 +876,46 @@
           }
         ]
       }
+    },
+    {
+      "type": "logs",
+      "title": "Recent warnings and errors",
+      "datasource": {
+        "type": "loki",
+        "uid": "qfw-loki"
+      },
+      "description": "What QFw's services and clients logged at warning and above, newest first. A line's trace id opens its trace.",
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "qfw-loki"
+          },
+          "refId": "A",
+          "expr": "{service_name=~\"qfw-.+\"} | severity_text=~\"WARN.*|ERROR|CRITICAL\" | line_format \"[{{.qfw_component_role}}{{if .qfw_device_name}} {{.qfw_device_name}}{{end}}] {{__line__}}\"",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
     }
   ],
   "links": [

@@ -65,6 +65,24 @@ def test_collectors_keep_partial_state_when_service_is_stopped() -> None:
     assert sources["service-plane"].status == "stopped"
 
 
+def test_docker_records_carry_published_ports() -> None:
+    runner = FakeRunner()
+    runner.host = lambda argv, timeout=None: CommandResult(
+        tuple(argv), 0,
+        '{"State":"running","Name":"grafana","Service":"grafana",'
+        '"Publishers":[{"URL":"0.0.0.0","TargetPort":3000,"PublishedPort":3000,'
+        '"Protocol":"tcp"},{"URL":"::","TargetPort":3000,"PublishedPort":3000,'
+        '"Protocol":"tcp"}]}\n'
+        '{"State":"running","Name":"c1","Publishers":[{"PublishedPort":0}]}\n',
+        "",
+    )
+    records = {item["name"]: item for item in docker_status(runner).records}
+    # One entry per host port, whatever the address families, and none for
+    # a container that publishes nothing.
+    assert records["grafana"]["ports"] == [3000]
+    assert records["c1"]["ports"] == []
+
+
 def test_malformed_docker_output_is_typed_unavailable() -> None:
     runner = FakeRunner()
     runner.host = lambda argv, timeout=None: CommandResult(tuple(argv), 0, "{", "")

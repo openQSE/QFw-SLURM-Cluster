@@ -1,13 +1,13 @@
 #!/bin/bash
 #
 # Start, stop or inspect the optional telemetry stack beside the running
-# cluster: the OpenTelemetry Collector, Prometheus, Tempo and Grafana from
+# cluster: the OpenTelemetry Collector, Prometheus, Tempo, Loki and Grafana from
 # docker-compose.telemetry.yml. The cluster's own containers are never
 # recreated by this script.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/qfw-install.env"
-SERVICES=(otel-collector prometheus tempo grafana)
+SERVICES=(otel-collector prometheus tempo loki grafana)
 
 usage() {
     cat <<USAGE
@@ -16,7 +16,7 @@ Usage: $(basename "$0") ACTION [compose arguments]
 Actions:
   up        Start the telemetry stack (pulls the pinned images on first use)
   down      Stop and remove its containers, keeping the data volumes
-  purge     down, then remove the Prometheus, Tempo and Grafana volumes
+  purge     down, then remove the Prometheus, Tempo, Loki and Grafana volumes
   status    Show its containers
   logs      Follow its logs (extra arguments go to docker compose logs)
   url       Print where Grafana is
@@ -63,7 +63,7 @@ case "${action}" in
     up)
         "${COMPOSE[@]}" up -d --no-recreate "${SERVICES[@]}" "$@"
         echo "Grafana: http://localhost:$(grafana_port)/ (anonymous viewers; admin password in QFW_GRAFANA_ADMIN_PASSWORD, default qfw-demo)"
-        echo "Prometheus: http://localhost:9090/  Tempo: http://localhost:3200/  OTLP/HTTP: http://localhost:4318/"
+        echo "Prometheus: http://localhost:9090/  Tempo: http://localhost:3200/  Loki: http://localhost:3100/  OTLP/HTTP: http://localhost:4318/"
         ;;
     down)
         "${COMPOSE[@]}" rm --stop --force "${SERVICES[@]}" "$@"
@@ -75,7 +75,7 @@ case "${action}" in
             echo "Could not determine the compose project name; volumes not removed." >&2
             exit 1
         fi
-        docker volume rm "${project}_prometheus_data" "${project}_tempo_data" "${project}_grafana_data"
+        docker volume rm "${project}_prometheus_data" "${project}_tempo_data" "${project}_loki_data" "${project}_grafana_data"
         ;;
     status)
         "${COMPOSE[@]}" ps "${SERVICES[@]}" "$@"

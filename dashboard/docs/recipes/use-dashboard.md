@@ -10,7 +10,10 @@ qfw-dashboard status
 ```
 
 The Dashboard pane shows fixed health, node, service, allocation, experiment,
-topology, result, and alert widgets. Collapse a widget to reduce its footprint
+topology, result, and alert widgets. When the optional telemetry stack is up
+(see `telemetry/README.md` in the repository root), the health widget and
+the view controls in the top bar link to its Grafana, where QFw's own job
+metrics and traces live. Collapse a widget to reduce its footprint
 or select **Pop out** to mirror it in another browser window. The original
 widget remains in place.
 

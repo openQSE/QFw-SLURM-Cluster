@@ -545,6 +545,8 @@
 .qfw-stopped,
 .qfw-unavailable { color: var(--qfw-danger); }
 .qfw-freshness { color: var(--qfw-muted); font-size: 0.78em; }
+.qfw-telemetry-link { font-size: 0.85em; }
+.qfw-telemetry-link-header { margin-left: 0.75em; font-weight: 600; }
 .qfw-table-wrap { max-height: 22em; overflow: auto; }
 
 .qfw-table {
