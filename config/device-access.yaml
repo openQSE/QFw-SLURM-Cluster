@@ -10,6 +10,11 @@ qpus:
   backline-local:
     provider: backline
     provider-device-id: backline-local
+  iqm-garnet-mock:
+    provider: iqm
+    provider-device-id: "garnet:mock"
+    url: https://resonance.iqm.tech
+    credential-db: qpu-users.json
   ibm-156-nh:
     provider: ibm
     provider-device-id: ibm_156_nh
