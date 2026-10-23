@@ -288,7 +288,6 @@ shared-dir/
   benchmarks/   # optional benchmark outputs
   rocm/         # optional ROCm prefix for ROCm/HIP builds
   mqt-core/     # optional active MQT Core checkout
-  mqt-cc-venv/  # optional compiler Python venv created inside the container
 ```
 
 1. Configure the host mount and clone [QFw] and MQT Core:

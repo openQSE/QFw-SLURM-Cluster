@@ -12,12 +12,13 @@ export QFW_DEV_SRC="" QFW_DEV_VENV="" QFW_DEV_BUILD="" QFW_DEV_PREFIX=""
 export UV_LOG="${temporary}/uv.log"
 
 mkdir -p "${QFW_BASE}/QFw/setup" "${QFW_BASE}/mqt-core" \
-    "${QFW_BASE}/qfw-venv/bin" "${QFW_BASE}/mqt-cc-venv" "${MLIR_DIR}"
+    "${QFW_BASE}/qfw-venv/bin" "${MLIR_DIR}"
 touch "${QFW_BASE}/QFw/CMakeLists.txt" "${QFW_BASE}/mqt-core/pyproject.toml" \
     "${QFW_BASE}/qfw-venv/bin/activate" "${MLIR_DIR}/MLIRConfig.cmake" \
     "${QFW_BASE}/QFw/setup/build-requirements.txt" \
     "${QFW_BASE}/QFw/setup/requirements.txt" \
-    "${QFW_BASE}/QFw/setup/qdmi-requirements.txt"
+    "${QFW_BASE}/QFw/setup/qdmi-requirements.txt" \
+    "${QFW_BASE}/QFw/setup/overrides.txt"
 sed -n '/^QFW_BASE=/,/^REMOTE$/p' "${repo_dir}/do_qfw_build.sh" |
     sed '$d' >"${temporary}/remote.sh"
 
@@ -38,16 +39,27 @@ for qrmi in pinned fallback unpinned; do
     fi
     : >"${UV_LOG}"
     bash -euo pipefail "${temporary}/remote.sh" >"${temporary}/output" 2>&1
-    expected="<pip><install><-r><${QFW_BASE}/QFw/setup/build-requirements.txt><-r><${QFW_BASE}/QFw/setup/requirements.txt><-r><${QFW_BASE}/QFw/setup/qdmi-requirements.txt><${requirement}>"
+    expected="<pip><install><-r><${QFW_BASE}/QFw/setup/build-requirements.txt><-r><${QFW_BASE}/QFw/setup/requirements.txt><-r><${QFW_BASE}/QFw/setup/qdmi-requirements.txt><--override><${QFW_BASE}/QFw/setup/overrides.txt><${requirement}>"
     if ! grep -Fxq "${expected}" "${UV_LOG}"; then
         echo "Dependencies were not resolved together (${qrmi} QRMI):" >&2
         cat "${UV_LOG}" >&2
         exit 1
     fi
     [ "$(grep -c 'requirements.txt' "${UV_LOG}")" -eq 1 ]
-    grep -Fq "<pip><install><--python><${QFW_BASE}/mqt-cc-venv><${QFW_BASE}/mqt-core><qiskit==" "${UV_LOG}"
+    grep -Fxq "<pip><install><--reinstall-package><mqt-core><${QFW_BASE}/mqt-core>" "${UV_LOG}"
+    ! grep -Fq "mqt-cc-venv" "${UV_LOG}"
 done
 
+rm "${QFW_BASE}/QFw/setup/overrides.txt"
+: >"${UV_LOG}"
+if bash -euo pipefail "${temporary}/remote.sh" >"${temporary}/output" 2>&1; then
+    echo "Missing overrides did not stop the build" >&2
+    exit 1
+fi
+grep -Fq "No dependency overrides at ${QFW_BASE}/QFw/setup/overrides.txt" "${temporary}/output"
+[ ! -s "${UV_LOG}" ]
+
+touch "${QFW_BASE}/QFw/setup/overrides.txt"
 rm "${QFW_BASE}/QFw/setup/qdmi-requirements.txt"
 : >"${UV_LOG}"
 if bash -euo pipefail "${temporary}/remote.sh" >"${temporary}/output" 2>&1; then

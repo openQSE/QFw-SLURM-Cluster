@@ -15,15 +15,15 @@
 
 set -euo pipefail
 
-MQT_CC_VENV="${MQT_CC_VENV:-/opt/openqse/mqt-cc-venv}"
-if [ ! -x "${MQT_CC_VENV}/bin/python" ]; then
-    echo "No mqt-cc environment at ${MQT_CC_VENV}. Build the image or run ./do_qfw_build.sh." >&2
+QFW_VENV="${QFW_VENV:-/opt/openqse/qfw-venv}"
+if [ ! -x "${QFW_VENV}/bin/python" ]; then
+    echo "No QFw environment at ${QFW_VENV}. Build the image or run ./do_qfw_build.sh." >&2
     exit 1
 fi
 
 echo "[$(date)] mqt-cc-smoke-test on $(hostname)"
 
-"${MQT_CC_VENV}/bin/python" - <<'PY'
+"${QFW_VENV}/bin/python" - <<'PY'
 from qiskit import QuantumCircuit
 
 from mqt.core.mlir import CompilerTarget, compile_program
