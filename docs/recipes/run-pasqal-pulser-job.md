@@ -29,9 +29,18 @@ atom flipped).
   ```
 
   or export `PASQAL_USERNAME`, `PASQAL_PASSWORD` and `PASQAL_PROJECT_ID`
-  instead. An exported `PASQAL_TOKEN` is used as is; a `token=` in the file
-  only when there is no username and password. Nothing from it is written
-  into the shared mount; see [Credentials](#credentials).
+  instead. To use a token, export `PASQAL_TOKEN`: it takes precedence over
+  the login. Pasqal's `pasqal-cloud` SDK (`pip install pasqal-cloud`) gets
+  one from your login, and prompts for the password:
+
+  ```bash
+  export PASQAL_TOKEN="$(python3 -c 'from pasqal_cloud import SDK
+  print(SDK(username="you@example.com").user_token())')"
+  ```
+
+  A `token=` in the file is used only when there is no username and
+  password. Nothing from it is written into the shared mount; see
+  [Credentials](#credentials).
 - `python3` on the Docker host.
 
 ## Build QFw
@@ -54,7 +63,7 @@ the developer venv because the checkout has it.
 test_scripts/pasqal/run_pulser_example.sh
 ```
 
-The script fetches a token from your login, allocates one application group
+The script reads your login, allocates one application group
 and one service group in `slurmctld`, activates the developer build and runs
 `examples/qfw_pulser.sh`. It prints the allocation, the QPM the reservation
 picked, any error lines and the results; the full log is
@@ -94,7 +103,7 @@ Other options go to `examples/qfw_pulser.sh`, for example `--shots 500`. Run
 
 | Step | Where |
 | --- | --- |
-| `pasqal_token.py` | Docker host, as you |
+| `pasqal_login.py` | Docker host, as you |
 | `salloc` (two groups) | `slurmctld` |
 | `qfw-setup`: directory service, shim QPM for the device | service group |
 | `test_pulser.py` with `QFwConnection` | application group |
@@ -125,25 +134,25 @@ QFw checkout, Section 4):
 The project is the reservation's, else the device's `project-id`, which
 `qfw_pulser.sh` fills in from `QFW_PASQAL_PROJECT_ID`.
 
-`run_pulser_example.sh` gives the service a token. `pasqal_token.py`
-exchanges your login for one on the Docker host and writes `QFW_API_KEY` and
-`QFW_PASQAL_PROJECT_ID` to an owner-only file in a private temporary
+`run_pulser_example.sh` gives the service your login. `pasqal_login.py`
+reads it on the Docker host and writes `PASQAL_USERNAME`, `PASQAL_PASSWORD`
+and `QFW_PASQAL_PROJECT_ID` to an owner-only file in a private temporary
 directory. The script passes that file to `docker exec --env-file`, so the
-token never appears on a command line, and deletes it when the run ends. It
-is never written into `shared-dir`.
+login never appears on a command line, and deletes it when the run ends. It
+is never written into `shared-dir`. QRMI logs in with it and renews the token
+as it expires, so a long FRESNEL queue does not outlive it.
 
-A token expires and QRMI cannot renew it, which is fine for one run. A QPM
-that stays up should log in with something QRMI renews from: a service
-account, or a `PASQAL_CONFIG_ROOT` whose `config` holds a username and
-password (and may name the project). Tokens in a credential DB are not
+With an exported `PASQAL_TOKEN`, or a `token=` and no username and password,
+the script passes the token as `QFW_API_KEY` instead. QRMI cannot renew a
+token, which is fine for one short run. Tokens in a credential DB are not
 renewed either.
 
 ## Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
-| `no Pasqal Cloud login` | No token, username/password or `~/.pasqal/config` on the host. |
-| `auth token is missing or expired and refresh credentials are not configured` | The token outlived the run, or a stored `PASQAL_TOKEN` or `token=` has expired; rerun with a username and password for a fresh one, or give a long-lived QPM a login QRMI renews ([Credentials](#credentials)). |
+| `no Pasqal Cloud login` | No username/password, token or `~/.pasqal/config` on the host. |
+| `auth token is missing or expired and refresh credentials are not configured` | The run used a token (an exported `PASQAL_TOKEN`, or `token=` without a username and password), and it expired; unset `PASQAL_TOKEN` and rerun with a username and password, which QRMI renews from ([Credentials](#credentials)). |
 | `422 ... exceeds the maximum number of atoms supported by this device (12)` | EMU_FREE takes at most 12 atoms; the 42-atom FRESNEL program cannot run on it. |
 | `QRMI job ... timed out after ... and it was stopped` | The Pasqal queue was longer than the device's `job-timeout-seconds`; the job was cancelled. |
 | `QPM reads ..., not Pulser sequences` | The reservation picked a non-Pasqal QPM; check `--device-id`. |

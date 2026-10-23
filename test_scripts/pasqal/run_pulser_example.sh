@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run QFw's Pulser example on a Pasqal Cloud device from the
 # Docker host, in one command:
-#   1. fetch a Pasqal Cloud token from your own login (pasqal_token.py),
+#   1. read your own Pasqal Cloud login (pasqal_login.py),
 #   2. allocate a two-group heterogeneous job in slurmctld,
 #   3. activate the QFw build and run examples/qfw_pulser.sh,
 #   4. print the results table; the full log stays in pulser-<time>.log.
@@ -15,7 +15,7 @@
 #   run_pulser_example.sh                                  # EMU_FREE
 #   run_pulser_example.sh --device-id pasqal-fresnel --atoms 42
 #
-# The token is read from your environment or ~/.pasqal/config on this host,
+# The login is read from your environment or ~/.pasqal/config on this host,
 # written to an owner-only file in a private temporary directory, passed to
 # the container with --env-file, and the file is removed afterwards. It is
 # never printed and never written into the shared mount.
@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-envfile="$(python3 "${here}/pasqal_token.py")"
+envfile="$(python3 "${here}/pasqal_login.py")"
 log="pulser-$(date +%Y%m%d-%H%M%S).log"
 finish() {
 	rm -rf "$(dirname "${envfile}")"
