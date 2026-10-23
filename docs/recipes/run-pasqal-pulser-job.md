@@ -1,9 +1,8 @@
 # Run a Pulser Job on a Pasqal Device
 
-This recipe runs QFw's Pulser example on Pasqal Cloud from a QFw checkout
-carrying openQSE/QFw#158 (issue openQSE/QFw#157): Pasqal's EMU_FREE emulator
-by default, or the FRESNEL QPU. It uses the developer override, so it needs
-no QFw release.
+This recipe runs QFw's Pulser example (openQSE/QFw#158) on Pasqal Cloud:
+Pasqal's EMU_FREE emulator by default, or the FRESNEL QPU. It uses the
+developer override, so it needs no QFw release.
 
 The example starts a job-owned shim QPM for the Pasqal device, reserves it,
 and runs one Pulser program through Pulser's own `QPUBackend` with
@@ -18,8 +17,10 @@ atom flipped).
   not `release/v0.1`, whose `do_qfw_build.sh` does not install Pulser; see
   [Build and start the cluster](build-and-start-cluster.md). The image's
   QFw does not matter for the developer build below.
-- A Pasqal Cloud account with a project. On the Docker host, put the login in
-  `~/.pasqal/config` (the file pasqal-cloud and QRMI read):
+- A Pasqal Cloud account with a project. A free account from the
+  [Pasqal User Portal](https://portal.pasqal.cloud/) includes EMU_FREE; the
+  portal's **Projects** page shows the project ID. On the Docker host, put
+  the login in `~/.pasqal/config` (the file pasqal-cloud and QRMI read):
 
   ```ini
   username=you@example.com
@@ -33,15 +34,12 @@ atom flipped).
   into the shared mount; see [Credentials](#credentials).
 - `python3` on the Docker host.
 
-## Build QFw With #158
+## Build QFw
 
 From the cluster repository on the Docker host:
 
 ```bash
 git clone --recursive https://github.com/openQSE/QFw.git shared-dir/QFw
-git -C shared-dir/QFw fetch origin pull/158/head:pasqal-pulser
-git -C shared-dir/QFw checkout pasqal-pulser
-git -C shared-dir/QFw submodule update --init --recursive
 git clone https://github.com/munich-quantum-toolkit/core.git shared-dir/mqt-core
 
 ./do_qfw_build.sh --clean
@@ -149,20 +147,16 @@ renewed either.
 | `422 ... exceeds the maximum number of atoms supported by this device (12)` | EMU_FREE takes at most 12 atoms; the 42-atom FRESNEL program cannot run on it. |
 | `QRMI job ... timed out after ... and it was stopped` | The Pasqal queue was longer than the device's `job-timeout-seconds`; the job was cancelled. |
 | `QPM reads ..., not Pulser sequences` | The reservation picked a non-Pasqal QPM; check `--device-id`. |
-| `No module named 'pulser'` | The QFw checkout lacks #158, the cluster checkout lacks this branch's `do_qfw_build.sh`, or the venv predates either; rerun `./do_qfw_build.sh --clean`. |
+| `No module named 'pulser'` | The QFw checkout predates #158, the cluster checkout lacks this branch's `do_qfw_build.sh`, or the venv predates either; rerun `./do_qfw_build.sh --clean`. |
 
 ## Run on the Image's QFw
 
-To test #158 as installed in the image instead, build the image from it and
-pass `--image-install`:
+To test the QFw installed in the image instead, build the image from QFw
+main (the default `--qfw-ref`) and pass `--image-install`:
 
 ```bash
-./do_configure.sh --qfw-ref refs/pull/158/head
+./do_configure.sh
 ./do_build.sh
 ./do_restart.sh --force-recreate
 test_scripts/pasqal/run_pulser_example.sh --image-install
 ```
-
-Build from openQSE/QFw with the pull request's ref rather than from the
-author's fork: QFw's submodules have relative URLs, which a fork does not
-carry.
