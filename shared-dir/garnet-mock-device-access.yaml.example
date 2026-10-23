@@ -1,0 +1,15 @@
+# Copy this file to iqm-device-access.yaml and the credentials template to
+# garnet-mock-creds.json. docker-compose.iqm.yml points QFw at
+# iqm-device-access.yaml.
+#
+# Replace the API-key placeholders in garnet-mock-creds.json before running.
+
+qpus:
+  iqm-garnet-mock:
+    provider: iqm
+    # IQM Resonance's noiseless mock simulator for the 20-qubit Garnet device.
+    # This is the alias Resonance expects, not the QFw device id above it.
+    provider-device-id: "garnet:mock"
+    url: https://resonance.iqm.tech
+    # shared-dir is mounted at /mnt in the containers.
+    credential-db: /mnt/garnet-mock-creds.json
