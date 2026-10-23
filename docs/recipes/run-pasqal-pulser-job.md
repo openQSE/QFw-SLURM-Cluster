@@ -1,6 +1,6 @@
 # Run a Pulser Job on a Pasqal Device
 
-This recipe runs QFw's Pulser example (openQSE/QFw#158) on Pasqal Cloud:
+This recipe runs QFw's Pulser example on Pasqal Cloud:
 Pasqal's EMU_FREE emulator by default, or the FRESNEL QPU. It uses the
 developer override, so it needs no QFw release.
 
@@ -147,7 +147,7 @@ renewed either.
 | `422 ... exceeds the maximum number of atoms supported by this device (12)` | EMU_FREE takes at most 12 atoms; the 42-atom FRESNEL program cannot run on it. |
 | `QRMI job ... timed out after ... and it was stopped` | The Pasqal queue was longer than the device's `job-timeout-seconds`; the job was cancelled. |
 | `QPM reads ..., not Pulser sequences` | The reservation picked a non-Pasqal QPM; check `--device-id`. |
-| `No module named 'pulser'` | The QFw checkout predates #158, the cluster checkout lacks this branch's `do_qfw_build.sh`, or the venv predates either; rerun `./do_qfw_build.sh --clean`. |
+| `No module named 'pulser'` | The QFw checkout predates its Pulser frontend, the cluster checkout lacks this branch's `do_qfw_build.sh`, or the venv predates either; rerun `./do_qfw_build.sh --clean`. |
 
 ## Run on the Image's QFw
 

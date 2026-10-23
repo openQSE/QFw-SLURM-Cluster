@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run QFw's Pulser example (openQSE/QFw#158) on a Pasqal Cloud device from the
+# Run QFw's Pulser example on a Pasqal Cloud device from the
 # Docker host, in one command:
 #   1. fetch a Pasqal Cloud token from your own login (pasqal_token.py),
 #   2. allocate a two-group heterogeneous job in slurmctld,

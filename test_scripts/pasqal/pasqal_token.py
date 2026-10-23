@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write a Pasqal Cloud token and project to a private env file.
 
-QFw's Pasqal devices (openQSE/QFw#158) take a Pasqal Cloud token, not a
+QFw's Pasqal devices take a Pasqal Cloud token, not a
 username and password, and the token expires. This fetches a fresh one from
 the caller's own Pasqal Cloud login and writes
 
