@@ -1,0 +1,3 @@
+# ibm-platform-services 0.55.2 imports pkg_resources in setup.py.
+# setuptools 81 removed it; keep isolated builds compatible until upstream fixes this.
+setuptools<81

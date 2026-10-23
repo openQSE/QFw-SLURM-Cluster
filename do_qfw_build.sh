@@ -192,6 +192,7 @@ if [ "${QFW_SKIP_VENV}" != "true" ]; then
     # QHW packages are copied into site-packages. QFw's requirements supply
     # their dependencies, including jsonschema.
     uv pip install \
+        --build-constraint /opt/qfw/python-build-constraints.txt \
         -r "${QFW_SRC}/setup/build-requirements.txt" \
         -r "${QFW_SRC}/setup/requirements.txt" \
         -r "${QFW_SRC}/setup/qdmi-requirements.txt" \

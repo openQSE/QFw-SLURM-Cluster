@@ -38,7 +38,7 @@ for qrmi in pinned fallback unpinned; do
     fi
     : >"${UV_LOG}"
     bash -euo pipefail "${temporary}/remote.sh" >"${temporary}/output" 2>&1
-    expected="<pip><install><-r><${QFW_BASE}/QFw/setup/build-requirements.txt><-r><${QFW_BASE}/QFw/setup/requirements.txt><-r><${QFW_BASE}/QFw/setup/qdmi-requirements.txt><${requirement}>"
+    expected="<pip><install><--build-constraint></opt/qfw/python-build-constraints.txt><-r><${QFW_BASE}/QFw/setup/build-requirements.txt><-r><${QFW_BASE}/QFw/setup/requirements.txt><-r><${QFW_BASE}/QFw/setup/qdmi-requirements.txt><${requirement}>"
     if ! grep -Fxq "${expected}" "${UV_LOG}"; then
         echo "Dependencies were not resolved together (${qrmi} QRMI):" >&2
         cat "${UV_LOG}" >&2
