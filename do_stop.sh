@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/qfw-install.env"
 COMPOSE=(docker compose --env-file "${ENV_FILE}")
+. "${SCRIPT_DIR}/tools/compose-env.sh"
 DELETE=false
 DRY_RUN=false
 

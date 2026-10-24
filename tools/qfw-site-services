@@ -13,6 +13,7 @@ QFW_IQM_NODE="${QFW_IQM_NODE:-iqm-head}"
 QFW_SHIM_NODE="${QFW_SHIM_NODE:-shim-head}"
 QFW_IBM_NODE="${QFW_IBM_NODE:-ibm-156-nh}"
 QFW_AWS_NODE="${QFW_AWS_NODE:-aws}"
+QFW_QSA_SIM_NODE="${QFW_QSA_SIM_NODE:-qsa-sim-head}"
 QFW_FAKE_IQM_NODE="${QFW_FAKE_IQM_NODE:-fake-iqm-head}"
 QFW_BACKLINE_NODE="${QFW_BACKLINE_NODE:-qec-backline-head}"
 QFW_SIMULATOR_NODES="${QFW_SIMULATOR_NODES:-nwqsim-head,nwqsim-worker-1,nwqsim-worker-2}"
@@ -29,6 +30,7 @@ iqm_run_dir="${QFW_SITE_RUN_ROOT}/qpm/iqm-ornl-20q"
 shim_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-ornl-20q"
 ibm_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-ibm-156-nh"
 aws_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-aws-qpm"
+qsa_sim_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-ibm-fake-lagos"
 fake_iqm_run_dir="${QFW_SITE_RUN_ROOT}/qpm/fake-iqm"
 backline_run_dir="${QFW_SITE_RUN_ROOT}/qpm/backline-local"
 gateway_run_dir="${QFW_SITE_RUN_ROOT}/gateway"
@@ -53,8 +55,8 @@ Actions:
 
 Options:
   --target TARGET
-             Select all, directory, nwqsim, iqm, shim, ibm, aws, fake-iqm,
-             backline, or gateway
+             Select all, directory, nwqsim, iqm, shim, ibm, aws, qsa-sim,
+             fake-iqm, backline, or gateway
              (default: all). backline is opt-in: "all" starts and reports
              without it, and stops it only when it is running
              (needs tools/install-backline-venv.sh first)
@@ -371,6 +373,11 @@ stop_aws() {
 		--run-dir "${aws_run_dir}"
 }
 
+stop_qsa_sim() {
+	run_qfw "${QFW_QSA_SIM_NODE}" qfw-qpm-svc stop \
+		--run-dir "${qsa_sim_run_dir}"
+}
+
 stop_fake_iqm() {
 	run_qfw "${QFW_FAKE_IQM_NODE}" qfw-qpm-svc stop \
 		--run-dir "${fake_iqm_run_dir}"
@@ -432,6 +439,11 @@ aws_ready() {
 		--run-dir "${aws_run_dir}"
 }
 
+qsa_sim_ready() {
+	run_qfw "${QFW_QSA_SIM_NODE}" qfw-qpm-svc status \
+		--run-dir "${qsa_sim_run_dir}"
+}
+
 fake_iqm_ready() {
 	run_qfw "${QFW_FAKE_IQM_NODE}" qfw-qpm-svc status \
 		--run-dir "${fake_iqm_run_dir}"
@@ -470,6 +482,9 @@ require_directory_dependents_stopped() {
 	fi
 	if aws_ready >/dev/null 2>&1; then
 		active+=(aws)
+	fi
+	if qsa_sim_ready >/dev/null 2>&1; then
+		active+=(qsa-sim)
 	fi
 	if fake_iqm_ready >/dev/null 2>&1; then
 		active+=(fake-iqm)
@@ -583,6 +598,19 @@ start_aws() {
 		--timeout "${QFW_SITE_START_TIMEOUT}"
 }
 
+start_qsa_sim() {
+	require_directory || return 1
+	if prepare_component_start "QSA Sim QPM" qsa_sim_ready stop_qsa_sim; then
+		return 0
+	fi
+	run_qfw "${QFW_QSA_SIM_NODE}" qfw-qpm-svc start \
+		--scope site \
+		--run-dir "${qsa_sim_run_dir}" \
+		--site-config "${QFW_SITE_CONFIG}" \
+		--service-id shim-ibm-fake-lagos \
+		--timeout "${QFW_SITE_START_TIMEOUT}"
+}
+
 start_fake_iqm() {
 	require_directory || return 1
 	if prepare_component_start \
@@ -618,6 +646,7 @@ start_services() {
 	local shim_started=false
 	local ibm_started=false
 	local aws_started=false
+	local qsa_sim_started=false
 	local fake_iqm_started=false
 	local directory_was_ready=false
 	local nwqsim_was_ready=false
@@ -625,6 +654,7 @@ start_services() {
 	local shim_was_ready=false
 	local ibm_was_ready=false
 	local aws_was_ready=false
+	local qsa_sim_was_ready=false
 	local fake_iqm_was_ready=false
 	local gateway_was_ready=false
 
@@ -637,6 +667,7 @@ start_services() {
 		shim_ready >/dev/null 2>&1 && shim_was_ready=true
 		ibm_ready >/dev/null 2>&1 && ibm_was_ready=true
 		aws_ready >/dev/null 2>&1 && aws_was_ready=true
+		qsa_sim_ready >/dev/null 2>&1 && qsa_sim_was_ready=true
 		fake_iqm_ready >/dev/null 2>&1 && fake_iqm_was_ready=true
 		gateway_managed_ready >/dev/null 2>&1 && gateway_was_ready=true
 
@@ -651,6 +682,10 @@ start_services() {
 			if ${fake_iqm_was_ready}; then
 				stop_fake_iqm || return 1
 				fake_iqm_was_ready=false
+			fi
+			if ${qsa_sim_was_ready}; then
+				stop_qsa_sim || return 1
+				qsa_sim_was_ready=false
 			fi
 			if ${aws_was_ready}; then
 				stop_aws || return 1
@@ -720,7 +755,19 @@ start_services() {
 	fi
 	${aws_was_ready} || aws_started=true
 
+	if ! start_qsa_sim; then
+		${aws_started} && stop_aws >/dev/null 2>&1 || true
+		${ibm_started} && stop_ibm >/dev/null 2>&1 || true
+		${shim_started} && stop_shim >/dev/null 2>&1 || true
+		${iqm_started} && stop_iqm >/dev/null 2>&1 || true
+		${nwqsim_started} && stop_nwqsim >/dev/null 2>&1 || true
+		${directory_started} && stop_directory >/dev/null 2>&1 || true
+		return 1
+	fi
+	${qsa_sim_was_ready} || qsa_sim_started=true
+
 	if ! start_fake_iqm; then
+		${qsa_sim_started} && stop_qsa_sim >/dev/null 2>&1 || true
 		${aws_started} && stop_aws >/dev/null 2>&1 || true
 		${ibm_started} && stop_ibm >/dev/null 2>&1 || true
 		${shim_started} && stop_shim >/dev/null 2>&1 || true
@@ -733,6 +780,7 @@ start_services() {
 
 	if ! start_gateway; then
 		${fake_iqm_started} && stop_fake_iqm >/dev/null 2>&1 || true
+		${qsa_sim_started} && stop_qsa_sim >/dev/null 2>&1 || true
 		${aws_started} && stop_aws >/dev/null 2>&1 || true
 		${ibm_started} && stop_ibm >/dev/null 2>&1 || true
 		${shim_started} && stop_shim >/dev/null 2>&1 || true
@@ -760,6 +808,7 @@ service_status() {
 	local shim_output="" shim_status=-1
 	local ibm_output="" ibm_status=-1
 	local aws_output="" aws_status=-1
+	local qsa_sim_output="" qsa_sim_status=-1
 	local fake_iqm_output="" fake_iqm_status=-1
 	local gateway_output="" gateway_status=-1
 
@@ -781,6 +830,9 @@ service_status() {
 		esac
 		case "${target}" in
 		all|aws) aws_ready ;;
+		esac
+		case "${target}" in
+		all|qsa-sim) qsa_sim_ready ;;
 		esac
 		case "${target}" in
 		all|fake-iqm) fake_iqm_ready ;;
@@ -846,6 +898,15 @@ service_status() {
 		;;
 	esac
 	case "${target}" in
+	all|qsa-sim)
+		if qsa_sim_output="$(qsa_sim_ready 2>&1)"; then
+			qsa_sim_status=0
+		else
+			qsa_sim_status=$?
+		fi
+		;;
+	esac
+	case "${target}" in
 	all|fake-iqm)
 		if fake_iqm_output="$(fake_iqm_ready 2>&1)"; then
 			fake_iqm_status=0
@@ -872,6 +933,7 @@ service_status() {
 		"${shim_status}" "${shim_output}" \
 		"${ibm_status}" "${ibm_output}" \
 		"${aws_status}" "${aws_output}" \
+		"${qsa_sim_status}" "${qsa_sim_output}" \
 		"${fake_iqm_status}" "${fake_iqm_output}" \
 		"${gateway_status}" "${gateway_output}" <<'PY'
 import json
@@ -886,8 +948,9 @@ values = {
     "shim": ("Shim", int(sys.argv[9]), sys.argv[10]),
     "ibm": ("IBM", int(sys.argv[11]), sys.argv[12]),
     "aws": ("AWS", int(sys.argv[13]), sys.argv[14]),
-    "fake-iqm": ("Fake IQM", int(sys.argv[15]), sys.argv[16]),
-    "gateway": ("Gateway", int(sys.argv[17]), sys.argv[18]),
+    "qsa-sim": ("QSA Sim", int(sys.argv[15]), sys.argv[16]),
+    "fake-iqm": ("Fake IQM", int(sys.argv[17]), sys.argv[18]),
+    "gateway": ("Gateway", int(sys.argv[19]), sys.argv[20]),
 }
 selected = list(values) if target == "all" else [target]
 
@@ -999,6 +1062,7 @@ stop_services() {
 	if ${dry_run} || backline_ready >/dev/null 2>&1; then
 		stop_backline || status=1
 	fi
+	stop_qsa_sim || status=1
 	stop_aws || status=1
 	stop_ibm || status=1
 	stop_shim || status=1
@@ -1026,6 +1090,7 @@ start_target() {
 	shim) start_shim ;;
 	ibm) start_ibm ;;
 	aws) start_aws ;;
+	qsa-sim) start_qsa_sim ;;
 	fake-iqm) start_fake_iqm ;;
 	backline) start_backline ;;
 	gateway) start_gateway ;;
@@ -1044,6 +1109,7 @@ stop_target() {
 	shim) stop_shim ;;
 	ibm) stop_ibm ;;
 	aws) stop_aws ;;
+	qsa-sim) stop_qsa_sim ;;
 	fake-iqm) stop_fake_iqm ;;
 	backline) stop_backline ;;
 	gateway) stop_gateway ;;
@@ -1107,7 +1173,7 @@ main() {
 		return 2
 	}
 	case "${target}" in
-	all|directory|nwqsim|iqm|shim|ibm|aws|fake-iqm|backline|gateway) ;;
+	all|directory|nwqsim|iqm|shim|ibm|aws|qsa-sim|fake-iqm|backline|gateway) ;;
 	*) die "unknown target: ${target}" ;;
 	esac
 	if ! ${dry_run} && [[ ${EUID} -ne 0 ]]; then

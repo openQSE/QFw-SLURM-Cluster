@@ -185,6 +185,8 @@ services:
     <<: *qfw-telemetry
   fake-iqm-head:
     <<: *qfw-telemetry
+  qsa-sim-head:
+    <<: *qfw-telemetry
 
 volumes:
   prometheus_data:

@@ -1,0 +1,39 @@
+# Compose overlay: add the qsa-sim-head QPM service node.
+#
+# qsa-sim-head hosts the QPMd for the QSA simulator device (ibm-fake-lagos).
+# It is a slurmd service node like aws or fake-iqm-head, kept out of the base
+# stack so clusters that do not use the simulator do not carry the container.
+#
+#   ./do_configure.sh --qsa-sim
+#
+# The Slurm node (slurm.conf), QPM definition (config/site-services.yaml) and
+# `qfw-site-services --target qsa-sim` are part of the base configuration; this
+# overlay only supplies the container. The resource limits repeat the
+# x-slurmd-resources values from docker-compose.yml because YAML anchors do not
+# cross files.
+
+services:
+  qsa-sim-head:
+    cpus: 4
+    cpuset: "0-3"
+    mem_limit: 6g
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: qsa-sim-head
+    container_name: qsa-sim-head
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home:z
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network

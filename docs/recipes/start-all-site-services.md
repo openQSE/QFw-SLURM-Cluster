@@ -2,8 +2,8 @@
 
 This is the canonical administrator workflow. It starts the directory service
 on `slurmctld`, a three-node NWQSim DVM and QPMd, the IQM QPMd, IQM shim QPMd,
-IBM shim QPMd, AWS QPMd, fake IQM QPMd, and QFw Slurm gateway. The QPMd
-service nodes remain outside application allocations.
+IBM shim QPMd, AWS QPMd, QSA simulator QPMd (`qsa-sim-head`), fake IQM QPMd, and QFw Slurm
+gateway. The QPMd service nodes remain outside application allocations.
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ qfw-site-services status
 
 Run `man 8 qfw-site-services` for command details. Startup is dependency
 ordered and failure-safe: directory, NWQSim, IQM, IQM shim, IBM shim, AWS,
-fake IQM, then gateway. If a component fails to start, the command removes
+QSA simulator, fake IQM, then gateway. If a component fails to start, the command removes
 only components started by that invocation.
 
 ## Verify

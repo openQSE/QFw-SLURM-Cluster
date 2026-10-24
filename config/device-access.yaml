@@ -63,3 +63,28 @@ qpus:
       run_circuit: [qdmi]
       get_task_timing: [qdmi]
       get_task_metadata: [qdmi]
+  ibm-fake-lagos:
+    provider: ibm
+    resource-type: IBMQuantumSystem
+    provider-device-id: fake_lagos
+    url: http://HOST_IP_ADDRESS:8292
+    iam-endpoint: http://HOST_IP_ADDRESS:8292
+    service-crn: ""
+    s3-endpoint: http://HOST_IP_ADDRESS:9000
+    s3-bucket: ""
+    s3-region: ""
+    job-timeout-seconds: "400"
+    credential-db: qpu-users.json
+    libraries:
+      - qrmi
+    preference: qrmi
+    execution-owner: qrmi
+    caps:
+      get_device_info: [qrmi]
+      get_coupling_graph: [qrmi]
+      get_backend_info: [qrmi]
+      get_dynamic_backend_info: [qrmi]
+      run_circuit: [qrmi]
+      get_task_timing: [qrmi]
+      get_task_metadata: [qrmi]
+      get_calibration_snapshot: [qrmi]

@@ -17,6 +17,10 @@ containers=(
 	nwqsim-head nwqsim-worker-1 nwqsim-worker-2
 	iqm-head shim-head ibm-156-nh aws fake-iqm-head qec-backline-head
 )
+# Optional container from docker-compose.qsa-sim.yml.
+if docker inspect qsa-sim-head >/dev/null 2>&1; then
+	containers+=(qsa-sim-head)
+fi
 
 die() {
 	echo "qfw-provision: $*" >&2

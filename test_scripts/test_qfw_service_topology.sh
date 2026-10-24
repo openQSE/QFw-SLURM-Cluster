@@ -28,13 +28,15 @@ grep -q '^NodeName=ibm-156-nh .*qpm-shim-ibm-156-nh' "${slurm_config}"
 grep -q '^NodeName=aws .*qpm-shim-aws-qpm' "${slurm_config}"
 grep -A7 '^  aws:$' "${compose_config}" |
 	grep -q '^    container_name: aws$'
+grep -q '^NodeName=qsa-sim-head .*qpm-shim-ibm-fake-lagos' "${slurm_config}"
+grep -q '^  qsa-sim-head:$' "${repo_dir}/docker-compose.qsa-sim.yml"
 grep -q '^NodeName=fake-iqm-head .*qpm-fake-iqm' "${slurm_config}"
 grep -q '^set root /opt/qfw/openmpi$' "${repo_dir}/modulefiles/openmpi"
 grep -q '^export QFW_SIMULATOR_NODES=nwqsim-head,nwqsim-worker-1,nwqsim-worker-2$' \
 	"${user_profile}"
 
 if grep '^PartitionName=normal ' "${slurm_config}" |
-	grep -Eq 'nwqsim|iqm-head|shim-head|ibm-156-nh|aws|fake-iqm-head'; then
+	grep -Eq 'nwqsim|iqm-head|shim-head|ibm-156-nh|aws|qsa-sim-head|fake-iqm-head'; then
 	echo "service node leaked into the normal partition" >&2
 	exit 1
 fi
@@ -47,6 +49,9 @@ for resource in aws-ionq-aria-1 aws-rigetti-ankaa; do
 	grep -A1 "^\[resource \"${resource}\"\]$" "${plugin_config}" |
 		grep -q '^service_id=shim-aws-qpm$'
 done
+grep -q '\["ibm-fake-lagos"\] = "shim-ibm-fake-lagos"' "${resource_config}"
+grep -A1 '^\[resource "ibm-fake-lagos"\]$' "${plugin_config}" |
+	grep -q '^service_id=shim-ibm-fake-lagos$'
 grep -q '/etc/openqse/qfw/services/site-services.yaml:0644' \
 	"${repo_dir}/tools/provision-qfw-cluster.sh"
 python3 - "${device_config}" "${service_config}" \
