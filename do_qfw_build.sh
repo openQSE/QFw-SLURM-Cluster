@@ -189,12 +189,18 @@ if [ "${QFW_SKIP_VENV}" != "true" ]; then
     else
         echo "No QRMI version pin available; installing unpinned qrmi" >&2
     fi
+    # The Pulser frontend's requirements, in QFw checkouts that have them.
+    pulser_requirements=()
+    if [ -f "${QFW_SRC}/setup/pulser-requirements.txt" ]; then
+        pulser_requirements=(-r "${QFW_SRC}/setup/pulser-requirements.txt")
+    fi
     # QHW packages are copied into site-packages. QFw's requirements supply
     # their dependencies, including jsonschema.
     uv pip install \
         -r "${QFW_SRC}/setup/build-requirements.txt" \
         -r "${QFW_SRC}/setup/requirements.txt" \
         -r "${QFW_SRC}/setup/qdmi-requirements.txt" \
+        "${pulser_requirements[@]}" \
         "${qrmi_requirement}"
 else
     # shellcheck disable=SC1091
