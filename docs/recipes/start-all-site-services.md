@@ -15,9 +15,9 @@ service nodes remain outside application allocations.
   service CRN. AWS entries require the credentials expected by AWS QDMI. Keep
   the file owned by `root:root` with mode `0600`.
 - Do not accept AWS reservations until the shim can bind the reservation's
-  selected target to an AWS-QDMI device session. The cluster advertises
-  `aws-ionq-aria-1` and `aws-rigetti-ankaa`, but the current shim remains
-  single-target.
+  selected target to an AWS-QDMI device session. The cluster advertises the
+  single name `aws`, because the current shim remains single-target and
+  qfw-slurm rejects two public names sharing one `service_id`.
 
 The packaged credential file intentionally contains empty API keys. Never put
 a real key in the repository, image, shell command line, or application
