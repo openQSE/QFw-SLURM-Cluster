@@ -13,8 +13,8 @@ atom flipped).
 
 ## Prerequisites
 
-- The cluster is built and started from this branch (main once it merges),
-  not `release/v0.1`, whose `do_qfw_build.sh` does not install Pulser; see
+- The cluster is built and started from a checkout whose `do_qfw_build.sh`
+  installs Pulser (main once #68 merges), not `release/v0.1`; see
   [Build and start the cluster](build-and-start-cluster.md). The image's
   QFw does not matter for the developer build below.
 - A Pasqal Cloud account with a project. A free account from the
@@ -156,7 +156,7 @@ renewed either.
 | `422 ... exceeds the maximum number of atoms supported by this device (12)` | EMU_FREE takes at most 12 atoms; the 42-atom FRESNEL program cannot run on it. |
 | `QRMI job ... timed out after ... and it was stopped` | The Pasqal queue was longer than the device's `job-timeout-seconds`; the job was cancelled. |
 | `QPM reads ..., not Pulser sequences` | The reservation picked a non-Pasqal QPM; check `--device-id`. |
-| `No module named 'pulser'` | The QFw checkout predates its Pulser frontend, the cluster checkout lacks this branch's `do_qfw_build.sh`, or the venv predates either; rerun `./do_qfw_build.sh --clean`. |
+| `No module named 'pulser'` | The QFw checkout predates its Pulser frontend, the cluster checkout's `do_qfw_build.sh` predates #68, or the venv predates either; rerun `./do_qfw_build.sh --clean`. |
 
 ## Run on the Image's QFw
 
