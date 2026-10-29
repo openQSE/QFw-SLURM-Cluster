@@ -20,6 +20,8 @@ the tree being built is your own shared-dir/QFw checkout:
   build tree          \${QFW_BASE}/qfw-build
   install tree        \${QFW_BASE}/qfw-install
   mqt-core source     \${QFW_BASE}/mqt-core
+  libquantum source   \${QFW_BASE}/libquantum
+  qiskit compiler     \${QFW_BASE}/libquantum-compiler-qiskit
 
 To build a second checkout under the shared mount into its own prefix, set
 QFW_DEV_SRC, QFW_DEV_BUILD and QFW_DEV_PREFIX (and QFW_DEV_VENV to use another
@@ -90,6 +92,8 @@ docker exec -i \
     -e QFW_DEV_VENV="${QFW_DEV_VENV:-}" \
     -e QFW_DEV_BUILD="${QFW_DEV_BUILD:-}" \
     -e QFW_DEV_PREFIX="${QFW_DEV_PREFIX:-}" \
+    -e LIBQUANTUM_DEV_SRC="${LIBQUANTUM_DEV_SRC:-}" \
+    -e QISKIT_COMPILER_DEV_SRC="${QISKIT_COMPILER_DEV_SRC:-}" \
     "${CONTAINER}" bash -s <<'REMOTE'
 set -euo pipefail
 
@@ -98,6 +102,8 @@ QFW_SRC="${QFW_DEV_SRC:-${QFW_BASE}/QFw}"
 QFW_VENV="${QFW_DEV_VENV:-${QFW_BASE}/qfw-venv}"
 QFW_BUILD="${QFW_DEV_BUILD:-${QFW_BASE}/qfw-build}"
 QFW_PREFIX="${QFW_DEV_PREFIX:-${QFW_BASE}/qfw-install}"
+LIBQUANTUM_SRC="${LIBQUANTUM_DEV_SRC:-${QFW_BASE}/libquantum}"
+QISKIT_COMPILER_SRC="${QISKIT_COMPILER_DEV_SRC:-${QFW_BASE}/libquantum-compiler-qiskit}"
 QFW_HOST_BASE="${QFW_HOST_BASE:-shared-dir}"
 QFW_CONTAINER_NAME="${QFW_CONTAINER_NAME:-slurmctld}"
 MQT_CORE_SRC="${QFW_BASE}/mqt-core"
@@ -148,6 +154,14 @@ if [ ! -f "${QFW_SRC}/CMakeLists.txt" ]; then
     echo "    git -C ${QFW_HOST_BASE}/QFw log --oneline -1" >&2
     exit 1
 fi
+
+for package_source in "${LIBQUANTUM_SRC}" "${QISKIT_COMPILER_SRC}"; do
+    if [ ! -f "${package_source}/pyproject.toml" ]; then
+        echo "No installable Python package at ${package_source}." >&2
+        echo "Mount the libquantum repositories under ${QFW_BASE}." >&2
+        exit 1
+    fi
+done
 
 if [ "${QFW_SKIP_VENV}" != "true" ]; then
     if [ ! -f "${QFW_SRC}/setup/qdmi-requirements.txt" ]; then
@@ -242,6 +256,28 @@ cmake --build "${QFW_BUILD}" -j "${jobs}"
 
 echo "== cmake install"
 cmake --install "${QFW_BUILD}"
+
+echo "== libquantum and Qiskit compiler wheels"
+wheelhouse="${QFW_BASE}/libquantum-wheelhouse"
+rm -rf "${wheelhouse}"
+mkdir -p "${wheelhouse}"
+"${QFW_VENV}/bin/python" -m pip wheel --no-deps \
+    --wheel-dir "${wheelhouse}" \
+    "${LIBQUANTUM_SRC}" \
+    "${QISKIT_COMPILER_SRC}"
+uv pip install --python "${QFW_VENV}" --no-deps "${wheelhouse}"/*.whl
+"${QFW_VENV}/bin/python" - <<'PY'
+from pathlib import Path
+
+import libquantum
+from libquantum_compiler_qiskit import plugin_path
+
+manifest = Path(plugin_path()) / "compiler.json"
+if not manifest.is_file():
+    raise SystemExit(f"missing packaged compiler manifest: {manifest}")
+print(f"libquantum={libquantum.__file__}")
+print(f"qiskit_compiler_manifest={manifest}")
+PY
 
 # A DEFw without libfabric still builds and runs, and says so in a single
 # configure line, so check the library that was installed.
