@@ -5,6 +5,11 @@ checkouts, then runs the same installed QFw example through the legacy and V2
 backend paths in one qfw-slurm allocation. It is simulator qualification, not
 physical-device evidence.
 
+The frozen simulator qualification inputs are QFw `daae4a59e47c`, qfw-slurm
+`e940e0a60022`, QFw-SLURM-Cluster `61ef996c7e97`, libquantum `62ec4a809a32`,
+libquantum-compiler-qiskit `698062f20752`, and Qiskit `2.2.3`. QFw owns the QPM
+query and qhw implementations at the same `daae4a59e47c` revision.
+
 ## Freeze the sources
 
 Record the exact commits before building.
