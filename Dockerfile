@@ -413,7 +413,9 @@ RUN set -ex \
     && test -x "${TNQVM_PREFIX}/bin/circuit_runner.tnqvm" \
     && test -f "${TNQVM_PREFIX}/xacc/plugins/libtnqvm.so"
 
-# Share QFw's QDMI package pins with developer installs.
+COPY config/python-build-constraints.txt /opt/qfw/python-build-constraints.txt
+
+# Share QFw's QDMI package pins and isolated-build constraints with developer installs.
 # DEFw finds libfabric through pkg-config. Without libfabric's .pc file on the
 # search path it still builds, as a TCP-only transport, so the last check makes
 # sure the installed library links libfabric.
@@ -422,6 +424,7 @@ RUN set -ex \
     && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
         pip setuptools wheel \
     && uv pip install --python "${QFW_IMAGE_VENV}" \
+        --build-constraint /opt/qfw/python-build-constraints.txt \
         -r "${QFW_IMAGE_SOURCE}/setup/build-requirements.txt" \
         -r "${QFW_IMAGE_SOURCE}/setup/requirements.txt" \
         "qrmi==${QRMI_VERSION}" \
