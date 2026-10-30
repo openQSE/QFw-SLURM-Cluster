@@ -62,7 +62,7 @@ services:
     hostname: otel-collector
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
-      - ./telemetry/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+      - ./telemetry/otel-collector.yaml:/etc/otelcol/config.yaml:ro,z
     expose:
       - "4317"
       - "4318"
@@ -82,7 +82,7 @@ services:
       - --storage.tsdb.retention.time=15d
       - --web.enable-remote-write-receiver
     volumes:
-      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./telemetry/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
       - prometheus_data:/prometheus
     ports:
       - "127.0.0.1:9090:9090"
@@ -97,7 +97,7 @@ services:
     hostname: tempo
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
-      - ./telemetry/tempo.yaml:/etc/tempo.yaml:ro
+      - ./telemetry/tempo.yaml:/etc/tempo.yaml:ro,z
       - tempo_data:/var/tempo
     ports:
       - "127.0.0.1:3200:3200"
@@ -110,7 +110,7 @@ services:
     hostname: loki
     command: ["-config.file=/etc/loki.yaml"]
     volumes:
-      - ./telemetry/loki.yaml:/etc/loki.yaml:ro
+      - ./telemetry/loki.yaml:/etc/loki.yaml:ro,z
       - loki_data:/loki
     ports:
       - "127.0.0.1:3100:3100"
@@ -138,8 +138,8 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_NEWS_NEWS_FEED_ENABLED: "false"
     volumes:
-      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards/qfw:ro
+      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro,z
+      - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards/qfw:ro,z
       - grafana_data:/var/lib/grafana
     ports:
       - "${QFW_GRAFANA_PORT:-3000}:3000"
