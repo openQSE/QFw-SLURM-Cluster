@@ -19,7 +19,7 @@ repo="${QCSC_PREFECT_REPO:-https://github.com/qiskit-community/qcsc-prefect.git}
 # qcsc-prefect commit validated with this recipe, including QFw support and the
 # H2/STO-3G FCIDUMP used by the fake-device pipe-cleaner. Override to follow a
 # newer commit or branch.
-ref="${QCSC_PREFECT_REF:-6a441958bf4fdbb78c0e173f230950020c55184d}"
+ref="${QCSC_PREFECT_REF:-95385887afe0ee6e4c02598e4ab74909574315b7}"
 image_venv="${QFW_IMAGE_VENV:-/opt/openqse/qfw-venv}"
 prefix="${QFW_PREFECT_PREFIX:-/opt/openqse/qfw}"
 
@@ -108,7 +108,11 @@ uv pip freeze --python "${IMAGE_VENV}" 2>/dev/null |
 # needs 0.18. Nothing on the Prefect path uses iqm-exa-common, so this venv
 # overrides that one pin instead of carrying a pydantic_numpy that cannot
 # import under NumPy 2.5.
-printf 'ruamel-yaml>=0.18.5,<0.19\n' >"${override}"
+# Recreate the working QFw environment while allowing the Prefect dependencies
+# to resolve against the image's validated package set. The Prefect path needs
+# a newer ruamel-yaml for pydantic_numpy under NumPy 2.5, and Qiskit 2.5.2 is
+# preserved from the QFw image.
+printf 'ruamel-yaml>=0.18.5,<0.19\nqiskit==2.5.2\n' >"${override}"
 say "$(wc -l <"${base}" | tr -d ' ') packages pinned from ${IMAGE_VENV}"
 
 # 3. The venv itself.

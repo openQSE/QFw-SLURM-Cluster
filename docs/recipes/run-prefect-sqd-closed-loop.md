@@ -93,63 +93,18 @@ Prefect
   -> Slurm SBD solver
 ```
 
-Before running the SQD workflow, follow the
-[IBM QSA simulator recipe](https://github.com/openQSE/QFw-SLURM-Cluster/blob/main/docs/recipes/start-ibm-qsa-sim.md)
-to configure and start QSA with `fake_lagos`.
-
-The
-[IBM job recipe](https://github.com/openQSE/QFw-SLURM-Cluster/blob/main/docs/recipes/run-ibm-job.md)
-can be used first as a standalone smoke test of the QFw/QRMI/QSA path.
-
-The S3 configuration used by QSA must match the S3 endpoint and credentials
-used by QFw/QRMI. A mismatch can allow backend metadata queries to succeed
-while quantum task result retrieval fails later in the workflow.
-
-The standard SQD workflow uses the N2 FCIDUMP by default. For this pipe-cleaner,
-use the smaller H2/STO-3G FCIDUMP from `qcsc-prefect`:
-
-```text
-algorithms/sbd/data/fcidump_H2_STO3G.txt
-```
-
-The H2/STO-3G problem contains 2 spatial orbitals, corresponding to 4 spin
-orbitals / qubits, and therefore fits comfortably on the 7-qubit
-`fake_lagos` device.
-
 ### Configure QFw access to fake Lagos
 
-Before provisioning the cluster, review:
+The QFw-SLURM cluster includes the `ibm-fake-lagos` device for use with the
+QSA simulator.
 
-```text
-config/device-access.yaml
-config/qpu-users.json
-```
+The simulator-specific device-access and credential files are created as part
+of the [IBM QSA simulator recipe](start-ibm-qsa-sim.md). These files are kept
+under the shared workspace and are separate from the real-device configuration
+in `config/device-access.yaml` and `config/qpu-users.json`.
 
-Configure a QFw logical device that maps to the QSA `fake_lagos` backend and
-ensure that the corresponding QRMI/QSA configuration is available.
-
-The device must support the telemetry capability required to construct the
-device-specific backend target.
-
-For QRMI-backed IBM-style devices, the corresponding entry in
-`config/device-access.yaml` requires:
-
-```yaml
-caps:
-  run_circuit: [qrmi]
-  get_backend_info: [qrmi]
-  get_task_timing: [qrmi]
-  get_task_metadata: [qrmi]
-```
-
-`get_backend_info` allows `QFwBackend.target` to obtain the device-specific
-target through the QPM telemetry path.
-
-> **Important:** Cluster provisioning installs the device and credential
-> configuration into the QFw service and compute containers. Editing the files
-> under `config/` afterward does not automatically update an already-provisioned
-> environment. If either file changes later, reprovision or synchronize the
-> updated files to the running containers and restart the QFw site services.
+The [IBM job recipe](run-ibm-job.md) can be used as a standalone smoke test of
+the QFw/QRMI/QSA path before running the full SQD workflow.
 
 ### Provision the QFw-SLURM cluster
 
@@ -211,10 +166,11 @@ Everything else runs as `user-a` inside that workspace:
 2. Create `venv/` with the image venv's package set so that QFw's Qiskit,
    QRMI, and QDMI versions remain in force, then install Prefect, Ray, ffsim,
    PySCF, `qiskit-addon-sqd`, and the qcsc-prefect packages.
-3. Override the image's `ruamel-yaml` pin because the Prefect path requires a
-   version compatible with `pydantic_numpy` under NumPy 2.5.
-4. Hold FastAPI below 0.150 because Prefect 3.8.8 still passes `min_items` to
-   `Body()`, which newer FastAPI versions no longer accept.
+3. Override dependency constraints needed to reproduce the working QFw
+   environment, including `ruamel-yaml` for compatibility with
+   `pydantic_numpy` under NumPy 2.5 and Qiskit 2.5.2 from the QFw image.
+4. Hold FastAPI below 0.150 because Prefect's server still uses an API removed
+   by newer FastAPI versions.
 5. Rebuild ffsim from source when its wheel fails with an illegal instruction,
    which can occur on Apple Silicon hosts.
 6. Build the native SBD solver with the image's OpenMPI and OpenBLAS.
@@ -232,10 +188,12 @@ Start the Prefect server and deployment:
 PREFECT_RAY_NUM_CPUS=4 tools/prefect-sqd start
 ```
 
-Create the QFw block for the fake-Lagos device:
+For a lightweight pipe-cleaner, create the QFw block with a small shot count:
 
 ```bash
-QFW_PREFECT_DEVICE=<fake-lagos-device-id> tools/prefect-sqd blocks
+SBD_SHOTS=500 \
+QFW_PREFECT_DEVICE=ibm-fake-lagos \
+tools/prefect-sqd blocks
 ```
 
 Check the deployment:
@@ -271,7 +229,18 @@ and QFw-SLURM.
 
 ### Run the H2 pipe-cleaner
 
-Override the default N2 input with the smaller H2 input for this run:
+The standard SQD workflow uses the N2 FCIDUMP by default. For the fake-Lagos
+pipe-cleaner, use the smaller H2/STO-3G FCIDUMP from `qcsc-prefect`:
+
+```text
+algorithms/sbd/data/fcidump_H2_STO3G.txt
+```
+
+The H2/STO-3G problem contains 2 spatial orbitals, corresponding to 4 spin
+orbitals / qubits, and therefore fits comfortably on the 7-qubit
+`fake_lagos` device.
+
+Override the default N2 input with H2 for this run:
 
 ```bash
 SBD_FCIDUMP=algorithms/sbd/data/fcidump_H2_STO3G.txt \
