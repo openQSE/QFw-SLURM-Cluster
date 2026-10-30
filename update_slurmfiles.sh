@@ -18,8 +18,11 @@ for var in "$@"
 do
     if [ "$var" = "slurmdbd.conf" ] || [ "$var" = "slurm.conf" ] || [ "$var" = "cgroup.conf" ] || [ "$var" = "rest.conf" ] || [ "$var" = "gres.conf" ]
     then
-        export SLURM_TMP=$(cat $var)
-        docker exec slurmctld bash -c "echo \"$SLURM_TMP\" >/etc/slurm/\"$var\""
+        # Stream the checkout's file in as the new content of the volume's
+        # copy, which keeps that copy's owner and mode and writes the bytes as
+        # they are. (Echoing the content through bash -c expanded $ and
+        # backticks and dropped trailing newlines.)
+        docker exec -i slurmctld sh -c "cat >/etc/slurm/${var}" <"${SCRIPT_DIR}/${var}"
         restart=true
     fi
 done

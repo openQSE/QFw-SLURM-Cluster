@@ -49,8 +49,7 @@ On a cluster that is already set up, pull this, then run these in place of `./do
 ```bash
 ./do_build.sh                       # modulefiles/backline is copied into the image
 ./do_restart.sh --force-recreate    # recreate the containers from it, adding qec-backline-head
-./update_slurmfiles.sh slurm.conf   # the etc_slurm volume keeps the old slurm.conf
-./tools/provision-qfw-cluster.sh    # now reaches qec-backline-head
+./do_startup.sh                     # refreshes slurm.conf in the etc_slurm volume, then provisions qec-backline-head
 ```
 
 ## Run a Backline program

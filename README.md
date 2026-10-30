@@ -541,8 +541,10 @@ Other important shared paths are:
 
 The `/etc/slurm` volume is important. The Docker image copies repository [Slurm]
 configuration into `/etc/slurm` during build, but once the named volume exists,
-the volume overrides the image-baked files. Use `./update_slurmfiles.sh` to
-refresh live [Slurm] config without rebuilding:
+the volume overrides the image-baked files. `./do_startup.sh` refreshes the
+files in the volume that differ from the checkout before it provisions, and
+restarts the containers when it does. Use `./update_slurmfiles.sh` to refresh
+live [Slurm] config by hand without rebuilding:
 
 ```bash
 ./update_slurmfiles.sh slurm.conf
@@ -703,6 +705,10 @@ docker compose --env-file qfw-install.env restart
 ./register_cluster.sh
 ```
 
+`./do_startup.sh` does this refresh itself for every one of `slurm.conf`,
+`slurmdbd.conf`, `cgroup.conf`, `rest.conf` and `gres.conf` that differs from
+the checkout, before it registers and provisions.
+
 Rebuild the image only when you change image contents, such as:
 
 - `Dockerfile`
@@ -754,6 +760,17 @@ If [Slurm] config changes are not visible inside the running containers:
 
 ```bash
 ./update_slurmfiles.sh slurm.conf gres.conf rest.conf cgroup.conf
+```
+
+If `./tools/provision-qfw-cluster.sh` reports that a container is not running
+(older checkouts failed instead with Docker's `is not running` or podman's
+`container state improper`), the cluster was created before that node was
+added: the volume's `slurm.conf` has no entry for it, so its `slurmd` exits at
+once. `./do_startup.sh` refreshes the volume, restarts the containers and
+provisions:
+
+```bash
+./do_startup.sh
 ```
 
 To rebuild the mounted developer venv from scratch:
