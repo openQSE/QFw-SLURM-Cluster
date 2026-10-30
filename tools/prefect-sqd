@@ -213,7 +213,7 @@ do_run() {
 	local params
 	params=$(cat <<EOF
 {"parameters": {
-  "fcidump": "${SBD_FCIDUMP:-${QCSC_DIR}/algorithms/sbd/data/fcidump_N2_MO.txt}",
+  "fcidump": "${QCSC_DIR}/${SBD_FCIDUMP:-algorithms/sbd/data/fcidump_N2_MO.txt}",
   "sqd_dim": ${dim},
   "quantum_source": "${source}",
   "random_seed": 24,

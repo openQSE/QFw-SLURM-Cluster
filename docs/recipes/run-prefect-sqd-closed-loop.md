@@ -93,18 +93,20 @@ Prefect
   -> Slurm SBD solver
 ```
 
-Before running the SQD workflow, set up the IBM QSA simulator by following:
+Before running the SQD workflow, follow the
+[IBM QSA simulator recipe](https://github.com/openQSE/QFw-SLURM-Cluster/blob/main/docs/recipes/start-ibm-qsa-sim.md)
+to configure and start QSA with `fake_lagos`.
 
-[Start the IBM QSA simulator](https://github.com/openQSE/QFw-SLURM-Cluster/blob/main/docs/recipes/start-ibm-qsa-sim.md)
+The
+[IBM job recipe](https://github.com/openQSE/QFw-SLURM-Cluster/blob/main/docs/recipes/run-ibm-job.md)
+can be used first as a standalone smoke test of the QFw/QRMI/QSA path.
 
-For a standalone QFw-SLURM example showing how jobs are submitted to an IBM
-device or the QSA simulator, see:
+The S3 configuration used by QSA must match the S3 endpoint and credentials
+used by QFw/QRMI. A mismatch can allow backend metadata queries to succeed
+while quantum task result retrieval fails later in the workflow.
 
-[Run an IBM job](https://github.com/openQSE/QFw-SLURM-Cluster/blob/main/docs/recipes/run-ibm-job.md)
-
-For this pipe-cleaner, configure QSA with the `fake_lagos` backend.
-
-The pipe-cleaner uses a small H2/STO-3G FCIDUMP from `qcsc-prefect`:
+The standard SQD workflow uses the N2 FCIDUMP by default. For this pipe-cleaner,
+use the smaller H2/STO-3G FCIDUMP from `qcsc-prefect`:
 
 ```text
 algorithms/sbd/data/fcidump_H2_STO3G.txt
@@ -113,26 +115,6 @@ algorithms/sbd/data/fcidump_H2_STO3G.txt
 The H2/STO-3G problem contains 2 spatial orbitals, corresponding to 4 spin
 orbitals / qubits, and therefore fits comfortably on the 7-qubit
 `fake_lagos` device.
-
-### Configure the QSA simulator
-
-Follow the
-[IBM QSA simulator recipe](https://github.com/openQSE/QFw-SLURM-Cluster/blob/main/docs/recipes/start-ibm-qsa-sim.md)
-to configure and start QSA with `fake_lagos`.
-
-The simulator should expose the fake Lagos device metadata, including its
-7-qubit topology and coupling map.
-
-The S3 configuration used by QSA must match the S3 endpoint and credentials
-used by QFw/QRMI.
-
-A mismatch can allow backend metadata queries to succeed while quantum task
-result retrieval fails later in the workflow.
-
-The
-[IBM job recipe](https://github.com/openQSE/QFw-SLURM-Cluster/blob/main/docs/recipes/run-ibm-job.md)
-can be used first as a standalone smoke test of the QFw/QRMI/QSA path before
-running the full SQD workflow.
 
 ### Configure QFw access to fake Lagos
 
@@ -272,14 +254,6 @@ tools/prefect-sqd status
 `PREFECT_RAY_NUM_CPUS` bounds the Ray task runner used to fan out the SQD
 walkers.
 
-Set:
-
-```bash
-SBD_TASK_RUNNER=concurrent
-```
-
-to use threads instead.
-
 `blocks` writes:
 
 ```text
@@ -297,14 +271,16 @@ and QFw-SLURM.
 
 ### Run the H2 pipe-cleaner
 
-The normal SQD workflow uses the N2 FCIDUMP by default.
-
-For the fake-Lagos pipe-cleaner, override the FCIDUMP with the small H2 input:
+Override the default N2 input with the smaller H2 input for this run:
 
 ```bash
-SBD_FCIDUMP="${QCSC_DIR}/algorithms/sbd/data/fcidump_H2_STO3G.txt" \
+SBD_FCIDUMP=algorithms/sbd/data/fcidump_H2_STO3G.txt \
 tools/prefect-sqd run qfw 10000 1
 ```
+
+This override is only needed for the simulator pipe-cleaner. Real-device runs
+continue to use the default N2 FCIDUMP unless a different input is explicitly
+selected.
 
 The arguments to `run` are:
 
@@ -357,7 +333,7 @@ The H2 input is intended only as a lightweight end-to-end validation.
 After the simulator pipe-cleaner succeeds, configure a real QFw-supported
 device.
 
-The existing SQD example uses the N2 FCIDUMP:
+The existing SQD example uses the N2 FCIDUMP by default:
 
 ```text
 algorithms/sbd/data/fcidump_N2_MO.txt
@@ -408,47 +384,31 @@ including the API key and service CRN.
 For another QFw-supported device, configure the corresponding logical device,
 provider mapping, and credentials required by that provider.
 
-Configure these files before running:
+### Apply the real-device configuration
+
+After updating `config/device-access.yaml` and `config/qpu-users.json`,
+reprovision the QFw-SLURM cluster so that the updated configuration is copied
+into the QFw service and compute containers:
 
 ```bash
 tools/provision-qfw-cluster.sh
 ```
 
-If the device configuration changes after provisioning, reprovision or
-synchronize the configuration into the running containers and restart the QFw
-site services.
-
-### Provision the cluster and workflow
-
-From the Docker host:
-
-```bash
-tools/provision-qfw-cluster.sh
-```
-
-Enter the cluster:
+Enter the cluster environment and start the QFw site services:
 
 ```bash
 ./do_ssh.sh
-```
-
-Start the QFw site services:
-
-```bash
 qfw-site-services start
 ```
 
-Return to the Docker host:
+Then return to the Docker host:
 
 ```bash
 exit
 ```
 
-Provision the Prefect environment:
-
-```bash
-tools/provision-prefect.sh
-```
+The Prefect workflow environment does not need to be reprovisioned solely
+because the selected QFw device has changed.
 
 ### Create the real-device QFw block
 
