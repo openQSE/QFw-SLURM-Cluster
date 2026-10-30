@@ -99,39 +99,10 @@ The QFw-SLURM cluster includes the `ibm-fake-lagos` device for use with the
 QSA simulator.
 
 The simulator-specific device-access and credential files are created as part
-of the [IBM QSA simulator recipe](start-ibm-qsa-sim.md). These files are kept
-under the shared workspace and are separate from the real-device configuration
-in `config/device-access.yaml` and `config/qpu-users.json`.
+of the [IBM QSA simulator recipe](start-ibm-qsa-sim.md).
 
 The [IBM job recipe](run-ibm-job.md) can be used as a standalone smoke test of
 the QFw/QRMI/QSA path before running the full SQD workflow.
-
-### Provision the QFw-SLURM cluster
-
-From the Docker host:
-
-```bash
-cd /path/to/QFw-SLURM-Cluster
-tools/provision-qfw-cluster.sh
-```
-
-Enter the cluster environment:
-
-```bash
-./do_ssh.sh
-```
-
-Start the QFw site services:
-
-```bash
-qfw-site-services start
-```
-
-Exit back to the Docker host:
-
-```bash
-exit
-```
 
 ### Provision the Prefect workflow environment
 
@@ -212,13 +183,14 @@ tools/prefect-sqd status
 `PREFECT_RAY_NUM_CPUS` bounds the Ray task runner used to fan out the SQD
 walkers.
 
-`blocks` writes:
+`blocks` creates the Slurm SBD configuration and stores the SQD runtime options,
+including the sampling shot count, in Prefect.
+
+The generated cluster configuration is written to:
 
 ```text
 /workspace/home/user-a/sbd_blocks.toml
 ```
-
-for the cluster and creates the Slurm SBD blocks.
 
 It also registers the `QFwResource` block type and creates the `qfw-runner`
 block for `QFW_PREFECT_DEVICE`.
@@ -230,27 +202,18 @@ and QFw-SLURM.
 ### Run the H2 pipe-cleaner
 
 The standard SQD workflow uses the N2 FCIDUMP by default. For the fake-Lagos
-pipe-cleaner, use the smaller H2/STO-3G FCIDUMP from `qcsc-prefect`:
+pipe-cleaner, use the smaller H2/STO-3G FCIDUMP.
 
-```text
-algorithms/sbd/data/fcidump_H2_STO3G.txt
-```
+The shot count was configured when the Prefect blocks were created using
+`SBD_SHOTS`. This pipe-cleaner uses 500 shots for a lightweight validation;
+increase the value as needed for other runs.
 
-The H2/STO-3G problem contains 2 spatial orbitals, corresponding to 4 spin
-orbitals / qubits, and therefore fits comfortably on the 7-qubit
-`fake_lagos` device.
-
-Override the default N2 input with H2 for this run:
+Override the default N2 input with H2 for this pipe-cleaner:
 
 ```bash
 SBD_FCIDUMP=algorithms/sbd/data/fcidump_H2_STO3G.txt \
 tools/prefect-sqd run qfw 10000 1
 ```
-
-This override is only needed for the simulator pipe-cleaner. Real-device runs
-continue to use the default N2 FCIDUMP unless a different input is explicitly
-selected.
-
 The arguments to `run` are:
 
 ```text
@@ -384,7 +347,9 @@ because the selected QFw device has changed.
 For the included IBM example:
 
 ```bash
-QFW_PREFECT_DEVICE=ibm-156-nh tools/prefect-sqd blocks
+SBD_SHOTS=<shots> \
+QFW_PREFECT_DEVICE=ibm-156-nh \
+tools/prefect-sqd blocks
 ```
 
 The command should report:
@@ -396,7 +361,9 @@ Device ID: ibm-156-nh
 For another configured QFw device:
 
 ```bash
-QFW_PREFECT_DEVICE=<device-id> tools/prefect-sqd blocks
+SBD_SHOTS=<shots> \
+QFW_PREFECT_DEVICE=<device-id> \
+tools/prefect-sqd blocks
 ```
 
 ### Run the N2 SQD workflow
