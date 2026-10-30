@@ -47,3 +47,7 @@ docker-compose.override.yml
 # ElectroBoy local runtime state
 .electroboy/local/
 .electroboy/shared/runs/*/progress/
+/shared-dir/chemistry_he/
+/shared-dir/streamflow-chemistry/
+/shared-dir/home/
+/streamflow/chemistry/**/__pycache__/
