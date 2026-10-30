@@ -15,6 +15,7 @@ using the virtual QFw Slurm cluster.
 | Run a guarded real-IQM application job | [Run an IQM job](run-iqm-job.md) |
 | Run a circuit against an IBM Quantum System device | [Run an IBM job](run-ibm-job.md) |
 | Run a heterogeneous application job | [Run a heterogeneous NWQSim job](run-heterogeneous-nwqsim-job.md) |
+| Run a Pulser program on Pasqal (developer build) | [Run a Pasqal Pulser job](run-pasqal-pulser-job.md) |
 | Inspect and recover the cluster | [Inspect and recover services](inspect-and-recover-services.md) |
 | Run the Prefect-orchestrated SQD closed loop | [Run the Prefect SQD closed loop](run-prefect-sqd-closed-loop.md) |
 | Run a workflow's quantum stage as a qfw-slurm job | [Run a quantum stage through qfw-slurm](run-quantum-stage-through-qfw-slurm.md) |
