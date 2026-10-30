@@ -54,10 +54,32 @@ done < <(
 )
 [[ ${#users[@]} -gt 0 ]] || die "no users are defined in ${user_file}"
 
+# Every container must be running before anything is provisioned. A container
+# that compose created but that is not running passes a plain `docker inspect`,
+# and the first `docker exec` into it then fails with Docker's "is not running"
+# or podman's "container state improper", which names neither the container nor
+# the cause (#77). On a cluster that already existed, the usual cause is a node
+# added to the checkout after the cluster was created: the etc_slurm volume
+# still holds the old slurm.conf, so that node's slurmd finds no NodeName and
+# exits at once. ./do_startup.sh refreshes the volume before it provisions.
+unavailable=0
 for container in "${containers[@]}"; do
-	docker inspect "${container}" >/dev/null 2>&1 ||
-		die "container is not available: ${container}"
+	if ! state="$(docker inspect --format '{{.State.Status}}' \
+			"${container}" 2>/dev/null)"; then
+		echo "qfw-provision: container does not exist: ${container}" >&2
+		unavailable=1
+	elif [[ "${state}" != running ]]; then
+		echo "qfw-provision: container is not running (${state}): ${container}" >&2
+		docker logs --tail 5 "${container}" 2>&1 | sed 's/^/    /' >&2 || true
+		unavailable=1
+	fi
+done
+[[ "${unavailable}" -eq 0 ]] ||
+	die "every container must be running; on a cluster created before a node" \
+		"was added, ./do_startup.sh refreshes the Slurm configuration in the" \
+		"etc_slurm volume and restarts the containers before it provisions"
 
+for container in "${containers[@]}"; do
 	for definition in "${users[@]}"; do
 		IFS=: read -r name uid gid home shell <<<"${definition}"
 		[[ "${name}" =~ ^[a-z_][a-z0-9_-]*$ ]] ||
