@@ -159,13 +159,16 @@ Start the Prefect server and deployment:
 PREFECT_RAY_NUM_CPUS=4 tools/prefect-sqd start
 ```
 
-For a lightweight pipe-cleaner, create the QFw block with a small shot count:
+For a lightweight pipe-cleaner, create the QFw block with a small shot count.
+`SBD_SHOTS` controls the number of shots stored in the SQD runtime
+options used by the workflow:
 
 ```bash
 SBD_SHOTS=500 \
 QFW_PREFECT_DEVICE=ibm-fake-lagos \
 tools/prefect-sqd blocks
 ```
+Increase `SBD_SHOTS` as needed for other validation or real-device runs.
 
 Check the deployment:
 
@@ -203,10 +206,6 @@ and QFw-SLURM.
 
 The standard SQD workflow uses the N2 FCIDUMP by default. For the fake-Lagos
 pipe-cleaner, use the smaller H2/STO-3G FCIDUMP.
-
-The shot count was configured when the Prefect blocks were created using
-`SBD_SHOTS`. This pipe-cleaner uses 500 shots for a lightweight validation;
-increase the value as needed for other runs.
 
 Override the default N2 input with H2 for this pipe-cleaner:
 
