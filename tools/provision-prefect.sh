@@ -16,9 +16,10 @@ workspace="${QFW_PREFECT_ROOT:-/workspace/qfw-container-base/qfw-prefect}"
 venv="${QFW_PREFECT_VENV:-${workspace}/venv}"
 checkout="${QCSC_PREFECT_DIR:-${workspace}/qcsc-prefect}"
 repo="${QCSC_PREFECT_REPO:-https://github.com/qiskit-community/qcsc-prefect.git}"
-# The merge of qiskit-community/qcsc-prefect#48, the QFw support this recipe
-# was validated with. Override to follow a newer commit or branch.
-ref="${QCSC_PREFECT_REF:-96fed8eed8aa00966342951ec1e9957d5f40fd80}"
+# qcsc-prefect commit validated with this recipe, including QFw support and the
+# H2/STO-3G FCIDUMP used by the fake-device pipe-cleaner. Override to follow a
+# newer commit or branch.
+ref="${QCSC_PREFECT_REF:-6a441958bf4fdbb78c0e173f230950020c55184d}"
 image_venv="${QFW_IMAGE_VENV:-/opt/openqse/qfw-venv}"
 prefix="${QFW_PREFECT_PREFIX:-/opt/openqse/qfw}"
 
