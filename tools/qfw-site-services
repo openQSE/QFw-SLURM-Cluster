@@ -154,6 +154,7 @@ shift 6
 export QFW_SHARED_ROOT="${qfw_shared_root}"
 export QFW_SITE_CONFIG="${qfw_site_config}"
 export QFW_SIMULATOR_NODES="${qfw_simulator_nodes}"
+export QFW_PREFIX="${qfw_prefix}"
 while (( qfw_forwarded_count > 0 )); do
 	export "$1"
 	shift
