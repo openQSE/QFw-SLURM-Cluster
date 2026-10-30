@@ -186,8 +186,8 @@ tools/prefect-sqd status
 `PREFECT_RAY_NUM_CPUS` bounds the Ray task runner used to fan out the SQD
 walkers.
 
-`blocks` creates the Slurm SBD configuration and stores the SQD runtime options,
-including the sampling shot count, in Prefect.
+`blocks` creates the Slurm SBD configuration and stores the SQD runtime options
+in Prefect.
 
 The generated cluster configuration is written to:
 
@@ -364,6 +364,7 @@ SBD_SHOTS=<shots> \
 QFW_PREFECT_DEVICE=<device-id> \
 tools/prefect-sqd blocks
 ```
+Set `SBD_SHOTS` to the desired sampling shot count for the real-device run.
 
 ### Run the N2 SQD workflow
 
