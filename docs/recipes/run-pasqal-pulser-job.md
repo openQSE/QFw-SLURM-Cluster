@@ -1,8 +1,9 @@
 # Run a Pulser Job on a Pasqal Device
 
 This recipe runs QFw's Pulser example on Pasqal Cloud:
-Pasqal's EMU_FREE emulator by default, or the FRESNEL QPU. It uses the
-developer override, so it needs no QFw release.
+Pasqal's EMU_FREE emulator by default, or the FRESNEL QPU. It uses the QFw
+installed in the image, or, with `--developer`, a QFw checkout you build
+yourself.
 
 The example starts a job-owned shim QPM for the Pasqal device, reserves it,
 and runs one Pulser program through Pulser's own `QPUBackend` with
@@ -11,12 +12,22 @@ through the QPM, places atoms on a calibrated layout, and runs two jobs: a
 pi/2 pulse (each atom excited about half the time) and a pi pulse (every
 atom flipped).
 
+The QPM runs with your own Pasqal login, so this needs a Pasqal Cloud
+account but no site setup, and reaches FRESNEL as well as EMU_FREE. The site
+device in [Run a Pulser job on Pasqal EMU_FREE](run-pasqal-emu-free-job.md)
+is the other way round: an operator-started QPM runs every user's jobs with
+the site's login and admits users through `config/qpu-users.json`. Both name
+the emulator `pasqal-emu-free`; this recipe's device comes from the
+example's own device config, and its reservation goes to the job's QPM,
+never to the site's.
+
 ## Prerequisites
 
-- The cluster is built and started from a checkout whose `do_qfw_build.sh`
-  installs Pulser (main once #68 merges), not `release/v0.1`; see
-  [Build and start the cluster](build-and-start-cluster.md). The image's
-  QFw does not matter for the developer build below.
+- The cluster is built and started from main; see
+  [Build and start the cluster](build-and-start-cluster.md). Its image
+  carries QFw with pulser-core, QRMI and `examples/qfw_pulser.sh`, and
+  `do_startup.sh` creates the test users and the `qfw-test` account. The
+  job runs as `user-a` in `qfw-test`; `--user` and `--account` pick others.
 - A Pasqal Cloud account with a project. A free account from the
   [Pasqal User Portal](https://portal.pasqal.cloud/) includes EMU_FREE; the
   portal's **Projects** page shows the project ID. On the Docker host, put
@@ -43,33 +54,23 @@ atom flipped).
   [Credentials](#credentials).
 - `python3` on the Docker host.
 
-## Build QFw
+## Run on EMU_FREE
 
 From the cluster repository on the Docker host:
-
-```bash
-git clone --recursive https://github.com/openQSE/QFw.git shared-dir/QFw
-git clone https://github.com/munich-quantum-toolkit/core.git shared-dir/mqt-core
-
-./do_qfw_build.sh --clean
-```
-
-`do_qfw_build.sh` installs `setup/pulser-requirements.txt` (pulser-core) into
-the developer venv because the checkout has it.
-
-## Run on EMU_FREE
 
 ```bash
 test_scripts/pasqal/run_pulser_example.sh
 ```
 
-The script reads your login, allocates one application group
-and one service group in `slurmctld`, activates the developer build and runs
-`examples/qfw_pulser.sh`. It prints the allocation, the QPM the reservation
+The script reads your login, allocates one application group and one
+service group in `slurmctld` as `user-a` with `--account qfw-test`,
+activates the image's QFw and runs `examples/qfw_pulser.sh`; QFw's run
+files go to `~user-a/qfw-runs/job-<id>`. It prints the allocation, the QPM the reservation
 picked, any error lines and the results; the full log is
 `pulser-<time>.log` in the current directory, printed at the end of every
 run. The allocation is limited to two hours, and Ctrl-C cancels it. Expected
-(EMU_FREE, 100 shots per job):
+(EMU_FREE, 100 shots per job; the log ends with a `QFW_EXAMPLE_RESULT`
+record with `"status": "ok"`):
 
 ```
 [slurm] Granted job allocation 3
@@ -99,12 +100,60 @@ hour (`job-timeout-seconds` in the device config).
 Other options go to `examples/qfw_pulser.sh`, for example `--shots 500`. Run
 `examples/qfw_pulser.sh --help` in the QFw checkout for the list.
 
+## Run by Hand
+
+The script does the following, which you can also run yourself. From the
+Docker host:
+
+```bash
+./do_ssh.sh --user user-a
+```
+
+Inside `slurmctld`, give the QPM your login without writing it to a file or
+a command line, and allocate one application group and one service group:
+
+```bash
+export PASQAL_USERNAME=you@example.com QFW_PASQAL_PROJECT_ID=...
+read -rsp 'Pasqal password: ' PASQAL_PASSWORD; echo; export PASQAL_PASSWORD
+
+salloc --account=qfw-test --partition=normal --nodes=1 --ntasks=1 \
+  --time=02:00:00 \
+  : --account=qfw-test --partition=normal --nodes=1 --ntasks=1 \
+  --time=02:00:00
+```
+
+The local QFw profile expects the two groups (`docs/usage.md` in QFw,
+"Heterogeneous Slurm Allocation"). Inside the allocation:
+
+```bash
+source "${QFW_INSTALL_PREFIX}/bin/qfw-activate" --venv "${QFW_VENV}"
+cd "${QFW_SHARE_DIR}/examples"
+./qfw_pulser.sh
+qfw-deactivate
+exit
+```
+
+It prints the same table as above, and a successful run ends with a
+`QFW_EXAMPLE_RESULT` record with `"status": "ok"` and `"rc": 0`.
+
+## Security Check
+
+The login reaches only the QPM, not the application or the run's files.
+After a run, as `user-a`, with `PASQAL_PASSWORD` still set:
+
+```bash
+grep -rlF -- "${PASQAL_PASSWORD}" ~/qfw-runs || echo "login not in the run files"
+```
+
+With `run_pulser_example.sh`, check the host log the same way; the env file
+the script wrote is already gone.
+
 ## What Runs Where
 
 | Step | Where |
 | --- | --- |
 | `pasqal_login.py` | Docker host, as you |
-| `salloc` (two groups) | `slurmctld` |
+| `salloc` (two groups) | `slurmctld`, as `user-a` |
 | `qfw-setup`: directory service, shim QPM for the device | service group |
 | `test_pulser.py` with `QFwConnection` | application group |
 | QRMI `PasqalCloud` resource, Pasqal Cloud API calls | shim QPM |
@@ -156,16 +205,22 @@ renewed either.
 | `422 ... exceeds the maximum number of atoms supported by this device (12)` | EMU_FREE takes at most 12 atoms; the 42-atom FRESNEL program cannot run on it. |
 | `QRMI job ... timed out after ... and it was stopped` | The Pasqal queue was longer than the device's `job-timeout-seconds`; the job was cancelled. |
 | `QPM reads ..., not Pulser sequences` | The reservation picked a non-Pasqal QPM; check `--device-id`. |
-| `No module named 'pulser'` | The QFw checkout predates its Pulser frontend, the cluster checkout's `do_qfw_build.sh` predates #68, or the venv predates either; rerun `./do_qfw_build.sh --clean`. |
+| `No module named 'pulser'` | The image was built before #68; rebuild it from main. With `--developer`: the QFw checkout predates its Pulser frontend or the venv predates it; rerun `./do_qfw_build.sh --clean`. |
+| `unknown QFw test user` | `--user` names a user missing from `config/qfw-users.conf`. |
 
-## Run on the Image's QFw
+## Run on a QFw Checkout
 
-To test the QFw installed in the image instead, build the image from QFw
-main (the default `--qfw-ref`) and pass `--image-install`:
+To test a QFw checkout under development, build it into the shared mount
+and pass `--developer`. From the cluster repository on the Docker host:
 
 ```bash
-./do_configure.sh
-./do_build.sh
-./do_restart.sh --force-recreate
-test_scripts/pasqal/run_pulser_example.sh --image-install
+git clone --recursive https://github.com/openQSE/QFw.git shared-dir/QFw
+git clone https://github.com/munich-quantum-toolkit/core.git shared-dir/mqt-core
+
+./do_qfw_build.sh --clean
+test_scripts/pasqal/run_pulser_example.sh --developer
 ```
+
+`do_qfw_build.sh` installs `setup/pulser-requirements.txt` (pulser-core) into
+the developer venv because the checkout has it. All other options work as
+above.

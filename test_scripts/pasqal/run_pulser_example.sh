@@ -2,15 +2,19 @@
 # Run QFw's Pulser example on a Pasqal Cloud device from the
 # Docker host, in one command:
 #   1. read your own Pasqal Cloud login (pasqal_login.py),
-#   2. allocate a two-group heterogeneous job in slurmctld,
+#   2. allocate a two-group heterogeneous job in slurmctld as a cluster user,
 #   3. activate the QFw build and run examples/qfw_pulser.sh,
 #   4. print the results table; the full log stays in pulser-<time>.log.
 #
-# Usage: run_pulser_example.sh [--container NAME] [--image-install]
+# Usage: run_pulser_example.sh [--container NAME] [--user NAME]
+#                              [--account NAME] [--developer]
 #                              [qfw_pulser.sh options...]
 #   --container NAME  container to run in (default: slurmctld)
-#   --image-install   use the image's QFw (QFW_PREFIX, QFW_VENV) instead of
-#                     the developer build do_qfw_build.sh makes
+#   --user NAME       cluster user to run as (default: user-a), one of
+#                     config/qfw-users.conf
+#   --account NAME    Slurm account for the allocation (default: qfw-test)
+#   --developer       use the developer build do_qfw_build.sh makes instead
+#                     of the image's QFw (QFW_PREFIX, QFW_VENV)
 # Everything else goes to qfw_pulser.sh, e.g.
 #   run_pulser_example.sh                                  # EMU_FREE
 #   run_pulser_example.sh --device-id pasqal-fresnel --atoms 42
@@ -27,15 +31,26 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 container=slurmctld
-install=developer
+user="user-a"
+account="qfw-test"
+install=image
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--container) container="$2"; shift 2 ;;
-		--image-install) install=image; shift ;;
+		--user) user="$2"; shift 2 ;;
+		--account) account="$2"; shift 2 ;;
+		--developer) install=developer; shift ;;
 		-h|--help) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0"; exit 0 ;;
 		*) break ;;
 	esac
 done
+
+home="$(awk -F: -v user="${user}" '$1 == user { print $4 }' \
+	"${here}/../../config/qfw-users.conf")"
+if [[ -z "${home}" ]]; then
+	echo "unknown QFw test user: ${user} (see config/qfw-users.conf)" >&2
+	exit 1
+fi
 
 envfile="$(python3 "${here}/pasqal_login.py")"
 log="pulser-$(date +%Y%m%d-%H%M%S).log"
@@ -55,9 +70,11 @@ interrupted() {
 trap finish EXIT
 trap interrupted INT TERM HUP
 
-echo "QFw Pulser example in ${container} (${install} QFw install): $*"
+echo "QFw Pulser example in ${container} as ${user}, account ${account}" \
+	"(${install} QFw install): $*"
 docker exec -i --env-file "${envfile}" -e QFW_RUN_INSTALL="${install}" \
-	-w /workspace/qfw-container-base "${container}" \
+	-e QFW_RUN_ACCOUNT="${account}" \
+	-u "${user}" -e HOME="${home}" -w "${home}" "${container}" \
 	bash -s -- "$@" <<'REMOTE' 2>&1 | tee "${log}" | awk '
 	/Granted job allocation/ { sub(/^salloc: /, ""); print "[slurm] " $0; next }
 	/"service_id": "shim-/ && !seen++ {
@@ -71,7 +88,8 @@ docker exec -i --env-file "${envfile}" -e QFW_RUN_INSTALL="${install}" \
 set -euo pipefail
 # One application group and one service group, as the local QFw profile
 # expects (docs/usage.md in QFw, "Heterogeneous Slurm Allocation").
-salloc -p normal -N1 -n1 --time=02:00:00 : -p normal -N1 -n1 --time=02:00:00 \
+salloc -p normal -N1 -n1 --time=02:00:00 -A "${QFW_RUN_ACCOUNT}" \
+	: -p normal -N1 -n1 --time=02:00:00 -A "${QFW_RUN_ACCOUNT}" \
 	bash -s -- "$@" <<'ALLOCATION'
 set -euo pipefail
 base=/workspace/qfw-container-base
@@ -81,7 +99,7 @@ else
 	prefix="${QFW_PREFIX}" venv="${QFW_VENV}"
 fi
 export QFW_SHARED_ROOT="${base}"
-export QFW_RUN_BASE_DIR="${base}/qfw-runs/job-${SLURM_JOB_ID}"
+export QFW_RUN_BASE_DIR="${HOME}/qfw-runs/job-${SLURM_JOB_ID}"
 mkdir -p "${QFW_RUN_BASE_DIR}"
 # shellcheck disable=SC1091
 source "${prefix}/bin/qfw-activate" --venv "${venv}"
