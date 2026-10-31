@@ -99,6 +99,8 @@ for mode, record in (("legacy", legacy), ("v2", v2)):
     assert sum(counts.values()) == 1024, (mode, counts)
     assert set(counts).issubset({"0000", "1111"}), (mode, counts)
     assert record["metrics"]["statevector_available"] is True
+assert "target_shared" not in legacy["metrics"]
+assert v2["metrics"]["target_shared"] is True
 print({
     "legacy_counts": legacy["metrics"]["counts"],
     "v2_counts": v2["metrics"]["counts"],

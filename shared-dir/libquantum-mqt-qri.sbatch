@@ -16,11 +16,11 @@ set -euo pipefail
 
 QFW_BASE="${QFW_BASE:-/workspace/qfw-container-base}"
 QFW_PREFIX="${LIBQUANTUM_QFW_PREFIX:-${QFW_BASE}/qfw-main-install}"
-MQT_VENV="${MQT_VENV:-${QFW_BASE}/mqt-cc-venv}"
+QFW_VENV="${LIBQUANTUM_QFW_VENV:-${QFW_BASE}/qfw-main-venv}"
 QFW_CLUSTER_SOURCE="${QFW_CLUSTER_SOURCE:-${QFW_BASE}/QFw-release-v0.1/repos-main-sync/QFw-SLURM-Cluster}"
 export QFW_SHARED_ROOT="${QFW_SHARED_ROOT:-${QFW_BASE}}"
 export QFW_PREFIX
-source "${QFW_PREFIX}/bin/qfw-activate" --venv "${MQT_VENV}"
+source "${QFW_PREFIX}/bin/qfw-activate" --venv "${QFW_VENV}"
 
 test -n "${QFW_RESERVATIONS:-}"
 source "${QFW_SHARE_DIR}/examples/qfw_example_common.sh"

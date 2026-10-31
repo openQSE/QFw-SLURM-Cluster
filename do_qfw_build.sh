@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [--jobs N] [--clean] [--skip-venv] [--skip-mqt]
+Usage: $(basename "$0") [--jobs N] [--clean] [--skip-venv]
        [--container NAME]
 
 Build and install QFw + DEFw and MQT Core developer overrides inside the
@@ -17,12 +17,13 @@ Everything lands on the shared mount, so every node sees the same install and
 the tree being built is your own shared-dir/QFw checkout:
 
   source              \${QFW_BASE}/QFw
-  python venv         \${QFW_BASE}/qfw-venv
-  build tree          \${QFW_BASE}/qfw-build
-  install tree        \${QFW_BASE}/qfw-install
+  python venv         \${QFW_BASE}/qfw-main-venv
+  build tree          \${QFW_BASE}/qfw-main-build
+  install tree        \${QFW_BASE}/qfw-main-install
   mqt-core source     \${QFW_BASE}/mqt-core
   libquantum source   \${QFW_BASE}/libquantum
   qiskit compiler     \${QFW_BASE}/libquantum-compiler-qiskit
+  mqt compiler        \${QFW_BASE}/libquantum-compiler-mqt
 
 To build a second checkout under the shared mount into its own prefix, set
 QFW_DEV_SRC, QFW_DEV_BUILD and QFW_DEV_PREFIX (and QFW_DEV_VENV to use another
@@ -38,7 +39,6 @@ Options:
   --jobs N          Parallel build jobs (default: nproc in the container)
   --clean           Remove the QFw build and install trees first
   --skip-venv       Reuse the existing venv, skip Python installs
-  --skip-mqt        Do not build the independent MQT compiler environment
   --container NAME  Container to build in (default: slurmctld)
   -h, --help        Show this help
 EOF
@@ -47,7 +47,6 @@ EOF
 JOBS=""
 CLEAN=false
 SKIP_VENV=false
-SKIP_MQT=false
 CONTAINER=slurmctld
 
 while [ "$#" -gt 0 ]; do
@@ -57,7 +56,6 @@ while [ "$#" -gt 0 ]; do
             JOBS="$2"; shift 2 ;;
         --clean)   CLEAN=true; shift ;;
         --skip-venv) SKIP_VENV=true; shift ;;
-        --skip-mqt) SKIP_MQT=true; shift ;;
         --container)
             [ "$#" -ge 2 ] || { echo "--container requires a name" >&2; exit 2; }
             CONTAINER="$2"; shift 2 ;;
@@ -90,7 +88,6 @@ docker exec -i \
     -e QFW_BUILD_JOBS_OVERRIDE="${JOBS}" \
     -e QFW_DO_CLEAN="${CLEAN}" \
     -e QFW_SKIP_VENV="${SKIP_VENV}" \
-    -e QFW_SKIP_MQT="${SKIP_MQT}" \
     -e QFW_HOST_BASE="${QFW_HOST_BASE}" \
     -e QFW_CONTAINER_NAME="${CONTAINER}" \
     -e QFW_DEV_SRC="${QFW_DEV_SRC:-}" \
@@ -101,21 +98,21 @@ docker exec -i \
     -e QISKIT_COMPILER_DEV_SRC="${QISKIT_COMPILER_DEV_SRC:-}" \
     -e MQT_COMPILER_DEV_SRC="${MQT_COMPILER_DEV_SRC:-}" \
     -e QFW_SLURM_DEV_SRC="${QFW_SLURM_DEV_SRC:-}" \
-    -e LIBQUANTUM_QISKIT_VERSION="${LIBQUANTUM_QISKIT_VERSION:-2.2.3}" \
+    -e LIBQUANTUM_QISKIT_VERSION="${LIBQUANTUM_QISKIT_VERSION:-2.5.2}" \
     -e QFW_QDMI_REQUIREMENTS_DEV="${QFW_QDMI_REQUIREMENTS_DEV:-}" \
     "${CONTAINER}" bash -s <<'REMOTE'
 set -euo pipefail
 
 QFW_BASE="${QFW_BASE:-/workspace/qfw-container-base}"
-QFW_SRC="${QFW_DEV_SRC:-${QFW_BASE}/QFw}"
-QFW_VENV="${QFW_DEV_VENV:-${QFW_BASE}/qfw-venv}"
-QFW_BUILD="${QFW_DEV_BUILD:-${QFW_BASE}/qfw-build}"
-QFW_PREFIX="${QFW_DEV_PREFIX:-${QFW_BASE}/qfw-install}"
+QFW_SRC="${QFW_DEV_SRC:-${QFW_BASE}/QFw-release-v0.1/repos-main-sync/QFw}"
+QFW_VENV="${QFW_DEV_VENV:-${QFW_BASE}/qfw-main-venv}"
+QFW_BUILD="${QFW_DEV_BUILD:-${QFW_BASE}/qfw-main-build}"
+QFW_PREFIX="${QFW_DEV_PREFIX:-${QFW_BASE}/qfw-main-install}"
 LIBQUANTUM_SRC="${LIBQUANTUM_DEV_SRC:-${QFW_BASE}/libquantum}"
 QISKIT_COMPILER_SRC="${QISKIT_COMPILER_DEV_SRC:-${QFW_BASE}/libquantum-compiler-qiskit}"
 MQT_COMPILER_SRC="${MQT_COMPILER_DEV_SRC:-${QFW_BASE}/libquantum-compiler-mqt}"
-QFW_SLURM_SRC="${QFW_SLURM_DEV_SRC:-${QFW_BASE}/qfw-slurm}"
-LIBQUANTUM_QISKIT_VERSION="${LIBQUANTUM_QISKIT_VERSION:-2.2.3}"
+QFW_SLURM_SRC="${QFW_SLURM_DEV_SRC:-${QFW_BASE}/QFw-release-v0.1/repos-main-sync/qfw-slurm}"
+LIBQUANTUM_QISKIT_VERSION="${LIBQUANTUM_QISKIT_VERSION:-2.5.2}"
 QFW_QDMI_REQUIREMENTS="${QFW_QDMI_REQUIREMENTS_DEV:-${QFW_SRC}/setup/qdmi-requirements.txt}"
 QFW_HOST_BASE="${QFW_HOST_BASE:-shared-dir}"
 QFW_CONTAINER_NAME="${QFW_CONTAINER_NAME:-slurmctld}"
@@ -266,13 +263,18 @@ from pathlib import Path
 
 import libquantum
 from libquantum_compiler_qiskit import plugin_path
+from libquantum_compiler_mqt import plugin_path as mqt_plugin_path
 from qfw_slurm_gateway.launcher import main as gateway_main
 
 manifest = Path(plugin_path()) / "compiler.json"
 if not manifest.is_file():
     raise SystemExit(f"missing packaged compiler manifest: {manifest}")
+mqt_manifest = Path(mqt_plugin_path()) / "compiler.json"
+if not mqt_manifest.is_file():
+    raise SystemExit(f"missing packaged MQT compiler manifest: {mqt_manifest}")
 print(f"libquantum={libquantum.__file__}")
 print(f"qiskit_compiler_manifest={manifest}")
+print(f"mqt_compiler_manifest={mqt_manifest}")
 print(f"qfw_slurm_gateway={gateway_main.__module__}")
 PY
 
@@ -284,43 +286,6 @@ if ! ldd "${QFW_PREFIX}/lib/libdefw.so" 2>/dev/null | grep -q libfabric; then
     exit 1
 fi
 
-if [ "${QFW_SKIP_VENV}" != "true" ] && \
-   [ "${QFW_SKIP_MQT}" != "true" ]; then
-    # Keep MQT's Qiskit 2.5.2 dependency set separate from QFw's Qiskit 2.2.3.
-    mqt_cc_venv="${QFW_BASE}/mqt-cc-venv"
-    [ -d "${mqt_cc_venv}" ] || uv venv --python python3 "${mqt_cc_venv}"
-    uv pip install --python "${mqt_cc_venv}" --upgrade pip
-    uv pip install --python "${mqt_cc_venv}" \
-        -r "${QFW_SRC}/setup/build-requirements.txt" \
-        -r "${QFW_SRC}/setup/requirements.txt" \
-        -r "${QFW_QDMI_REQUIREMENTS}" \
-        "${qrmi_requirement}"
-    mqt_core_requirement='mqt-core==4.1.1'
-    if [ -f "${MQT_CORE_SRC}/pyproject.toml" ]; then
-        mqt_core_requirement="${MQT_CORE_SRC}"
-    fi
-    CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" uv pip install \
-        --python "${mqt_cc_venv}" \
-        "${mqt_core_requirement}" 'qiskit==2.5.2'
-    uv pip install --python "${mqt_cc_venv}" --no-deps \
-        "${wheelhouse}"/libquantum-0.1.0.dev0-*.whl \
-        "${wheelhouse}"/libquantum_compiler_mqt-*.whl
-    PYTHONPATH="${QFW_PREFIX}/lib/python3.12/site-packages" \
-        "${mqt_cc_venv}/bin/python" - <<'PY'
-from pathlib import Path
-
-import mqt.core
-import qfw_mqt
-from libquantum_compiler_mqt import plugin_path
-
-manifest = Path(plugin_path()) / "compiler.json"
-if not manifest.is_file():
-    raise SystemExit(f"missing packaged MQT compiler manifest: {manifest}")
-print(f"mqt_core={mqt.core.__file__}")
-print(f"qfw_mqt={qfw_mqt.__file__}")
-print(f"mqt_compiler_manifest={manifest}")
-PY
-fi
 echo
 echo "QFw installed to ${QFW_PREFIX}"
 echo "Activate with: source ${QFW_PREFIX}/bin/qfw-activate --venv ${QFW_VENV}"

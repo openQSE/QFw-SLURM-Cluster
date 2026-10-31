@@ -22,7 +22,11 @@ try:
     assert len(query.routes) == 1, query.rejected
     route = context.open_route(query.routes[0])
     queue = context.create_completion_queue(route)
+    target = context.compiler_target(route)
     compiled = context.compile(route, program)
+    repeated = context.compile(route, program)
+    assert compiled.target_snapshot is target
+    assert repeated.target_snapshot is target
     assert compiled.representation.name == "openqasm"
     assert compiled.representation.version == "2.0"
     print({"compiled_payload": compiled.payload}, flush=True)
@@ -62,6 +66,7 @@ try:
         "parameter_metadata": dict(compiled.parameter_metadata),
         "provenance": str(compiled.provenance),
         "counts": counts,
+        "target_reused": True,
     }, flush=True)
     queue.close()
 except Exception as error:

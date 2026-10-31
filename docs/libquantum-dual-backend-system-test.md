@@ -5,10 +5,11 @@ checkouts, then runs the same installed QFw example through the legacy and V2
 backend paths in one qfw-slurm allocation. It is simulator qualification, not
 physical-device evidence.
 
-The frozen simulator qualification inputs are QFw `daae4a59e47c`, qfw-slurm
-`e940e0a60022`, QFw-SLURM-Cluster `61ef996c7e97`, libquantum `62ec4a809a32`,
-libquantum-compiler-qiskit `698062f20752`, and Qiskit `2.2.3`. QFw owns the QPM
-query and qhw implementations at the same `daae4a59e47c` revision.
+The Amendment 03 simulator qualification used QFw `0db5e4b8c34b`, qfw-slurm
+`e940e0a60022`, libquantum `6fc1428035da`, the Qiskit plugin
+`fba35c827e5f`, and the MQT plugin `352aee7549b4`. The cluster integration
+branch was rebased onto upstream `827fff2`. The installed environment used
+Qiskit 2.5.2 and MQT Core 4.1.1.
 
 ## Freeze the sources
 
@@ -20,12 +21,13 @@ git -C /path/to/qfw-slurm rev-parse HEAD
 git -C /path/to/QFw-SLURM-Cluster rev-parse HEAD
 git -C /path/to/libquantum rev-parse HEAD
 git -C /path/to/libquantum-compiler-qiskit rev-parse HEAD
+git -C /path/to/libquantum-compiler-mqt rev-parse HEAD
 ```
 
-Set `QFW_CONTAINER_BASE` to a host directory containing checkouts named `QFw`,
-`libquantum`, `libquantum-compiler-qiskit`, and `mqt-core`. Run
-`./do_configure.sh` again after changing the mount, then start and provision the
-cluster.
+Set `QFW_CONTAINER_BASE` to the OpenQSE workspace. The build uses QFw and
+qfw-slurm from `QFw-release-v0.1/repos-main-sync`, and the three new
+libquantum repositories from the workspace root. Run `./do_configure.sh` after
+changing the mount, then start and provision the cluster.
 
 ```bash
 ./do_build.sh
@@ -34,10 +36,10 @@ cluster.
 ./test_scripts/test_libquantum_integration.sh
 ```
 
-`do_qfw_build.sh` builds wheels for libquantum and the Qiskit compiler, installs
-them into the shared QFw virtual environment, and verifies the packaged
-`compiler.json`. QFw activation and qfw-slurm's `QFW_RESERVATIONS` injection
-remain unchanged.
+`do_qfw_build.sh` builds wheels for libquantum, both compiler plugins, and
+qfw-slurm. It installs them into the shared QFw virtual environment and
+verifies both packaged manifests. QFw activation and qfw-slurm's canonical
+`QFW_RESERVATIONS` injection remain unchanged.
 
 ## Run through Slurm
 
@@ -61,6 +63,32 @@ The output must end with `QFW DUAL BACKEND SYSTEM TEST: PASS`. Retain the main,
 legacy, and V2 logs after removing access tokens, provider credentials, remote
 service objects, and environment dumps. The test logs may retain reservation
 service IDs and operation IDs needed for correlation.
+
+Run the MQT route and managed-QFw gates from the same account.
+
+```bash
+sbatch --wait /mnt/libquantum-mqt-qri.sbatch
+sbatch --wait /mnt/libquantum-phase12.sbatch
+```
+
+The MQT log must contain `target_reused: True` and
+`LIBQUANTUM MQT QRI SYSTEM TEST: PASS`.
+
+## Amendment 03 Results
+
+NWQSim job 51 completed the legacy and V2 paths with exit status zero. Both
+paths produced 1,024 GHZ samples using only `0000` and `1111`. V2 reported
+`target_shared: true`; the legacy record did not gain a V2 target field.
+
+NWQSim job 53 completed the MQT route with exit status zero. Direct target
+access and two compilations returned the same target object. Managed-QFw job
+54 passed its allocation-scoped integration test.
+
+The deployed regression matrix reported 135 core tests passed with one skip,
+16 Qiskit plugin tests passed, 15 MQT plugin tests passed, 12 focused V2 and
+selector tests passed, four standard target tests passed, 60 legacy backend
+and job tests passed with one skip, and 96 qfw-slurm tests passed with one
+skip. Skips were not counted as qualification.
 
 ## Regression and cleanup
 
