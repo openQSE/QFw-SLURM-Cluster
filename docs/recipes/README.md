@@ -11,6 +11,7 @@ using the virtual QFw Slurm cluster.
 | Start only the directory and NWQSim QPMd | [Start the NWQSim QPM](start-nwqsim-qpm.md) |
 | Start only the directory and IQM QPMd | [Start the IQM QPM](start-iqm-qpm.md) |
 | Start IBM QSA simulator and QSA QPMd  | [Start the IBM QSA simulator](start-ibm-qsa-sim.md) |
+| Start the Pasqal EMU_FREE QPMd and run a Pulser job | [Run a Pulser job on Pasqal EMU_FREE](run-pasqal-emu-free-job.md) |
 | Run a normal NWQSim application job | [Run an NWQSim job](run-nwqsim-job.md) |
 | Run a guarded real-IQM application job | [Run an IQM job](run-iqm-job.md) |
 | Run a circuit against an IBM Quantum System device | [Run an IBM job](run-ibm-job.md) |
