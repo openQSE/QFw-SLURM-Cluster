@@ -16,6 +16,10 @@ QFW_AWS_NODE="${QFW_AWS_NODE:-aws}"
 QFW_QSA_SIM_NODE="${QFW_QSA_SIM_NODE:-qsa-sim-head}"
 QFW_FAKE_IQM_NODE="${QFW_FAKE_IQM_NODE:-fake-iqm-head}"
 QFW_BACKLINE_NODE="${QFW_BACKLINE_NODE:-qec-backline-head}"
+QFW_PASQAL_NODE="${QFW_PASQAL_NODE:-pasqal-head}"
+# The directory whose .pasqal/config the Pasqal QPM logs in with, as a path
+# inside the containers (/mnt is the cluster checkout's shared-dir).
+QFW_PASQAL_CONFIG_ROOT="${PASQAL_CONFIG_ROOT:-/mnt/pasqal}"
 QFW_SIMULATOR_NODES="${QFW_SIMULATOR_NODES:-nwqsim-head,nwqsim-worker-1,nwqsim-worker-2}"
 QFW_GATEWAY_HOST="${QFW_GATEWAY_HOST:-slurmctld}"
 QFW_GATEWAY_PORT="${QFW_GATEWAY_PORT:-18095}"
@@ -33,6 +37,7 @@ aws_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-aws-qpm"
 qsa_sim_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-ibm-fake-lagos"
 fake_iqm_run_dir="${QFW_SITE_RUN_ROOT}/qpm/fake-iqm"
 backline_run_dir="${QFW_SITE_RUN_ROOT}/qpm/backline-local"
+pasqal_run_dir="${QFW_SITE_RUN_ROOT}/qpm/shim-pasqal-emu-free"
 gateway_run_dir="${QFW_SITE_RUN_ROOT}/gateway"
 gateway_pid_file="${gateway_run_dir}/supervisor.pid"
 gateway_log_file="${QFW_GATEWAY_LOG_DIR}/gateway.log"
@@ -56,10 +61,12 @@ Actions:
 Options:
   --target TARGET
              Select all, directory, nwqsim, iqm, shim, ibm, aws, qsa-sim,
-             fake-iqm, backline, or gateway
-             (default: all). qsa-sim and backline are opt-in: "all" starts
-             and reports without them, and stops them only when they are
-             running (backline needs tools/install-backline-venv.sh first)
+             fake-iqm, backline, pasqal, or gateway
+             (default: all). qsa-sim, backline and pasqal are opt-in: "all"
+             starts and reports without them, and stops them only when they
+             are running (backline needs tools/install-backline-venv.sh
+             first; pasqal needs a Pasqal login under PASQAL_CONFIG_ROOT,
+             default /mnt/pasqal, see docs/recipes/run-pasqal-emu-free-job.md)
   --json     Emit one machine-readable status document
   --dry-run  Print the commands without executing them
 EOF
@@ -90,6 +97,10 @@ QFW_FORWARDED_VARIABLES=(
 	QFW_TELEMETRY_VENDOR
 	OTEL_METRIC_EXPORT_INTERVAL OTEL_EXPORTER_OTLP_ENDPOINT
 	OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+	# The Pasqal QPM's login: the directory QRMI reads .pasqal/config from,
+	# and the same file for the native pasqal-qdmi library (start_pasqal
+	# sets both).
+	PASQAL_CONFIG_ROOT PASQAL_AUTHFILE
 )
 
 forwarded_env_args() {
@@ -388,6 +399,11 @@ stop_backline() {
 		--run-dir "${backline_run_dir}"
 }
 
+stop_pasqal() {
+	run_qfw "${QFW_PASQAL_NODE}" qfw-qpm-svc stop \
+		--run-dir "${pasqal_run_dir}"
+}
+
 start_gateway() {
 	require_directory || return 1
 	if prepare_component_start \
@@ -454,6 +470,11 @@ backline_ready() {
 		--run-dir "${backline_run_dir}"
 }
 
+pasqal_ready() {
+	run_qfw "${QFW_PASQAL_NODE}" qfw-qpm-svc status \
+		--run-dir "${pasqal_run_dir}"
+}
+
 require_directory() {
 	if directory_ready >/dev/null 2>&1; then
 		return 0
@@ -491,6 +512,9 @@ require_directory_dependents_stopped() {
 	fi
 	if backline_ready >/dev/null 2>&1; then
 		active+=(backline)
+	fi
+	if pasqal_ready >/dev/null 2>&1; then
+		active+=(pasqal)
 	fi
 	if gateway_managed_ready >/dev/null 2>&1; then
 		active+=(gateway)
@@ -639,6 +663,27 @@ start_backline() {
 		--timeout "${QFW_SITE_START_TIMEOUT}"
 }
 
+start_pasqal() {
+	require_directory || return 1
+	if prepare_component_start "Pasqal QPM" pasqal_ready stop_pasqal; then
+		return 0
+	fi
+	# The QPM logs in to Pasqal Cloud as the service, with the .pasqal/config
+	# under this directory: QRMI reads it from PASQAL_CONFIG_ROOT, and the
+	# native pasqal-qdmi library (QFw#182) reads the same key=value file from
+	# PASQAL_AUTHFILE, so one file serves a device on either library. ssh
+	# drops the environment, so run_qfw forwards both with the telemetry
+	# variables.
+	export PASQAL_CONFIG_ROOT="${QFW_PASQAL_CONFIG_ROOT}"
+	export PASQAL_AUTHFILE="${PASQAL_AUTHFILE:-${QFW_PASQAL_CONFIG_ROOT}/.pasqal/config}"
+	run_qfw "${QFW_PASQAL_NODE}" qfw-qpm-svc start \
+		--scope site \
+		--run-dir "${pasqal_run_dir}" \
+		--site-config "${QFW_SITE_CONFIG}" \
+		--service-id shim-pasqal-emu-free \
+		--timeout "${QFW_SITE_START_TIMEOUT}"
+}
+
 start_services() {
 	local directory_started=false
 	local nwqsim_started=false
@@ -684,6 +729,9 @@ start_services() {
 			# only here, where a live one would be stale.
 			if qsa_sim_ready >/dev/null 2>&1; then
 				stop_qsa_sim || return 1
+			fi
+			if pasqal_ready >/dev/null 2>&1; then
+				stop_pasqal || return 1
 			fi
 			if ${aws_was_ready}; then
 				stop_aws || return 1
@@ -794,6 +842,7 @@ service_status() {
 	local ibm_output="" ibm_status=-1
 	local aws_output="" aws_status=-1
 	local qsa_sim_output="" qsa_sim_status=-1
+	local pasqal_output="" pasqal_status=-1
 	local fake_iqm_output="" fake_iqm_status=-1
 	local gateway_output="" gateway_status=-1
 
@@ -818,6 +867,9 @@ service_status() {
 		esac
 		case "${target}" in
 		qsa-sim) qsa_sim_ready ;;
+		esac
+		case "${target}" in
+		pasqal) pasqal_ready ;;
 		esac
 		case "${target}" in
 		all|fake-iqm) fake_iqm_ready ;;
@@ -892,6 +944,15 @@ service_status() {
 		;;
 	esac
 	case "${target}" in
+	pasqal)
+		if pasqal_output="$(pasqal_ready 2>&1)"; then
+			pasqal_status=0
+		else
+			pasqal_status=$?
+		fi
+		;;
+	esac
+	case "${target}" in
 	all|fake-iqm)
 		if fake_iqm_output="$(fake_iqm_ready 2>&1)"; then
 			fake_iqm_status=0
@@ -920,7 +981,8 @@ service_status() {
 		"${aws_status}" "${aws_output}" \
 		"${qsa_sim_status}" "${qsa_sim_output}" \
 		"${fake_iqm_status}" "${fake_iqm_output}" \
-		"${gateway_status}" "${gateway_output}" <<'PY'
+		"${gateway_status}" "${gateway_output}" \
+		"${pasqal_status}" "${pasqal_output}" <<'PY'
 import json
 import sys
 
@@ -936,10 +998,11 @@ values = {
     "qsa-sim": ("QSA Sim", int(sys.argv[15]), sys.argv[16]),
     "fake-iqm": ("Fake IQM", int(sys.argv[17]), sys.argv[18]),
     "gateway": ("Gateway", int(sys.argv[19]), sys.argv[20]),
+    "pasqal": ("Pasqal", int(sys.argv[21]), sys.argv[22]),
 }
-# qsa-sim is opt-in, so the aggregate view leaves it out.
+# qsa-sim and pasqal are opt-in, so the aggregate view leaves them out.
 selected = (
-    [name for name in values if name != "qsa-sim"]
+    [name for name in values if name not in ("qsa-sim", "pasqal")]
     if target == "all" else [target]
 )
 
@@ -1054,6 +1117,9 @@ stop_services() {
 	if ${dry_run} || qsa_sim_ready >/dev/null 2>&1; then
 		stop_qsa_sim || status=1
 	fi
+	if ${dry_run} || pasqal_ready >/dev/null 2>&1; then
+		stop_pasqal || status=1
+	fi
 	stop_aws || status=1
 	stop_ibm || status=1
 	stop_shim || status=1
@@ -1082,6 +1148,7 @@ start_target() {
 	ibm) start_ibm ;;
 	aws) start_aws ;;
 	qsa-sim) start_qsa_sim ;;
+	pasqal) start_pasqal ;;
 	fake-iqm) start_fake_iqm ;;
 	backline) start_backline ;;
 	gateway) start_gateway ;;
@@ -1101,6 +1168,7 @@ stop_target() {
 	ibm) stop_ibm ;;
 	aws) stop_aws ;;
 	qsa-sim) stop_qsa_sim ;;
+	pasqal) stop_pasqal ;;
 	fake-iqm) stop_fake_iqm ;;
 	backline) stop_backline ;;
 	gateway) stop_gateway ;;
@@ -1164,7 +1232,7 @@ main() {
 		return 2
 	}
 	case "${target}" in
-	all|directory|nwqsim|iqm|shim|ibm|aws|qsa-sim|fake-iqm|backline|gateway) ;;
+	all|directory|nwqsim|iqm|shim|ibm|aws|qsa-sim|fake-iqm|backline|pasqal|gateway) ;;
 	*) die "unknown target: ${target}" ;;
 	esac
 	if ! ${dry_run} && [[ ${EUID} -ne 0 ]]; then

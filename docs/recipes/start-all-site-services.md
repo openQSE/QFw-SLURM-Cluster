@@ -11,6 +11,10 @@ starts nor reports it. Start it with
 [start-ibm-qsa-sim.md](start-ibm-qsa-sim.md)); `stop` stops it when it is
 running.
 
+The Pasqal QPMd (`pasqal-head`) is opt-in in the same way, because it runs
+with the operator's Pasqal Cloud login: `qfw-site-services start --target
+pasqal` (see [run-pasqal-emu-free-job.md](run-pasqal-emu-free-job.md)).
+
 ## Prerequisites
 
 - Complete [Build and start the cluster](build-and-start-cluster.md).

@@ -535,6 +535,29 @@ services:
     networks:
       - slurm-network
 
+  pasqal-head:
+    <<: *slurmd-resources
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: pasqal-head
+    container_name: pasqal-head
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home:z
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
 volumes:
   etc_munge:
   etc_slurm:
