@@ -9,6 +9,7 @@ return {
 		["fake-iqm-20q"] = "fake-iqm",
 		["backline-local"] = "backline-local",
 		["ibm-fake-lagos"] = "shim-ibm-fake-lagos",
+		["pasqal-emu-free"] = "shim-pasqal-emu-free",
 	},
 	partitions = {
 		normal = {
@@ -22,6 +23,7 @@ return {
 				["fake-iqm-20q"] = true,
 				["backline-local"] = true,
 				["ibm-fake-lagos"] = true,
+				["pasqal-emu-free"] = true,
 			},
 		},
 	},

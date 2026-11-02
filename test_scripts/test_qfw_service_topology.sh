@@ -12,7 +12,7 @@ service_config="${repo_dir}/config/site-services.yaml"
 resource_config="${repo_dir}/config/qfw-slurm/resources.lua"
 plugin_config="${repo_dir}/config/qfw-slurm/plugin.conf"
 
-for node in nwqsim-head nwqsim-worker-1 nwqsim-worker-2 iqm-head shim-head ibm-156-nh aws fake-iqm-head; do
+for node in nwqsim-head nwqsim-worker-1 nwqsim-worker-2 iqm-head shim-head ibm-156-nh aws fake-iqm-head pasqal-head; do
 	grep -q "^NodeName=${node} " "${slurm_config}"
 	grep -q "^  ${node}:$" "${compose_config}"
 done
@@ -32,12 +32,15 @@ grep -q '^NodeName=qsa-sim-head .*qpm-shim-ibm-fake-lagos' "${slurm_config}"
 grep -A7 '^  qsa-sim-head:$' "${compose_config}" |
 	grep -q '^    container_name: qsa-sim-head$'
 grep -q '^NodeName=fake-iqm-head .*qpm-fake-iqm' "${slurm_config}"
+grep -q '^NodeName=pasqal-head .*qpm-shim-pasqal-emu-free' "${slurm_config}"
+grep -A7 '^  pasqal-head:$' "${compose_config}" |
+	grep -q '^    container_name: pasqal-head$'
 grep -q '^set root /opt/qfw/openmpi$' "${repo_dir}/modulefiles/openmpi"
 grep -q '^export QFW_SIMULATOR_NODES=nwqsim-head,nwqsim-worker-1,nwqsim-worker-2$' \
 	"${user_profile}"
 
 if grep '^PartitionName=normal ' "${slurm_config}" |
-	grep -Eq 'nwqsim|iqm-head|shim-head|ibm-156-nh|aws|qsa-sim-head|fake-iqm-head'; then
+	grep -Eq 'nwqsim|iqm-head|shim-head|ibm-156-nh|aws|qsa-sim-head|fake-iqm-head|pasqal-head'; then
 	echo "service node leaked into the normal partition" >&2
 	exit 1
 fi
@@ -53,6 +56,30 @@ done
 grep -q '\["ibm-fake-lagos"\] = "shim-ibm-fake-lagos"' "${resource_config}"
 grep -A1 '^\[resource "ibm-fake-lagos"\]$' "${plugin_config}" |
 	grep -q '^service_id=shim-ibm-fake-lagos$'
+grep -q '\["pasqal-emu-free"\] = "shim-pasqal-emu-free"' "${resource_config}"
+grep -A1 '^\[resource "pasqal-emu-free"\]$' "${plugin_config}" |
+	grep -q '^service_id=shim-pasqal-emu-free$'
+# The Pasqal QPM runs as the service and admits users by entitlement: the
+# device names the provider, the provider binds no secret, the service
+# requires a credential binding, and every test user is entitled.
+grep -A9 '^  pasqal-emu-free:$' "${device_config}" |
+	grep -q '^    resource-type: PasqalCloud$'
+grep -A9 '^  pasqal-emu-free:$' "${device_config}" |
+	grep -q '^    credential-provider: pasqal-entitlement$'
+grep -A3 '^  pasqal-entitlement:$' "${device_config}" |
+	grep -q '^    type: entitlement$'
+grep -A1 '^  - name: shim-pasqal-emu-free$' "${service_config}" |
+	grep -q '^    credential-mode: required$'
+python3 - "${credential_config}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    users = json.load(stream)["users"]
+assert users
+for name, record in users.items():
+    assert record["devices"]["pasqal-emu-free"] == {"enabled": True}, name
+PY
 grep -q '/etc/openqse/qfw/services/site-services.yaml:0644' \
 	"${repo_dir}/tools/provision-qfw-cluster.sh"
 python3 - "${device_config}" "${service_config}" \

@@ -15,6 +15,10 @@ docker-compose.override.yml
 /shared-dir/qsa-sim-device-access.yaml
 /shared-dir/qsa-sim-creds.json
 
+# The Pasqal Cloud login the pasqal-head site QPM runs with: a .pasqal/config
+# under this directory (see docs/recipes/run-pasqal-emu-free-job.md).
+/shared-dir/pasqal/
+
 # Local diagnostic output
 /shared-dir/qrmi_target_dump.json
 

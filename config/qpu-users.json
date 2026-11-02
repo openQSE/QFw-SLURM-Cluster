@@ -13,6 +13,9 @@
         "backline-local": {
           "enabled": true
         },
+        "pasqal-emu-free": {
+          "enabled": true
+        },
         "ibm-156-nh": {
           "enabled": true,
           "api_key": "",
@@ -60,6 +63,9 @@
         "backline-local": {
           "enabled": true
         },
+        "pasqal-emu-free": {
+          "enabled": true
+        },
         "ibm-156-nh": {
           "enabled": true,
           "api_key": "",
@@ -105,6 +111,9 @@
           "enabled": true
         },
         "backline-local": {
+          "enabled": true
+        },
+        "pasqal-emu-free": {
           "enabled": true
         },
         "ibm-156-nh": {
