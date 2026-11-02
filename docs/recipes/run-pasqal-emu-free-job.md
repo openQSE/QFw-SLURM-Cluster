@@ -1,8 +1,10 @@
 # Run a Pulser Job on Pasqal EMU_FREE
 
 `pasqal-emu-free` is Pasqal Cloud's free emulator as a site device: a shim QPM
-on `pasqal-head` opens it through QRMI's `PasqalCloud` resource, and a job
-reserves it with `--qpu=pasqal-emu-free` like any other site QPM. The QPM runs
+on `pasqal-head` opens it through QRMI's `PasqalCloud` resource or through
+Pasqal's native QDMI library, `pasqal-qdmi` (QRMI unless the job asks for
+QDMI), and a job reserves it with `--qpu=pasqal-emu-free` like any other site
+QPM. The QPM runs
 as the service, with the operator's Pasqal login, and admits a user by the
 enabled entry for the device in `config/qpu-users.json`. The user needs no
 Pasqal account.
@@ -25,9 +27,11 @@ because it needs that login.
 
 The QPM reads `.pasqal/config` under `PASQAL_CONFIG_ROOT`, which is
 `/mnt/pasqal` in the containers and `shared-dir/pasqal` on the Docker host.
-QRMI logs in with the username and password and renews the token itself, so
-the file holds a login rather than a token, and its `project_id` is the
-project the jobs are billed to. On the Docker host:
+`qfw-site-services` also points `PASQAL_AUTHFILE` at the same file, which is
+where pasqal-qdmi reads it, so one file serves both libraries. Each logs in
+with the username and password and renews the token itself, so the file
+holds a login rather than a token, and its `project_id` is the project the
+jobs are billed to. On the Docker host:
 
 ```bash
 install -d -m 0700 shared-dir/pasqal/.pasqal
@@ -106,6 +110,23 @@ Pulser program on 4 atoms, 100 shots per job, built on FRESNEL_CAN1
          1000 ns  excited 1.00  1111:100
 ```
 
+The first argument names the shim library: `qdmi` runs the program through
+pasqal-qdmi, and `qrmi,qdmi` through each in turn, two jobs per library, so
+`--circ-count=4` in the `salloc`. Expected for `qrmi,qdmi`:
+
+```
+Pulser program on 4 atoms, 100 shots per job, built on FRESNEL_CAN1
+  QRMI  DONE      44.4s
+          500 ns  excited 0.49  1100:11  0000:10
+         1000 ns  excited 1.00  1111:100
+  QDMI  DONE      43.9s
+          500 ns  excited 0.48  1100:12  0101:11
+         1000 ns  excited 1.00  1111:100
+```
+
+The QPM's log under `/var/lib/qfw-site-services/qpm/shim-pasqal-emu-free` on
+its node shows `routing run_circuit -> qdmi` for the QDMI jobs.
+
 ## Notes
 
 - Jobs run under the service's login and are billed to the config file's
@@ -115,12 +136,10 @@ Pulser program on 4 atoms, 100 shots per job, built on FRESNEL_CAN1
   bounds the wait in Pasqal's queue; a job past it is cancelled.
 - `docker exec slurmctld qfw-site-services stop --target pasqal` stops the
   QPM; `stop` on target `all` stops it too when it is running.
-- The device runs through QRMI. QFw#182 adds a QDMI path for Pasqal
-  (`pasqal-qdmi`, installed by `setup/qdmi-requirements.txt`); once an image
-  carries it, adding `qdmi` to the device's `libraries` in
-  `config/device-access.yaml` offers both. The native library reads the same
-  login file through `PASQAL_AUTHFILE`, which `qfw-site-services` already
-  forwards.
+- The QDMI route needs an image whose QFw installs `pasqal-qdmi` from
+  `setup/qdmi-requirements.txt` (QFw `e0a8c66` or later, the image's
+  default). On an older image a `qdmi` job fails with
+  `QDMI provider 'pasqal' needs pasqal-qdmi`; the QRMI route still works.
 
 | Piece | Where |
 | --- | --- |

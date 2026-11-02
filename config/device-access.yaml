@@ -89,12 +89,15 @@ qpus:
       get_task_timing: [qrmi]
       get_task_metadata: [qrmi]
       get_calibration_snapshot: [qrmi]
-  # Pasqal Cloud's free emulator, through QRMI's PasqalCloud resource. The QPM
-  # runs as the service: its login is the .pasqal/config under
-  # PASQAL_CONFIG_ROOT (qfw-site-services forwards it, default /mnt/pasqal),
-  # which QRMI reads and renews itself, and that file also names the project
-  # the jobs are billed to. A user needs no key, only an enabled entry for the
-  # device in qpu-users.json (see docs/recipes/run-pasqal-emu-free-job.md).
+  # Pasqal Cloud's free emulator, through QRMI's PasqalCloud resource or
+  # Pasqal's native QDMI library (pasqal-qdmi); QRMI unless a job asks for
+  # qdmi. The QPM runs as the service: its login is the .pasqal/config under
+  # PASQAL_CONFIG_ROOT (qfw-site-services forwards it, default /mnt/pasqal,
+  # and points PASQAL_AUTHFILE at the same file for pasqal-qdmi). Both
+  # libraries read it and renew the token themselves, and that file also
+  # names the project the jobs are billed to. A user needs no key, only an
+  # enabled entry for the device in qpu-users.json (see
+  # docs/recipes/run-pasqal-emu-free-job.md).
   pasqal-emu-free:
     provider: pasqal
     provider-device-id: EMU_FREE
@@ -104,6 +107,15 @@ qpus:
     credential-provider: pasqal-entitlement
     libraries:
       - qrmi
+      - qdmi
+    preference: qrmi
+    execution-owner: qrmi
+    caps:
+      get_backend_info: [qrmi, qdmi]
+      get_device_info: [qdmi]
+      run_circuit: [qrmi, qdmi]
+      get_task_timing: [qrmi, qdmi]
+      get_task_metadata: [qrmi, qdmi]
     job-timeout-seconds: 1800
 
 credential-providers:

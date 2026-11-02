@@ -101,7 +101,8 @@ services:
     provider-launch:
       type: qrmi-qdmi
 
-  # Pasqal Cloud's EMU_FREE emulator through QRMI. Opt-in: qfw-site-services
+  # Pasqal Cloud's EMU_FREE emulator through QRMI or pasqal-qdmi (the device's
+  # libraries in device-access.yaml). Opt-in: qfw-site-services
   # starts it only with --target pasqal, because it needs the operator's
   # Pasqal login (the .pasqal/config under PASQAL_CONFIG_ROOT, see
   # docs/recipes/run-pasqal-emu-free-job.md). Users are admitted by their
