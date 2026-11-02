@@ -1,0 +1,9 @@
+slurm:
+  hostname: slurmctld
+  ssh_key: ~/.ssh/streamflow_ed25519
+qfw:
+  shared_root: /workspace/qfw-container-base
+optimizer:
+  macro_iterations: 1
+  amplitude_iterations: 18
+  orbital_iterations: 1

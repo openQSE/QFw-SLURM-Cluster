@@ -1,0 +1,32 @@
+application:
+  class: Directory
+  path: ../chemistry_he
+cases:
+- name: He4
+  gamess_input:
+    class: File
+    path: ../chemistry_he/He4/He1-4.inp
+  fcidump:
+    class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP
+  fragments:
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-1-1
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-1-2
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-1-3
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-1-4
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-2-1
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-2-2
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-2-3
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-2-4
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-2-5
+  - class: File
+    path: ../chemistry_he/He4/He1-4.FCIDUMP-2-6

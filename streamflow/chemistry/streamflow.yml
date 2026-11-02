@@ -1,0 +1,41 @@
+version: v1.0
+workflows:
+  chemistry:
+    type: cwl
+    config:
+      file: cwl/workflow.cwl
+      settings: cases.yml
+    bindings:
+      - step: /prepare
+        target: {deployment: slurm, service: prepare, locations: 1}
+      - step: /chemistry_a
+        target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
+      - step: /chemistry_b
+        target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
+      - step: /collect
+        target: {deployment: slurm, service: collect, locations: 1}
+
+deployments:
+  cluster-login:
+    type: ssh
+    config:
+      nodes: [slurmctld]
+      username: user-a
+      sshKey: ~/.ssh/streamflow_ed25519
+      checkHostKey: true
+  slurm:
+    type: slurm
+    wraps: cluster-login
+    workdir: work
+    config:
+      services:
+        prepare:
+          file: slurm/prepare.sbatch
+        chemistry-nwqsim:
+          file: slurm/chemistry-nwqsim.sbatch
+        chemistry-fake-iqm:
+          file: slurm/chemistry-fake-iqm.sbatch
+        chemistry-iqm:
+          file: slurm/chemistry-iqm.sbatch
+        collect:
+          file: slurm/collect.sbatch
