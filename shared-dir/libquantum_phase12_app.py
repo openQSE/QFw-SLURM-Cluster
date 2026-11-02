@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from libquantum_compiler_qiskit import plugin_path
+from libquantum_plugin_qiskit import plugin_path
 import pytest
 
 

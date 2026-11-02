@@ -22,8 +22,8 @@ the tree being built is your own shared-dir/QFw checkout:
   install tree        \${QFW_BASE}/qfw-main-install
   mqt-core source     \${QFW_BASE}/mqt-core
   libquantum source   \${QFW_BASE}/libquantum
-  qiskit compiler     \${QFW_BASE}/libquantum-compiler-qiskit
-  mqt compiler        \${QFW_BASE}/libquantum-compiler-mqt
+  qiskit plugin       \${QFW_BASE}/libquantum/plugins/qiskit
+  mqt plugin          \${QFW_BASE}/libquantum/plugins/mqt
 
 To build a second checkout under the shared mount into its own prefix, set
 QFW_DEV_SRC, QFW_DEV_BUILD and QFW_DEV_PREFIX (and QFW_DEV_VENV to use another
@@ -95,8 +95,6 @@ docker exec -i \
     -e QFW_DEV_BUILD="${QFW_DEV_BUILD:-}" \
     -e QFW_DEV_PREFIX="${QFW_DEV_PREFIX:-}" \
     -e LIBQUANTUM_DEV_SRC="${LIBQUANTUM_DEV_SRC:-}" \
-    -e QISKIT_COMPILER_DEV_SRC="${QISKIT_COMPILER_DEV_SRC:-}" \
-    -e MQT_COMPILER_DEV_SRC="${MQT_COMPILER_DEV_SRC:-}" \
     -e QFW_SLURM_DEV_SRC="${QFW_SLURM_DEV_SRC:-}" \
     -e LIBQUANTUM_QISKIT_VERSION="${LIBQUANTUM_QISKIT_VERSION:-2.5.2}" \
     -e QFW_QDMI_REQUIREMENTS_DEV="${QFW_QDMI_REQUIREMENTS_DEV:-}" \
@@ -109,8 +107,8 @@ QFW_VENV="${QFW_DEV_VENV:-${QFW_BASE}/qfw-main-venv}"
 QFW_BUILD="${QFW_DEV_BUILD:-${QFW_BASE}/qfw-main-build}"
 QFW_PREFIX="${QFW_DEV_PREFIX:-${QFW_BASE}/qfw-main-install}"
 LIBQUANTUM_SRC="${LIBQUANTUM_DEV_SRC:-${QFW_BASE}/libquantum}"
-QISKIT_COMPILER_SRC="${QISKIT_COMPILER_DEV_SRC:-${QFW_BASE}/libquantum-compiler-qiskit}"
-MQT_COMPILER_SRC="${MQT_COMPILER_DEV_SRC:-${QFW_BASE}/libquantum-compiler-mqt}"
+QISKIT_PLUGIN_SRC="${LIBQUANTUM_SRC}/plugins/qiskit"
+MQT_PLUGIN_SRC="${LIBQUANTUM_SRC}/plugins/mqt"
 QFW_SLURM_SRC="${QFW_SLURM_DEV_SRC:-${QFW_BASE}/QFw-release-v0.1/repos-main-sync/qfw-slurm}"
 LIBQUANTUM_QISKIT_VERSION="${LIBQUANTUM_QISKIT_VERSION:-2.5.2}"
 QFW_QDMI_REQUIREMENTS="${QFW_QDMI_REQUIREMENTS_DEV:-${QFW_SRC}/setup/qdmi-requirements.txt}"
@@ -166,11 +164,11 @@ if [ ! -f "${QFW_SRC}/CMakeLists.txt" ]; then
 fi
 
 for package_source in \
-		"${LIBQUANTUM_SRC}" "${QISKIT_COMPILER_SRC}" \
-		"${MQT_COMPILER_SRC}" "${QFW_SLURM_SRC}"; do
+		"${LIBQUANTUM_SRC}" "${QISKIT_PLUGIN_SRC}" \
+		"${MQT_PLUGIN_SRC}" "${QFW_SLURM_SRC}"; do
     if [ ! -f "${package_source}/pyproject.toml" ]; then
         echo "No installable Python package at ${package_source}." >&2
-        echo "Mount the libquantum repositories under ${QFW_BASE}." >&2
+        echo "Mount the libquantum monorepo under ${QFW_BASE}." >&2
         exit 1
     fi
 done
@@ -247,23 +245,23 @@ cmake --build "${QFW_BUILD}" -j "${jobs}"
 echo "== cmake install"
 cmake --install "${QFW_BUILD}"
 
-echo "== libquantum, Qiskit compiler, and qfw-slurm wheels"
+echo "== libquantum, compiler plugin, and qfw-slurm wheels"
 wheelhouse="${QFW_BASE}/libquantum-wheelhouse"
 rm -rf "${wheelhouse}"
 mkdir -p "${wheelhouse}"
 "${QFW_VENV}/bin/python" -m pip wheel --no-deps \
     --wheel-dir "${wheelhouse}" \
     "${LIBQUANTUM_SRC}" \
-    "${QISKIT_COMPILER_SRC}" \
-    "${MQT_COMPILER_SRC}" \
+    "${QISKIT_PLUGIN_SRC}" \
+    "${MQT_PLUGIN_SRC}" \
     "${QFW_SLURM_SRC}"
 uv pip install --python "${QFW_VENV}" --no-deps "${wheelhouse}"/*.whl
 "${QFW_VENV}/bin/python" - <<'PY'
 from pathlib import Path
 
 import libquantum
-from libquantum_compiler_qiskit import plugin_path
-from libquantum_compiler_mqt import plugin_path as mqt_plugin_path
+from libquantum_plugin_qiskit import plugin_path
+from libquantum_plugin_mqt import plugin_path as mqt_plugin_path
 from qfw_slurm_gateway.launcher import main as gateway_main
 
 manifest = Path(plugin_path()) / "compiler.json"

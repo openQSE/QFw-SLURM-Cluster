@@ -26,7 +26,7 @@ python - <<'PY'
 from importlib import metadata
 from pathlib import Path
 
-from libquantum_compiler_qiskit import plugin_path
+from libquantum_plugin_qiskit import plugin_path
 import qfw_qiskit
 from qfw_qiskit import QFwBackend, QFwBackendV2
 
@@ -37,7 +37,7 @@ print({
     "qfw_backend_v2": f"{QFwBackendV2.__module__}.{QFwBackendV2.__name__}",
     "libquantum": metadata.version("libquantum"),
     "qfw_qiskit": qfw_qiskit.__file__,
-    "qiskit_compiler": metadata.version("libquantum-compiler-qiskit"),
+    "qiskit_plugin": metadata.version("libquantum-plugin-qiskit"),
     "qiskit": metadata.version("qiskit"),
     "manifest": str(manifest),
 })

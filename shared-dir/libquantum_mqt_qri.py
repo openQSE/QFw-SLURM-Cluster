@@ -4,7 +4,7 @@ from importlib import metadata
 from pathlib import Path
 
 import libquantum as lq
-from libquantum_compiler_mqt import plugin_path
+from libquantum_plugin_mqt import plugin_path
 from mqt.core.mlir import QCProgram
 
 
@@ -56,7 +56,7 @@ try:
         "evidence": "simulator",
         "libquantum": metadata.version("libquantum"),
         "mqt_core": metadata.version("mqt-core"),
-        "mqt_compiler": metadata.version("libquantum-compiler-mqt"),
+        "mqt_plugin": metadata.version("libquantum-plugin-mqt"),
         "qiskit": metadata.version("qiskit"),
         "manifest": str(manifest),
         "route_id": route.definition.route_id,
