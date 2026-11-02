@@ -17,6 +17,7 @@
 #                     of the image's QFw (QFW_PREFIX, QFW_VENV)
 # Everything else goes to qfw_pulser.sh, e.g.
 #   run_pulser_example.sh                                  # EMU_FREE
+#   run_pulser_example.sh --libs qdmi                      # through pasqal-qdmi
 #   run_pulser_example.sh --device-id pasqal-fresnel --atoms 42
 #
 # The login is read from your environment or ~/.pasqal/config on this host,

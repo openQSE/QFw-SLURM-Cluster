@@ -3,7 +3,8 @@
 This recipe runs QFw's Pulser example on Pasqal Cloud:
 Pasqal's EMU_FREE emulator by default, or the FRESNEL QPU. It uses the QFw
 installed in the image, or, with `--developer`, a QFw checkout you build
-yourself.
+yourself. The program runs through QRMI by default, or through Pasqal's
+native QDMI library with `--libs qdmi`.
 
 The example starts a job-owned shim QPM for the Pasqal device, reserves it,
 and runs one Pulser program through Pulser's own `QPUBackend` with
@@ -100,6 +101,35 @@ hour (`job-timeout-seconds` in the device config).
 Other options go to `examples/qfw_pulser.sh`, for example `--shots 500`. Run
 `examples/qfw_pulser.sh --help` in the QFw checkout for the list.
 
+## Run Through QDMI
+
+The image also carries `pasqal-qdmi`, Pasqal's native QDMI library, which
+QFw opens through MQT Core. `--libs` picks the shim library the program runs
+through, and `qrmi,qdmi` runs it through each in turn:
+
+```bash
+test_scripts/pasqal/run_pulser_example.sh --libs qrmi,qdmi
+```
+
+Expected (EMU_FREE):
+
+```
+[slurm] Granted job allocation 6
+[qfw]   reserved QPM shim-pasqal-...
+Pulser program on 4 atoms, 100 shots per job, built on FRESNEL_CAN1
+  QRMI  DONE      44.3s
+          500 ns  excited 0.54  0010:10  1010:10
+         1000 ns  excited 1.00  1111:100
+  QDMI  DONE      45.1s
+          500 ns  excited 0.54  1111:11  0111:10
+         1000 ns  excited 1.00  1111:100
+```
+
+pasqal-qdmi reads the login from `PASQAL_EMAIL` and `PASQAL_PASSWORD`, where
+QRMI reads `PASQAL_USERNAME`; `pasqal_login.py` writes both names from the
+same login, so one login serves either library, and each renews its token
+itself.
+
 ## Run by Hand
 
 The script does the following, which you can also run yourself. From the
@@ -114,6 +144,7 @@ a command line, and allocate one application group and one service group:
 
 ```bash
 export PASQAL_USERNAME=you@example.com QFW_PASQAL_PROJECT_ID=...
+export PASQAL_EMAIL="${PASQAL_USERNAME}"   # the same login, for pasqal-qdmi
 read -rsp 'Pasqal password: ' PASQAL_PASSWORD; echo; export PASQAL_PASSWORD
 
 salloc --account=qfw-test --partition=normal --nodes=1 --ntasks=1 \
@@ -135,6 +166,7 @@ exit
 
 It prints the same table as above, and a successful run ends with a
 `QFW_EXAMPLE_RESULT` record with `"status": "ok"` and `"rc": 0`.
+`./qfw_pulser.sh --libs qdmi` runs it through QDMI instead.
 
 ## Security Check
 
@@ -156,18 +188,18 @@ the script wrote is already gone.
 | `salloc` (two groups) | `slurmctld`, as `user-a` |
 | `qfw-setup`: directory service, shim QPM for the device | service group |
 | `test_pulser.py` with `QFwConnection` | application group |
-| QRMI `PasqalCloud` resource, Pasqal Cloud API calls | shim QPM |
+| QRMI `PasqalCloud` resource or pasqal-qdmi, Pasqal Cloud API calls | shim QPM |
 
 The device definitions are `examples/qfw_pulser_device_access.yaml` in the
 QFw checkout: `pasqal-emu-free` (EMU_FREE) and `pasqal-fresnel` (FRESNEL),
-both through QRMI with a `no-secret` credential provider. `qfw_pulser.sh`
-fills in the project.
+both through QRMI or QDMI (QRMI unless `--libs` says otherwise) with a
+`no-secret` credential provider. `qfw_pulser.sh` fills in the project.
 
 ## Credentials
 
-QFw opens the Pasqal device with QRMI's `QuantumResource.from_config`, which
-reads neither the environment nor `$HOME`, so the QPM does not pick up a
-`~/.pasqal/config` on its own. Whose identity a job runs as depends on the
+Through QRMI, QFw opens the Pasqal device with `QuantumResource.from_config`,
+which reads neither the environment nor `$HOME`, so the QPM does not pick up
+a `~/.pasqal/config` on its own. Whose identity a job runs as depends on the
 reservation's credential (design doc `docs/design/pulser-programs.md` in the
 QFw checkout, Section 4):
 
@@ -178,18 +210,21 @@ QFw checkout, Section 4):
   `QFW_API_KEY`, a service account
   (`<DEVICE>_QRMI_PASQAL_CLOUD_CLIENT_ID` and `_CLIENT_SECRET`), or, set
   explicitly, `PASQAL_CONFIG_ROOT` (a directory holding `.pasqal/config`) or
-  `PASQAL_USERNAME`/`PASQAL_PASSWORD`.
+  `PASQAL_USERNAME`/`PASQAL_PASSWORD`. pasqal-qdmi reads
+  `PASQAL_EMAIL`/`PASQAL_PASSWORD` instead, or the file `PASQAL_AUTHFILE`
+  names, in the same `key=value` format as `.pasqal/config`.
 
 The project is the reservation's, else the device's `project-id`, which
 `qfw_pulser.sh` fills in from `QFW_PASQAL_PROJECT_ID`.
 
 `run_pulser_example.sh` gives the service your login. `pasqal_login.py`
-reads it on the Docker host and writes `PASQAL_USERNAME`, `PASQAL_PASSWORD`
-and `QFW_PASQAL_PROJECT_ID` to an owner-only file in a private temporary
+reads it on the Docker host and writes `PASQAL_USERNAME` (QRMI's name for the
+login), `PASQAL_EMAIL` (pasqal-qdmi's), `PASQAL_PASSWORD` and
+`QFW_PASQAL_PROJECT_ID` to an owner-only file in a private temporary
 directory. The script passes that file to `docker exec --env-file`, so the
 login never appears on a command line, and deletes it when the run ends. It
-is never written into `shared-dir`. QRMI logs in with it and renews the token
-as it expires, so a long FRESNEL queue does not outlive it.
+is never written into `shared-dir`. QRMI and pasqal-qdmi log in with it and
+renew the token as it expires, so a long FRESNEL queue does not outlive it.
 
 With an exported `PASQAL_TOKEN`, or a `token=` and no username and password,
 the script passes the token as `QFW_API_KEY` instead. QRMI cannot renew a
@@ -206,6 +241,7 @@ renewed either.
 | `QRMI job ... timed out after ... and it was stopped` | The Pasqal queue was longer than the device's `job-timeout-seconds`; the job was cancelled. |
 | `QPM reads ..., not Pulser sequences` | The reservation picked a non-Pasqal QPM; check `--device-id`. |
 | `No module named 'pulser'` | The image was built before #68; rebuild it from main. With `--developer`: the QFw checkout predates its Pulser frontend or the venv predates it; rerun `./do_qfw_build.sh --clean`. |
+| `QDMI provider 'pasqal' needs pasqal-qdmi` | `--libs qdmi` on an image whose QFw predates pasqal-qdmi; rebuild it from main. |
 | `unknown QFw test user` | `--user` names a user missing from `config/qfw-users.conf`. |
 
 ## Run on a QFw Checkout

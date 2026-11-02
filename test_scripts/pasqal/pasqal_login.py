@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Write a Pasqal Cloud login or token and the project to a private env file.
 
-QFw hands a QPM service's PASQAL_USERNAME and PASQAL_PASSWORD to QRMI, which
-logs in to Pasqal Cloud itself and renews the token as it expires. This writes
+A QPM service's shim library logs in to Pasqal Cloud with the service's login
+and renews the token as it expires: QRMI reads PASQAL_USERNAME and
+PASQAL_PASSWORD, and Pasqal's native QDMI library (pasqal-qdmi, --libs qdmi)
+reads PASQAL_EMAIL and PASQAL_PASSWORD. This writes
 
     PASQAL_USERNAME=<username>
+    PASQAL_EMAIL=<username>
     PASQAL_PASSWORD=<password>
     QFW_PASQAL_PROJECT_ID=<project>
 
@@ -58,7 +61,8 @@ def main():
 	password = setting("PASQAL_PASSWORD", "password")
 	token = os.environ.get("PASQAL_TOKEN")
 	if not token and username and password:
-		login = f"PASQAL_USERNAME={username}\nPASQAL_PASSWORD={password}\n"
+		login = (f"PASQAL_USERNAME={username}\nPASQAL_EMAIL={username}\n"
+			 f"PASQAL_PASSWORD={password}\n")
 	elif token or config.get("token"):
 		login = f"QFW_API_KEY={token or config['token']}\n"
 	else:
