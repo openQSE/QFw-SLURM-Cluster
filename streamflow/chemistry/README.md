@@ -44,8 +44,9 @@ reserved provider. The provider service runs on its dedicated service node, such
 as `nwqsim-head`; `qfw-slurm` owns reservation and release. A service node listed
 as `idle` by `sinfo` does not prove that its quantum endpoint is operational.
 
-This follows the allocation contract in the Confluence Workflow Manager Integration
-Guide and the service topology in the QFw-SLURM-Cluster Tutorial. `--qpu` belongs on
+This follows the allocation contract in the public
+[Workflow Manager Integration Guide](https://github.com/openQSE/qfw-slurm/blob/main/docs/workflow-manager-integration.md)
+and the service topology in [Design Overview](../../README.md#design-overview). `--qpu` belongs on
 `sbatch`, alongside the circuit, qubit, depth and shot bounds. It is not repeated
 on `qfw-srun`.
 
@@ -79,9 +80,7 @@ configured valid credentials and confirmed the endpoint, permissions and workloa
 bounds. Setup does not start IQM or submit hardware jobs. The IQM profile's provider
 mapping and reservation validation are unit tested; hardware execution is not.
 
-The IBM/AWS Confluence enablement document lists unfinished execution paths despite
-their service nodes and resource mappings being present. This integration does not
-enable those backends. QEC and shim-specific workflows are outside this example.
+This example does not cover the IBM, AWS, QEC or shim-specific workflows.
 
 `locations: 1` requests one Slurm allocation per scattered job. It does not mean
 one quantum processor or one fragment for the entire workflow. `local.yml` contains
@@ -128,7 +127,8 @@ These submit real StreamFlow/Slurm jobs with isolated application fixtures. They
 cover rejected submission, invalid preparation input, failed chemistry and failed
 collection, checking error propagation, blocked downstream execution and released
 quantum reservations. They do not run the scientific solver. Fixtures and logs
-are retained under the shared directory.
+are retained in the host-created `shared-dir/streamflow-chemistry/tests/failure-*`
+directories.
 
 `run-local.sh` is the positive end-to-end test. It uses the scientific application
 functions on all ten supplied fragments, with classical preparation and collection.

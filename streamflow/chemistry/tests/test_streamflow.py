@@ -83,23 +83,23 @@ class StreamFlowFailureTests(unittest.TestCase):
             jobs = re.findall(r"with job id (\d+)", log)
             if jobs:
                 self.docker("scancel", *jobs)
-            (run / "streamflow.log").write_text(log)
-            self.fail(f"StreamFlow did not terminate after failure; see {run}")
-        (run / "streamflow.log").write_text(log)
-        self.assertIn("EXECUTING workflow", log, f"Failure happened before StreamFlow execution: {run}")
-        self.assertNotEqual(returncode, 0, f"Failure was reported as success: {run}")
+            (bundle / "streamflow.log").write_text(log)
+            self.fail(f"StreamFlow did not terminate after failure; see {bundle}")
+        (bundle / "streamflow.log").write_text(log)
+        self.assertIn("EXECUTING workflow", log, f"Failure happened before StreamFlow execution: {bundle}")
+        self.assertNotEqual(returncode, 0, f"Failure was reported as success: {bundle}")
         self.assertFalse((run / "summary.json").exists())
         self.assertFalse(any((run / "output").rglob("workflow-results.json")))
         jobs = re.findall(r"Scheduled job .* with job id (\d+)", log)
         if fault in ("submission", "prepare"):
-            self.assertEqual(len(jobs), len(expected_stages), f"Unexpected downstream execution: {run}")
+            self.assertEqual(len(jobs), len(expected_stages), f"Unexpected downstream execution: {bundle}")
         if fault == "submission":
             self.assertIn("sf-no-such-partition", log)
         rows, releases = [], []
         if jobs:
             accounting = self.docker("sacct", "-j", ",".join(jobs), "-X", "--parsable2", "--noheader",
                                      "-o", "JobID,JobName,State,ExitCode,NodeList")
-            (run / "sacct.txt").write_text(accounting)
+            (bundle / "sacct.txt").write_text(accounting)
             by_id = {row.split("|")[0]: row.split("|") for row in accounting.splitlines() if row}
             seen = []
             for job in jobs:
@@ -125,7 +125,7 @@ class StreamFlowFailureTests(unittest.TestCase):
                 self.assertEqual(seen.count("chemistry"), 3)
         evidence = {"fault": fault, "exit_code": returncode, "jobs": rows, "releases": releases,
                     "downstream_blocked": True, "application": "isolated test fixture", "hardware_executed": False}
-        (run / "verification.json").write_text(json.dumps(evidence, indent=2) + "\n")
+        (bundle / "verification.json").write_text(json.dumps(evidence, indent=2) + "\n")
 
     def test_rejected_slurm_submission_does_not_start_any_stage(self):
         self.run_failure("submission", ())

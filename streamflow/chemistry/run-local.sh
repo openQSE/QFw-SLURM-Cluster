@@ -27,8 +27,9 @@ host_run=${QFW_CONTAINER_BASE}/home/${login_home#/workspace/home/}/chemistry-str
 
 docker exec --user "${app_user}" slurmctld mkdir "${container_run}"
 if ! docker exec --user "${app_user}" --env "HOME=${login_home}" slurmctld \
-    "${runtime}/venv-0.2.0rc3/bin/python" "${runtime}/run.py" "${runtime}" "${container_run}" > "${host_run}/streamflow.log" 2>&1; then
-    tail -n 40 "${host_run}/streamflow.log" >&2
+    bash -c '"$1" "$2" "$3" "$4" > "$4/streamflow.log" 2>&1' _ \
+    "${runtime}/venv-0.2.0rc3/bin/python" "${runtime}/run.py" "${runtime}" "${container_run}"; then
+    docker exec --user "${app_user}" slurmctld tail -n 40 "${container_run}/streamflow.log" >&2
     exit 1
 fi
 printf 'Results and logs: %s\n' "${host_run}"
