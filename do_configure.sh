@@ -49,6 +49,9 @@ Options:
                        Default: ${DEFAULT_MQT_CORE_REPOSITORY}
   --mqt-core-ref REF   MQT Core branch, tag, or commit used by the image build
                        Default: ${DEFAULT_MQT_CORE_REF}
+  --slim               Leave out the native QRMI build, TNQVM and the MQT
+                       compiler. Use this where no prebuilt image exists, for
+                       example on arm64. The NWQ-Sim path is unaffected.
   --dry-run            Print the resolved settings without creating anything
   -h, --help           Show this help text
   --telemetry      Start the telemetry stack with the cluster (docker-compose.telemetry.yml)
@@ -74,6 +77,9 @@ QFW_SLURM_REPOSITORY="${DEFAULT_QFW_SLURM_REPOSITORY}"
 QFW_SLURM_REF="${DEFAULT_QFW_SLURM_REF}"
 MQT_CORE_REPOSITORY="${DEFAULT_MQT_CORE_REPOSITORY}"
 MQT_CORE_REF="${DEFAULT_MQT_CORE_REF}"
+QFW_WITH_QRMI_NATIVE=1
+QFW_WITH_TNQVM=1
+QFW_WITH_MQT_CC=1
 DRY_RUN=false
 
 while [ "$#" -gt 0 ]; do
@@ -134,6 +140,12 @@ while [ "$#" -gt 0 ]; do
             ;;
         --telemetry)
             TELEMETRY=true
+            shift
+            ;;
+        --slim)
+            QFW_WITH_QRMI_NATIVE=0
+            QFW_WITH_TNQVM=0
+            QFW_WITH_MQT_CC=0
             shift
             ;;
         --dry-run)
@@ -202,6 +214,9 @@ print_settings() {
     echo "  QFW_CONTAINER_BASE=${BASE_DIR}"
     echo "  MQT_CORE_REPOSITORY=${MQT_CORE_REPOSITORY}"
     echo "  MQT_CORE_REF=${MQT_CORE_REF}"
+    echo "  QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}"
+    echo "  QFW_WITH_TNQVM=${QFW_WITH_TNQVM}"
+    echo "  QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}"
     if ${TELEMETRY}; then
         echo "  COMPOSE_FILE=$(compose_files)"
     fi
@@ -249,6 +264,9 @@ IMAGE_TAG=${IMAGE_TAG}
 QFW_CONTAINER_BASE=${BASE_DIR}
 MQT_CORE_REPOSITORY=${MQT_CORE_REPOSITORY}
 MQT_CORE_REF=${MQT_CORE_REF}
+QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}
+QFW_WITH_TNQVM=${QFW_WITH_TNQVM}
+QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}
 EOF
 
 if ${TELEMETRY}; then
@@ -274,4 +292,7 @@ echo "  QFW_SLURM_REF=${QFW_SLURM_REF}"
 echo "  QFW_CONTAINER_BASE=${BASE_DIR}"
 echo "  MQT_CORE_REPOSITORY=${MQT_CORE_REPOSITORY}"
 echo "  MQT_CORE_REF=${MQT_CORE_REF}"
+echo "  QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}"
+echo "  QFW_WITH_TNQVM=${QFW_WITH_TNQVM}"
+echo "  QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}"
 echo "Optional QFw development directories are created only when needed."

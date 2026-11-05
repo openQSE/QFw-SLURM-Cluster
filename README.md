@@ -117,6 +117,15 @@ docker pull ghcr.io/openqse/qfw-slurm-cluster:20260503-v1.0
 Do not run `./do_build.sh` in the prebuilt-image workflow unless you intend to
 rebuild the image locally.
 
+Prebuilt images are amd64 only. On other hosts, such as Apple silicon, a slim
+build leaves out the native QRMI build, TNQVM and the MQT compiler, none of
+which the NWQ-Sim path needs:
+
+```bash
+./do_configure.sh --slim --image-tag rocky10.1-slim
+./do_build.sh
+```
+
 For a private GHCR image, log in first with a GitHub token that has
 `read:packages` access:
 

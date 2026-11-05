@@ -256,10 +256,25 @@ ENV LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${LIBFABRIC_PREFIX}/lib
 # Lower-level interface libraries the QFw front-end shim will route to.
 # ----------------------------------------------------------------------
 
+# Optional heavy components. Each defaults to 1, which is the complete image.
+# A slim image (for example on an arm64 laptop, where no prebuilt image
+# exists) sets them to 0 with do_configure.sh --slim. Nothing QFw's NWQ-Sim
+# path, the fake IQM QPM, or the qfw-slurm plugin needs is behind them: the
+# QRMI and QDMI Python bindings still come from PyPI into the QFw venv.
+#   QFW_WITH_QRMI_NATIVE  Rust toolchain, libqrmi.so and the QRMI SPANK plugin
+#   QFW_WITH_TNQVM        TNQVM, XACC and ExaTN
+#   QFW_WITH_MQT_CC       MLIR and MQT Core rebuilt from source with the MLIR
+#                         compiler; without it the QFw venv keeps the PyPI
+#                         mqt-core wheel
+ARG QFW_WITH_QRMI_NATIVE=1
+ARG QFW_WITH_TNQVM=1
+ARG QFW_WITH_MQT_CC=1
+
 ARG RUST_VERSION=1.91.0
 ENV CARGO_HOME=/opt/qfw/rust/cargo \
     RUSTUP_HOME=/opt/qfw/rust/rustup
 RUN set -ex \
+    && if [ "${QFW_WITH_QRMI_NATIVE}" != "1" ]; then exit 0; fi \
     && mkdir -p "${CARGO_HOME}" "${RUSTUP_HOME}" \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --no-modify-path --profile minimal \
@@ -356,6 +371,7 @@ ARG QRMI_PREFIX=/opt/qfw/qrmi
 ARG QRMI_SPANK_REPO=https://github.com/qiskit-community/spank-plugins.git
 ARG QRMI_SPANK_REF=0.11.0
 RUN set -ex \
+    && if [ "${QFW_WITH_QRMI_NATIVE}" != "1" ]; then exit 0; fi \
     && git clone --depth=1 --branch "${QRMI_VERSION}" "${QRMI_REPO}" /tmp/qrmi \
     && cd /tmp/qrmi \
     && cargo build --locked --release --lib \
@@ -403,6 +419,7 @@ RUN set -ex \
     && test -x "${NWQSIM_PREFIX}/bin/circuit_runner.nwqsim"
 
 RUN set -ex \
+    && if [ "${QFW_WITH_TNQVM}" != "1" ]; then exit 0; fi \
     && "${QFW_IMAGE_SOURCE}/tools/dependencies/tnqvm/build.sh" \
         --work-dir "${SIMULATOR_WORK_ROOT}/tnqvm" \
         --prefix "${TNQVM_PREFIX}" \
@@ -499,6 +516,7 @@ ARG MLIR_VERSION=23.1.1
 ARG MLIR_PREFIX=/opt/llvm-23.1.1
 ENV MLIR_DIR=${MLIR_PREFIX}/lib/cmake/mlir
 RUN set -ex \
+    && if [ "${QFW_WITH_MQT_CC}" != "1" ]; then exit 0; fi \
     && curl -LsSf \
         "https://github.com/munich-quantum-software/setup-mlir/releases/download/${SETUP_MLIR_VERSION}/setup-mlir.sh" \
         -o /tmp/setup-mlir.sh \
@@ -508,6 +526,7 @@ RUN set -ex \
 
 ARG MQT_CORE_SOURCE_REVISION
 RUN set -ex \
+    && if [ "${QFW_WITH_MQT_CC}" != "1" ]; then exit 0; fi \
     && git clone "${MQT_CORE_REPOSITORY}" "${MQT_CORE_SOURCE}" \
     && git -C "${MQT_CORE_SOURCE}" fetch origin "${MQT_CORE_REF}" \
     && git -C "${MQT_CORE_SOURCE}" switch --detach FETCH_HEAD \
@@ -520,7 +539,9 @@ RUN set -ex \
 
 COPY shared-dir/mqt-cc-smoke-test.sbatch /tmp/mqt-cc-smoke-test.sbatch
 RUN set -ex \
-    && QFW_VENV="${QFW_IMAGE_VENV}" bash /tmp/mqt-cc-smoke-test.sbatch \
+    && if [ "${QFW_WITH_MQT_CC}" = "1" ]; then \
+        QFW_VENV="${QFW_IMAGE_VENV}" bash /tmp/mqt-cc-smoke-test.sbatch; \
+       fi \
     && rm /tmp/mqt-cc-smoke-test.sbatch
 
 ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
@@ -623,6 +644,7 @@ RUN set -ex \
         /etc/pam.d/sshd \
     && ! grep -qE '^session[[:space:]]+required[[:space:]]+pam_loginuid\.so' \
         /etc/pam.d/sshd
+
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY tools/qfw-site-services /usr/local/sbin/qfw-site-services
