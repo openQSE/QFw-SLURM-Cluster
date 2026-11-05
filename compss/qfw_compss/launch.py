@@ -21,6 +21,7 @@ with the rest of the job environment.
 
 import argparse
 import os
+import random
 import shlex
 import socket
 import subprocess
@@ -43,6 +44,21 @@ def _allocated_hosts():
 	return [host for host in output.split() if host]
 
 
+def _free_master_port():
+	# launch_compss picks a random port in 43000-44000 by default. That range is
+	# inside Linux's ephemeral ports, so anything on the node, such as the srun
+	# that starts a worker, can take it before the master binds it, and COMPSs
+	# then hangs. Below 32768 nothing is assigned automatically.
+	for port in random.sample(range(30000, 32000), 100):
+		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+			try:
+				sock.bind(("", port))
+			except OSError:
+				continue
+			return port
+	raise SystemExit("qfw-compss-launch: no free port for the COMPSs master")
+
+
 def build_command(args, hosts, master):
 	compss_home = os.environ.get("COMPSS_HOME", "/opt/COMPSs")
 	launch = Path(compss_home) / "Runtime" / "scripts" / "user" / "launch_compss"
@@ -59,6 +75,7 @@ def build_command(args, hosts, master):
 		str(launch),
 		f"--sc_cfg={args.sc_cfg}",
 		f"--master_node={master}",
+		f"--master_port={args.master_port}",
 		f"--worker_nodes={' '.join(workers)}",
 		f"--cpus_per_node={args.cpus_per_node}",
 		f"--worker_in_master_cpus={worker_in_master}",
@@ -142,6 +159,7 @@ def main(argv=None):
 		raise SystemExit(
 			f"qfw-compss-launch: this host ({master}) is not in the "
 			f"allocation {hosts}; run it from the batch script")
+	args.master_port = _free_master_port()
 	command = build_command(args, hosts, master)
 	print("qfw-compss-launch:", shlex.join(command), flush=True)
 	if args.dry_run:

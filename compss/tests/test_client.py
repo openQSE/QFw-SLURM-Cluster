@@ -249,18 +249,24 @@ class ClientTest(unittest.TestCase):
 
 
 class LaunchTest(unittest.TestCase):
+	def test_master_port_is_outside_the_ephemeral_range(self):
+		port = launch._free_master_port()
+		self.assertGreaterEqual(port, 30000)
+		self.assertLess(port, 32000)
+
 	def args(self, **overrides):
 		values = dict(
 			sc_cfg="qfw-cluster", cpus_per_node=4, worker_in_master_cpus=0,
 			worker_in_master_memory=2048, working_dir="/w", log_dir="/l",
 			log_level="off", pythonpath=["/app/src"], launch_option=[],
-			application="/x/app.py", arguments=["--flag", "1"])
+			application="/x/app.py", arguments=["--flag", "1"], master_port=30001)
 		values.update(overrides)
 		return SimpleNamespace(**values)
 
 	def test_master_is_not_a_worker(self):
 		command = build_command(self.args(), ["c1", "c2", "c3"], "c1")
 		self.assertIn("--worker_nodes=c2 c3", command)
+		self.assertIn("--master_port=30001", command)
 		self.assertIn("--worker_in_master_cpus=0", command)
 		self.assertIn("--pythonpath=/x:/app/src", command)
 		self.assertEqual(command[-3:], ["/x/app.py", "--flag", "1"])
