@@ -25,7 +25,7 @@ SLURM SPANK plugin) and [QDMI] (via IQM's `iqm-qdmi` reference implementation).
 - [Build And Run QFw](#build-and-run-qfw)
 - [Running Against The IQM QPU](IQM-ACCESS.md) — credentials, remote access, hardware smoke tests
 - [Telemetry Dashboard (Optional)](#telemetry-dashboard-optional)
-- [COMPSs + QFw](compss/README.md) — PyCOMPSs task graphs whose quantum tasks run on QFw QPMs
+- [COMPSs + QFw](compss/README.md) — run Python applications in parallel across the cluster, with tasks that use QFw
 - [Design Overview](#design-overview)
 - [Detailed Reference](#detailed-reference)
 - [Troubleshooting](#troubleshooting)
@@ -120,8 +120,8 @@ rebuild the image locally.
 
 Prebuilt images are amd64 only. On other hosts, such as Apple silicon, a slim
 build leaves out the native QRMI build, TNQVM and the MQT compiler, none of
-which the NWQ-Sim path needs. `--with-compss` adds COMPSs, described in
-[compss/README.md](compss/README.md):
+which the NWQ-Sim path needs. `--with-compss` adds COMPSs, for running Python
+applications in parallel; see [compss/README.md](compss/README.md):
 
 ```bash
 ./do_configure.sh --slim --with-compss --image-tag rocky10.1-compss

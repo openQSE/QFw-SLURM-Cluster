@@ -2,7 +2,7 @@
 #
 # COMPSs + QFw: chemistry_he's He4 FMO-VQE on the site NWQ-Sim QPM.
 #
-# setup-local.sh copies this directory to the shared directory; run-local.sh submits it as a test user.
+# ../setup-local.sh copies this directory to the shared directory; ../run-local.sh submits it as a test user.
 #
 # One node runs the COMPSs master, the other two run the ten fragment tasks,
 # four at a time each. The quantum options reserve one allocation-wide slice
@@ -40,7 +40,7 @@ trap 'qfw-teardown || true' EXIT
 # Four fragment tasks share each node's four CPUs.
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 
-example_dir=${CHEMISTRY_EXAMPLE_DIR:-${QFW_SHARED_ROOT}/compss-chemistry}
+example_dir=${CHEMISTRY_EXAMPLE_DIR:-${QFW_SHARED_ROOT}/compss-examples/chemistry}
 chemistry=${CHEMISTRY_ROOT:-${example_dir}/chemistry_he}
 
 qfw-compss-launch --pythonpath "${chemistry}" \
