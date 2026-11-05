@@ -100,6 +100,7 @@ if ${DRY_RUN}; then
         echo "    --build-arg QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE:-1} \\"
         echo "    --build-arg QFW_WITH_TNQVM=${QFW_WITH_TNQVM:-1} \\"
         echo "    --build-arg QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC:-1} \\"
+        echo "    --build-arg QFW_WITH_COMPSS=${QFW_WITH_COMPSS:-0} \\"
         echo "    ${SCRIPT_DIR}"
     else
         cat <<EOF
@@ -124,6 +125,7 @@ MQT_CORE_REF="${MQT_CORE_REF:-575acd1b9ca52e4608ccf4833e7d60640913cef4}"
 QFW_WITH_QRMI_NATIVE="${QFW_WITH_QRMI_NATIVE:-1}"
 QFW_WITH_TNQVM="${QFW_WITH_TNQVM:-1}"
 QFW_WITH_MQT_CC="${QFW_WITH_MQT_CC:-1}"
+QFW_WITH_COMPSS="${QFW_WITH_COMPSS:-0}"
 
 resolve_remote_ref() {
     local repository="$1"
@@ -172,7 +174,8 @@ echo "Resolved qfw-slurm revision ${QFW_SLURM_SOURCE_REVISION}"
 echo "Using MQT Core ${MQT_CORE_REF} from ${MQT_CORE_REPOSITORY}"
 echo "Resolved MQT Core revision ${MQT_CORE_SOURCE_REVISION}"
 echo "Optional components: QRMI native=${QFW_WITH_QRMI_NATIVE}" \
-    "TNQVM=${QFW_WITH_TNQVM} MQT compiler=${QFW_WITH_MQT_CC}"
+    "TNQVM=${QFW_WITH_TNQVM} MQT compiler=${QFW_WITH_MQT_CC}" \
+    "COMPSs=${QFW_WITH_COMPSS}"
 
 if ${NO_CACHE}; then
     docker build \
@@ -192,6 +195,7 @@ if ${NO_CACHE}; then
         --build-arg "QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}" \
         --build-arg "QFW_WITH_TNQVM=${QFW_WITH_TNQVM}" \
         --build-arg "QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}" \
+        --build-arg "QFW_WITH_COMPSS=${QFW_WITH_COMPSS}" \
         "${SCRIPT_DIR}"
 else
     docker build \
@@ -210,5 +214,6 @@ else
         --build-arg "QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}" \
         --build-arg "QFW_WITH_TNQVM=${QFW_WITH_TNQVM}" \
         --build-arg "QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}" \
+        --build-arg "QFW_WITH_COMPSS=${QFW_WITH_COMPSS}" \
         "${SCRIPT_DIR}"
 fi

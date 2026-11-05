@@ -52,6 +52,7 @@ Options:
   --slim               Leave out the native QRMI build, TNQVM and the MQT
                        compiler. Use this where no prebuilt image exists, for
                        example on arm64. The NWQ-Sim path is unaffected.
+  --with-compss        Add the COMPSs runtime and the qfw_compss bridge
   --dry-run            Print the resolved settings without creating anything
   -h, --help           Show this help text
   --telemetry      Start the telemetry stack with the cluster (docker-compose.telemetry.yml)
@@ -80,6 +81,7 @@ MQT_CORE_REF="${DEFAULT_MQT_CORE_REF}"
 QFW_WITH_QRMI_NATIVE=1
 QFW_WITH_TNQVM=1
 QFW_WITH_MQT_CC=1
+QFW_WITH_COMPSS=0
 DRY_RUN=false
 
 while [ "$#" -gt 0 ]; do
@@ -146,6 +148,10 @@ while [ "$#" -gt 0 ]; do
             QFW_WITH_QRMI_NATIVE=0
             QFW_WITH_TNQVM=0
             QFW_WITH_MQT_CC=0
+            shift
+            ;;
+        --with-compss)
+            QFW_WITH_COMPSS=1
             shift
             ;;
         --dry-run)
@@ -217,6 +223,7 @@ print_settings() {
     echo "  QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}"
     echo "  QFW_WITH_TNQVM=${QFW_WITH_TNQVM}"
     echo "  QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}"
+    echo "  QFW_WITH_COMPSS=${QFW_WITH_COMPSS}"
     if ${TELEMETRY}; then
         echo "  COMPOSE_FILE=$(compose_files)"
     fi
@@ -267,6 +274,7 @@ MQT_CORE_REF=${MQT_CORE_REF}
 QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}
 QFW_WITH_TNQVM=${QFW_WITH_TNQVM}
 QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}
+QFW_WITH_COMPSS=${QFW_WITH_COMPSS}
 EOF
 
 if ${TELEMETRY}; then
@@ -295,4 +303,5 @@ echo "  MQT_CORE_REF=${MQT_CORE_REF}"
 echo "  QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}"
 echo "  QFW_WITH_TNQVM=${QFW_WITH_TNQVM}"
 echo "  QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}"
+echo "  QFW_WITH_COMPSS=${QFW_WITH_COMPSS}"
 echo "Optional QFw development directories are created only when needed."

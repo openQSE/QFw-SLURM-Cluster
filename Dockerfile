@@ -645,6 +645,27 @@ RUN set -ex \
     && ! grep -qE '^session[[:space:]]+required[[:space:]]+pam_loginuid\.so' \
         /etc/pam.d/sshd
 
+# ----------------------------------------------------------------------
+# COMPSs (optional, QFW_WITH_COMPSS=1)
+#
+# COMPSs runs the application's task graph across the allocated nodes. Its
+# quantum tasks reach QFw through qfw_compss, which runs QFw's primitives in a
+# defw-python child per task. See compss/README.md.
+# ----------------------------------------------------------------------
+ARG QFW_WITH_COMPSS=0
+ARG COMPSS_VERSION=3.4
+ENV COMPSS_HOME=/opt/COMPSs \
+    JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+COPY tools/install-compss.sh /tmp/install-compss.sh
+COPY compss/qfw-cluster.cfg /tmp/qfw-cluster.cfg
+RUN set -ex \
+    && if [ "${QFW_WITH_COMPSS}" = "1" ]; then \
+        COMPSS_VERSION="${COMPSS_VERSION}" \
+        COMPSS_SC_CFG=/tmp/qfw-cluster.cfg \
+        bash /tmp/install-compss.sh; \
+       fi \
+    && rm -f /tmp/install-compss.sh /tmp/qfw-cluster.cfg
+ENV PATH=${COMPSS_HOME}/Runtime/scripts/user:${PATH}
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY tools/qfw-site-services /usr/local/sbin/qfw-site-services
@@ -655,6 +676,15 @@ RUN dnf -y install tcsh \
     && dnf clean all \
     && rm -rf /var/cache/yum \
     && uv pip install --system Jinja2
+
+# The bridge is the last layer so that editing it rebuilds only this step.
+COPY compss /opt/openqse/qfw-compss
+RUN set -ex \
+    && if [ "${QFW_WITH_COMPSS}" = "1" ]; then \
+        uv pip install --python "${QFW_IMAGE_VENV}" --no-deps \
+            /opt/openqse/qfw-compss \
+        && "${QFW_IMAGE_VENV}/bin/python" -c 'import qfw_compss'; \
+       fi
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 CMD ["slurmdbd"]
