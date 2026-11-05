@@ -55,3 +55,5 @@ docker-compose.override.yml
 /shared-dir/streamflow-chemistry/
 /shared-dir/home/
 /streamflow/chemistry/**/__pycache__/
+/shared-dir/compss-chemistry/
+/compss/**/__pycache__/
