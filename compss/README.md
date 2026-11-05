@@ -58,16 +58,7 @@ seconds rather than a minute.
 
 ## What just happened
 
-```text
- Slurm job, with a reservation on the quantum simulator
-   │
-   ├─ c1       The main program. It creates the tasks and waits for the results.
-   │
-   ├─ c2, c3   COMPSs workers, each running up to 4 tasks at a time.
-   │              Each quantum task sends its circuits through QFw ──┐
-   │                                                                 ▼
-   └─ nwqsim-head   The quantum simulator (the "QPM" in QFw's terms).
-```
+![The Slurm job, the COMPSs master on c1, the workers on c2 and c3, and the QFw services](diagrams/architecture.png)
 
 ## Write your own application
 
@@ -124,7 +115,7 @@ sbatch /workspace/qfw-container-base/my-app/my-app.sbatch
 
 ### Three things to remember
 
-1. **Open one `QFwClient` per task, not one per call.** Opening it takes about 6
+1. **Open one `QFwClient` per task, not one per call.** Opening it takes about 7.5
    seconds, and after that calls are quick. An optimisation loop can make hundreds
    of calls through the same client.
 2. **Import PySCF, OpenFermion and anything else that loads `h5py` inside your
@@ -184,8 +175,11 @@ tested.
 | `qfw_compss/launch.py` | `qfw-compss-launch`: captures the session and runs `launch_compss` inside the allocation. |
 | `qfw-cluster.cfg` | COMPSs' configuration for these containers: Slurm, 4 CPUs, 6 GB, workers started by `srun`. |
 | `tests/` | Tests that need neither QFw nor COMPSs. |
+| `diagrams/` | The diagrams on this page. `make_diagrams.py` redraws them. |
 
 ### Why each client has a child process
+
+![One quantum task, from the COMPSs master through the defw-python child to the QPM and back](diagrams/quantum-task.png)
 
 QFw's client needs the DEFw runtime, which `defw-python` provides: Python embedded
 in a native process with its own RPC listener threads. A COMPSs worker forks its
