@@ -54,9 +54,9 @@ def main():
 	for r in results:
 		expected = math.sin(r["angle"] / 2) ** 2
 		print(f"hello: {r['angle']:5.2f}  {r['measured']:8.3f}  {expected:8.3f}  {r['node']}")
-	work = sum(r["seconds"] for r in results)
-	print(f"hello: {len(results)} tasks did {work:.0f} s of work in {elapsed:.0f} s, "
-		  f"{work / elapsed:.1f} times faster than one after the other")
+	longest = max(r["seconds"] for r in results)
+	print(f"hello: {len(results)} tasks finished in {elapsed:.0f} s; "
+		  f"the slowest took {longest:.0f} s")
 
 
 if __name__ == "__main__":

@@ -47,14 +47,15 @@ angle  measured  expected  node
  2.24     0.801     0.812  c3
  2.69     0.946     0.950  c3
  3.14     1.000     1.000  c3
-8 tasks did 60 s of work in 13 s, 4.7 times faster than one after the other
+8 tasks finished in 15 s; the slowest took 9 s
 ```
 
 Each row is one task. It rotated a qubit by that angle, sent the circuit to a
 quantum simulator through QFw, and measured how often the qubit read 1. The
 `measured` column should be close to `expected`, the value from theory. The tasks
-ran at the same time on two nodes, `c2` and `c3`, which is why the job took 13
-seconds rather than a minute.
+ran at the same time on two nodes, `c2` and `c3`. They finish in about 15 seconds
+rather than the 60 they take one at a time, because most of each task is opening its
+connection to QFw, and that part can happen side by side.
 
 ## What just happened
 
@@ -144,7 +145,7 @@ Extrae, which the image leaves out.
 | Example | What it shows | Time |
 | --- | --- | --- |
 | [`hello`](hello/hello.py) | The basics: eight small quantum tasks in parallel | About 30 s |
-| [`chemistry`](chemistry/README.md) | A real application: the energy of a helium cluster, using 20 tasks | 10 to 12 min |
+| [`chemistry`](chemistry/README.md) | A real application: the energy of a helium cluster, using 20 tasks | 10 to 13 min |
 
 ## If something goes wrong
 
