@@ -153,14 +153,14 @@ Extrae, which the image leaves out.
 | Example | What it shows | Time |
 | --- | --- | --- |
 | [`hello`](hello/hello.py) | The basics: eight small quantum tasks in parallel | About 30 s |
-| [`chemistry`](chemistry/README.md) | A real application: the energy of a helium cluster, using 20 tasks | About 12 min |
+| [`chemistry`](chemistry/README.md) | A real application: the energy of a helium cluster, using 20 tasks | 10 to 12 min |
 
 ## If something goes wrong
 
 | What you see | What to do |
 | --- | --- |
 | The job fails | `run-local.sh` shows the end of the job's output. There is more under `~/.qfw-compss/<job>-<time>/`, which on your computer is in `shared-dir/home/user-a`: COMPSs' logs are in `.COMPSs/<job>/`, and a failed QFw connection keeps its logs in `qfw/clients/` |
-| The results printed, but the job stays `RUNNING` | A rare COMPSs 3.4 bug when it shuts down. Your results are fine. Cancel the job with `docker exec slurmctld scancel <job>`. `run-local.sh` clears anything left behind before its next run |
+| The results printed, but the job stays `RUNNING` | A COMPSs 3.4 bug when it shuts down, seen in about 1 run in 20. The log shows a `NullPointerException` in `shutdownNotification`. Your results are fine. Cancel the job with `docker exec slurmctld scancel <job>`. `run-local.sh` clears anything left behind before its next run |
 | Everything stops or takes far too long | If your computer goes to sleep, Docker freezes too, and jobs can pass their time limit. Keep it awake during a run |
 | `The image has no COMPSs` | Build the image with `--with-compss` (step 1) |
 

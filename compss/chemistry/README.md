@@ -18,7 +18,7 @@ After [building the image and starting the cluster](../README.md#try-it-in-a-few
 ./compss/run-local.sh chemistry
 ```
 
-It takes about 12 minutes on a laptop. Everything it needs is in this directory, so
+It takes 10 to 12 minutes on a laptop. Everything it needs is in this directory, so
 there is nothing else to install or download. It prints the final energy and where
 to find the results:
 
@@ -76,13 +76,13 @@ An image built with COMPSs also has a copy at `/opt/openqse/qfw-compss/chemistry
 
 ## About the energies
 
-Two runs gave these energies, in Hartree, the usual unit in chemistry:
+Three runs gave these energies, in Hartree, the usual unit in chemistry:
 
 | | This example | Accurate value |
 | --- | --- | --- |
 | Single atoms (monomers) | -2.869 to -2.893 | -2.8876 |
 | Pairs of atoms (dimers) | -1.096 to -5.742 | -5.7361 |
-| **Total energy** | **-2.27 and -4.60** | **-11.3155** |
+| **Total energy** | **-2.27, -4.60 and -9.89** | **-11.3155** |
 
 The accurate value comes from a full run of the same solver, on a simulator without
 measurement noise, which took about 3 hours on MareNostrum 5.
