@@ -4,8 +4,9 @@ This example calculates the energy of a small cluster of four helium atoms, usin
 COMPSs to run the work in parallel and QFw to run the quantum circuits.
 
 **This is an integration test.** It shows a real application running across the
-cluster. To keep the run short it stops the calculation early, so its energies are
-not accurate; see [About the energies](#about-the-energies).
+cluster. Its energies are not reliable yet, because of a bug in QFw and because the
+run stops the calculation early to stay short; see
+[About the energies](#about-the-energies).
 
 If you are new to COMPSs and QFw, start with
 [the `hello` example](../README.md#try-it-in-a-few-minutes).
@@ -18,9 +19,9 @@ After [building the image and starting the cluster](../README.md#try-it-in-a-few
 ./compss/run-local.sh chemistry
 ```
 
-It takes 10 to 13 minutes on a laptop. Everything it needs is in this directory, so
-there is nothing else to install or download. It prints the final energy and where
-to find the results:
+It takes 10 to 13 minutes on a laptop, and there is nothing else to do first:
+`setup-local.sh` already fetched the chemistry code it needs. It prints the final
+energy and where to find the results:
 
 ```text
 *FMO-VQE energy = -4.603224680447
@@ -62,13 +63,13 @@ The fragments don't depend on each other, so they can all run at the same time:
 Node `c1` runs the main program, and `c2` and `c3` run the tasks, four at a time
 each.
 
-**Running in parallel does not make this example faster here.** One task at a time
-took 672 seconds, and three parallel runs took 564, 724 and 764 seconds. Almost all
-of the time is spent in the quantum simulator, which all the tasks share, so the same
-circuits have to pass through it either way. A task takes about 75 seconds alone and
-up to 10 minutes when it is waiting behind the others. Tasks that do more of their
-work outside the simulator gain more: [`hello`](../README.md#try-it-in-a-few-minutes)
-runs about 4 times faster.
+**Running in parallel does not make this example faster here.** The simulator runs
+one circuit at a time, and almost all of the time goes on circuits, so they have to
+pass through it one by one either way. One task at a time took 672 seconds, and
+parallel runs took between 564 and 764 seconds, on a laptop in normal use, so treat
+these as rough. A task takes about 75 seconds alone and up to 10 minutes when it is
+waiting behind the others. Tasks that do more of their work outside the simulator
+gain more: [`hello`](../README.md#try-it-in-a-few-minutes) runs about 4 times faster.
 
 ## What's in this directory
 
@@ -76,42 +77,51 @@ runs about 4 times faster.
 | --- | --- |
 | [`he4_fmo_vqe.py`](he4_fmo_vqe.py) | The COMPSs application. Its `@task` functions are what run in parallel |
 | [`chemistry-nwqsim.sbatch`](chemistry-nwqsim.sbatch) | The batch script, with the job's resources and quantum reservation |
-| [`chemistry_he/`](chemistry_he/README.md) | The chemistry itself, copied unchanged from [openQSE/chemistry_he](https://github.com/openQSE/chemistry_he): the solver and the helium data |
-
-An image built with COMPSs also has a copy at `/opt/openqse/qfw-compss/chemistry/`.
+| `chemistry_he/` | The chemistry itself, from [openQSE/chemistry_he](https://github.com/openQSE/chemistry_he): the solver and the helium data. It is a git submodule pinned to a tested commit, which `setup-local.sh` fetches for you |
 
 ## About the energies
 
 These are the energies from our runs, in Hartree, the usual unit in chemistry:
 
-| | Parallel | One task at a time (one run) | Accurate value |
-| --- | --- | --- | --- |
-| Single atoms (monomers) | -2.869 to -2.893 | -2.855 to -2.893 | -2.8876 |
-| Pairs of atoms (dimers) | +3.544 to -5.742 | -5.700 to -5.731 | -5.7361 |
-| **Total energy** | **-1.62, -2.27, -4.60 and -9.89** | **-11.28** | **-11.3155** |
+| | Parallel | Parallel, with the QFw fix below (2 runs) | One task at a time (1 run) | Accurate value |
+| --- | --- | --- | --- | --- |
+| Single atoms (monomers) | -2.869 to -2.893 | -2.867 to -2.890 | -2.855 to -2.893 | -2.8876 |
+| Pairs of atoms (dimers) | +3.544 to -5.742 | -5.672 to -5.748 | -5.700 to -5.731 | -5.7361 |
+| **Total energy** | **+0.99, -1.62, -2.27, -4.60 and -9.89** | **-11.16 and -11.18** | **-11.28** | **-11.3155** |
 
 The accurate value comes from a full run of the same solver, on a simulator without
 measurement noise, which took about 3 hours on MareNostrum 5.
 
-**We do not yet know why some dimers go so far wrong.** A quantum measurement is
-statistical, so every energy the optimiser sees has some noise in it, and the noise
-can lead the optimiser astray. But the bad dimers have only appeared in parallel runs
-so far, so the tasks running at the same time may play a part, either through QFw or
-some other way. One good run is not enough to tell. Because the total adds and
-subtracts all ten energies, one poor dimer moves the total a long way, and each run
-gives a different answer.
+### The large errors: a bug in QFw
 
-These checks all ran one client at a time, so they do not cover tasks running at the
-same time:
+Each energy needs three circuits, one for each way of measuring the qubits. QFw
+assumes their results come back in the order the circuits were sent. With several
+tasks running at once, they sometimes do not: this happened in about 1 call in 5. The
+energy from such a call can be about +23 Hartree instead of about -5.7, which sends
+the optimiser the wrong way. Because the total adds and subtracts all ten energies,
+one poor dimer moves the total a long way.
+
+Putting the results back in order inside QFw brought the parallel runs close to the
+accurate value, as the table shows. The fix belongs in QFw
+([openQSE/QFw#192](https://github.com/openQSE/QFw/issues/192)), so until this
+repository builds a QFw that has it, **expect parallel runs of this example to give
+wrong energies**.
+
+### The small errors: a short run with measurement noise
+
+With the bug out of the way, the total is still 0.04 to 0.15 Hartree off. A quantum
+measurement is statistical, so every energy the optimiser sees has some noise in it,
+and this run also stops the optimiser early. We checked the noise with one client at
+a time:
 
 - With the circuit's parameters held fixed, QFw's energies match an exact simulation
   to within the measurement noise, about 0.01 to 0.02 Hartree.
-- With no noise and the same short limits, the dimers that went furthest wrong reach
-  -5.7355 Hartree, within 0.001 of the accurate value.
-- Neither more measurements nor more optimiser steps fixes it. Simulating the noise
-  with a million measurements per circuit still left two dimers 0.02 to 0.05 Hartree
-  too low, and 200 optimiser steps at the default 4096 measurements left one 0.75
-  Hartree too low.
+- With no noise and the same short limits, the dimers reach -5.7355 Hartree, within
+  0.001 of the accurate value.
+- Neither more measurements nor more optimiser steps fixes it by itself. Simulating
+  the noise with a million measurements per circuit still left two dimers 0.02 to
+  0.05 Hartree too low, and 200 optimiser steps at the default 4096 measurements left
+  one 0.75 Hartree too low.
 
 ## Changing the run
 

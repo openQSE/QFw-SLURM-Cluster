@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Prepare the local cluster for the COMPSs examples: start the cluster and the
-# QFw services they need, and copy the examples where the nodes can see them.
+# QFw services they need, fetch the chemistry example's solver, and copy the
+# examples where the nodes can see them.
 set -euo pipefail
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cluster_root=$(cd "${script_dir}/.." && pwd)
@@ -18,8 +19,16 @@ for target in directory nwqsim gateway; do
     docker exec slurmctld qfw-site-services start --target "${target}"
 done
 
+if [[ ! -f ${script_dir}/chemistry/chemistry_he/puccd.py ]] &&
+    ! git -C "${cluster_root}" submodule update --init compss/chemistry/chemistry_he; then
+    echo 'Could not fetch chemistry_he, so only the hello example will run.' >&2
+    echo 'The chemistry example needs a git clone of this repository.' >&2
+fi
+
 examples=${QFW_CONTAINER_BASE}/compss-examples
 rm -rf "${examples}"
 mkdir -p "${examples}"
-cp -R "${script_dir}/hello" "${script_dir}/chemistry" "${examples}/"
+# chemistry_he's .git is a pointer that means nothing on the nodes.
+tar -C "${script_dir}" --exclude=.git --exclude=__pycache__ -cf - hello chemistry |
+    tar -C "${examples}" -xf -
 echo 'Ready: ./compss/run-local.sh hello'

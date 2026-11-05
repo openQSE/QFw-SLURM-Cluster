@@ -7,7 +7,7 @@ reads the FCIDUMP and builds the pUCCD problem, and a quantum task runs its
 orbital-optimised VQE. The main program waits for all ten energies and adds
 them up into the FMO energy. The fragments, the solver and the
 dimer-to-monomer map are chemistry_he's. The ``chemistry_he`` directory next to
-this file holds an unchanged copy of the first two.
+this file is a submodule that ``setup-local.sh`` fetches.
 
 The optimiser limits are small by default to keep test runs short, so this is
 an integration test and its energies are not converged; see README.md.

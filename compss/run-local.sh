@@ -15,6 +15,10 @@ source "${cluster_root}/qfw-install.env"
 app_user=${QFW_USER:-user-a}
 [[ ${app_user} != root ]] || { echo 'Use a provisioned non-root user' >&2; exit 2; }
 
+if [[ ${name} == chemistry && ! -f ${script_dir}/chemistry/chemistry_he/puccd.py ]]; then
+    echo 'The chemistry example needs chemistry_he, which ./compss/setup-local.sh fetches' >&2
+    exit 2
+fi
 batch=/workspace/qfw-container-base/compss-examples/${batch}
 if ! docker exec slurmctld test -f "${batch}"; then
     echo 'Prepare the cluster first: ./compss/setup-local.sh' >&2
