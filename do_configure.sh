@@ -53,6 +53,9 @@ Options:
                        compiler. Use this where no prebuilt image exists, for
                        example on arm64. The NWQ-Sim path is unaffected.
   --with-compss        Add the COMPSs runtime and the qfw_compss bridge
+  --with-compss-tracing
+                       As --with-compss, and also build Extrae, so that COMPSs
+                       jobs can record Paraver traces
   --dry-run            Print the resolved settings without creating anything
   -h, --help           Show this help text
   --telemetry      Start the telemetry stack with the cluster (docker-compose.telemetry.yml)
@@ -82,6 +85,7 @@ QFW_WITH_QRMI_NATIVE=1
 QFW_WITH_TNQVM=1
 QFW_WITH_MQT_CC=1
 QFW_WITH_COMPSS=0
+QFW_WITH_COMPSS_TRACING=0
 DRY_RUN=false
 
 while [ "$#" -gt 0 ]; do
@@ -154,6 +158,11 @@ while [ "$#" -gt 0 ]; do
             QFW_WITH_COMPSS=1
             shift
             ;;
+        --with-compss-tracing)
+            QFW_WITH_COMPSS=1
+            QFW_WITH_COMPSS_TRACING=1
+            shift
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -224,6 +233,7 @@ print_settings() {
     echo "  QFW_WITH_TNQVM=${QFW_WITH_TNQVM}"
     echo "  QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}"
     echo "  QFW_WITH_COMPSS=${QFW_WITH_COMPSS}"
+    echo "  QFW_WITH_COMPSS_TRACING=${QFW_WITH_COMPSS_TRACING}"
     if ${TELEMETRY}; then
         echo "  COMPOSE_FILE=$(compose_files)"
     fi
@@ -275,6 +285,7 @@ QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}
 QFW_WITH_TNQVM=${QFW_WITH_TNQVM}
 QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}
 QFW_WITH_COMPSS=${QFW_WITH_COMPSS}
+QFW_WITH_COMPSS_TRACING=${QFW_WITH_COMPSS_TRACING}
 EOF
 
 if ${TELEMETRY}; then
@@ -304,4 +315,5 @@ echo "  QFW_WITH_QRMI_NATIVE=${QFW_WITH_QRMI_NATIVE}"
 echo "  QFW_WITH_TNQVM=${QFW_WITH_TNQVM}"
 echo "  QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}"
 echo "  QFW_WITH_COMPSS=${QFW_WITH_COMPSS}"
+echo "  QFW_WITH_COMPSS_TRACING=${QFW_WITH_COMPSS_TRACING}"
 echo "Optional QFw development directories are created only when needed."

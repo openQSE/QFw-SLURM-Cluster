@@ -30,7 +30,8 @@ set -euo pipefail
 qfw-setup --site-config "${QFW_SITE_CONFIG:-/etc/openqse/qfw/site.yaml}"
 trap 'qfw-teardown || true' EXIT
 
-qfw-compss-launch \
+# run-local.sh --trace sets COMPSS_TRACING.
+qfw-compss-launch ${COMPSS_TRACING:+--tracing} \
 	--launch-option=--graph=true \
 	--launch-option=--summary \
 	"${QFW_SHARED_ROOT}/compss-examples/hello/hello.py"

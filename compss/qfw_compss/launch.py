@@ -59,9 +59,25 @@ def _free_master_port():
 	raise SystemExit("qfw-compss-launch: no free port for the COMPSs master")
 
 
+def _compss_home():
+	return Path(os.environ.get("COMPSS_HOME", "/opt/COMPSs"))
+
+
+def _merge_trace(trace_dir):
+	# Workers leave one package per node. Paraver reads the single merged trace.
+	merge = _compss_home() / "Runtime" / "scripts" / "utils" / "compss_gentrace"
+	merged = subprocess.run(
+		[str(merge), str(trace_dir)], cwd=trace_dir,
+		stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+	if merged.returncode == 0:
+		print(f"qfw-compss-launch: trace: {trace_dir / 'trace.prv'}", flush=True)
+	else:
+		print(f"qfw-compss-launch: could not merge the trace in {trace_dir}:\n"
+			  f"{merged.stdout}", flush=True)
+
+
 def build_command(args, hosts, master):
-	compss_home = os.environ.get("COMPSS_HOME", "/opt/COMPSs")
-	launch = Path(compss_home) / "Runtime" / "scripts" / "user" / "launch_compss"
+	launch = _compss_home() / "Runtime" / "scripts" / "user" / "launch_compss"
 	workers = [host for host in hosts if host != master]
 	worker_in_master = args.worker_in_master_cpus
 	if not workers and worker_in_master == 0:
@@ -90,6 +106,8 @@ def build_command(args, hosts, master):
 		"--lang=python",
 		f"--pythonpath={':'.join(pythonpath)}",
 	]
+	if args.tracing:
+		command.append("--tracing=true")
 	if worker_in_master:
 		command.append(f"--worker_in_master_memory={args.worker_in_master_memory}")
 	command.extend(args.launch_option)
@@ -135,11 +153,21 @@ def main(argv=None):
 		"--launch-option", action="append", default=[],
 		help="Extra option passed verbatim to launch_compss")
 	parser.add_argument(
+		"--tracing", action="store_true",
+		help="Record a Paraver trace; needs an image built with "
+			 "--with-compss-tracing")
+	parser.add_argument(
 		"--dry-run", action="store_true",
 		help="Print the launch_compss command without running it")
 	parser.add_argument("application")
 	parser.add_argument("arguments", nargs=argparse.REMAINDER)
 	args = parser.parse_args(argv)
+
+	if args.tracing and not (
+			_compss_home() / "Dependencies" / "extrae" / "bin" / "mpi2prv").exists():
+		raise SystemExit(
+			"qfw-compss-launch: this image has no Extrae; build it with "
+			"./do_configure.sh --with-compss-tracing")
 
 	home = Path(os.environ.get("HOME", "."))
 	job_id = os.environ.get("SLURM_JOB_ID", "nojob")
@@ -172,10 +200,14 @@ def main(argv=None):
 	print(f"qfw-compss-launch: {session!r}", flush=True)
 	env = dict(os.environ, **{SESSION_ENV: str(session_file)})
 	try:
-		return subprocess.run(command, env=env).returncode
+		status = subprocess.run(command, env=env).returncode
 	finally:
 		# It holds the job's environment, which can include tokens.
 		session_file.unlink(missing_ok=True)
+	trace_dir = Path(args.log_dir) / ".COMPSs" / job_id / "trace"
+	if args.tracing and trace_dir.is_dir():
+		_merge_trace(trace_dir)
+	return status
 
 
 if __name__ == "__main__":

@@ -10,12 +10,14 @@ ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
 ARG COMPSS_VERSION=3.4
+ARG QFW_WITH_COMPSS_TRACING=0
 ENV COMPSS_HOME=/opt/COMPSs \
     JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 COPY tools/install-compss.sh /tmp/install-compss.sh
 COPY compss/qfw-cluster.cfg /tmp/qfw-cluster.cfg
 RUN set -ex \
     && COMPSS_VERSION="${COMPSS_VERSION}" \
+        COMPSS_WITH_TRACING="${QFW_WITH_COMPSS_TRACING}" \
         COMPSS_SC_CFG=/tmp/qfw-cluster.cfg \
         bash /tmp/install-compss.sh \
     && rm -f /tmp/install-compss.sh /tmp/qfw-cluster.cfg

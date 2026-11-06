@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run a COMPSs example as a test user, wait for it and show the result.
 set -euo pipefail
-usage='Usage: run-local.sh hello|chemistry   (prepare first with setup-local.sh)'
+usage='Usage: run-local.sh hello|chemistry [--trace]   (prepare first with setup-local.sh)'
 case "${1:-}" in
     hello) batch=hello/hello.sbatch ;;
     chemistry) batch=chemistry/chemistry-nwqsim.sbatch ;;
@@ -9,6 +9,11 @@ case "${1:-}" in
     *) echo "${usage}" >&2; exit 2 ;;
 esac
 name=$1
+case "${2:-}" in
+    '') tracing='' ;;
+    --trace) tracing=1 ;;
+    *) echo "${usage}" >&2; exit 2 ;;
+esac
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cluster_root=$(cd "${script_dir}/.." && pwd)
 source "${cluster_root}/qfw-install.env"
@@ -22,6 +27,10 @@ fi
 batch=/workspace/qfw-container-base/compss-examples/${batch}
 if ! docker exec slurmctld test -f "${batch}"; then
     echo 'Prepare the cluster first: ./compss/setup-local.sh' >&2
+    exit 2
+fi
+if [[ -n ${tracing} ]] && ! docker exec slurmctld test -x /opt/COMPSs/Dependencies/extrae/bin/mpi2prv; then
+    echo 'This image has no Extrae; build it with ./do_configure.sh --with-compss-tracing' >&2
     exit 2
 fi
 login_home=$(docker exec slurmctld getent passwd "${app_user}" | cut -d: -f6)
@@ -39,7 +48,7 @@ echo "Running the ${name} example; this waits until the job ends"
 # A login shell applies the test user's QFw profile.
 status=0
 job=$(docker exec --user "${app_user}" --workdir "${login_home}" \
-    --env "HOME=${login_home}" slurmctld \
+    --env "HOME=${login_home}" --env "COMPSS_TRACING=${tracing}" slurmctld \
     bash -lc 'sbatch --parsable --wait "$1"' _ "${batch}") || status=$?
 job=${job%%;*}
 [[ ${job} =~ ^[0-9]+$ ]] || { echo "Submission failed: ${job}" >&2; exit 1; }
@@ -59,3 +68,6 @@ for graph in "${host_home}/.qfw-compss/${job}"-*/.COMPSs/"${job}"/monitor/comple
     latest_graph=${graph}
 done
 echo "Graph:   ${latest_graph}"
+if [[ -n ${tracing} ]]; then
+    echo "Trace:   ${latest_graph%/monitor/complete_graph.dot}/trace/trace.prv"
+fi

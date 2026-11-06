@@ -258,7 +258,7 @@ class LaunchTest(unittest.TestCase):
 		values = dict(
 			sc_cfg="qfw-cluster", cpus_per_node=4, worker_in_master_cpus=0,
 			worker_in_master_memory=2048, working_dir="/w", log_dir="/l",
-			log_level="off", pythonpath=["/app/src"], launch_option=[],
+			log_level="off", pythonpath=["/app/src"], launch_option=[], tracing=False,
 			application="/x/app.py", arguments=["--flag", "1"], master_port=30001)
 		values.update(overrides)
 		return SimpleNamespace(**values)
@@ -270,6 +270,12 @@ class LaunchTest(unittest.TestCase):
 		self.assertIn("--worker_in_master_cpus=0", command)
 		self.assertIn("--pythonpath=/x:/app/src", command)
 		self.assertEqual(command[-3:], ["/x/app.py", "--flag", "1"])
+
+	def test_tracing_is_off_unless_asked_for(self):
+		hosts = ["c1", "c2"]
+		self.assertNotIn("--tracing=true", build_command(self.args(), hosts, "c1"))
+		self.assertIn(
+			"--tracing=true", build_command(self.args(tracing=True), hosts, "c1"))
 
 	def test_single_node_runs_tasks_on_the_master(self):
 		command = build_command(self.args(), ["c1"], "c1")
@@ -303,6 +309,50 @@ class LaunchMainTest(unittest.TestCase):
 		self.assertTrue(seen["path"].is_absolute())
 		self.assertEqual(seen["session"].environment["QFW_RESERVATIONS"], "x")
 		self.assertFalse(seen["path"].exists())
+
+	def run_traced(self, tmp, merge_status=0, extrae=True):
+		home = tmp / "compss"
+		if extrae:
+			mpi2prv = home / "Dependencies" / "extrae" / "bin" / "mpi2prv"
+			mpi2prv.parent.mkdir(parents=True)
+			mpi2prv.touch()
+		calls = []
+
+		def fake_run(command, **kwargs):
+			if command[0] == "scontrol":
+				return SimpleNamespace(stdout="c1 c2\n", returncode=0)
+			calls.append(command)
+			if command[0].endswith("launch_compss"):
+				(tmp / "w" / ".COMPSs" / "5" / "trace").mkdir(parents=True)
+				return SimpleNamespace(returncode=3)
+			return SimpleNamespace(returncode=merge_status, stdout="merge output")
+
+		session = QFwSession({}, tmp / "qfw")
+		environment = {"SLURM_JOB_NODELIST": "c[1-2]", "SLURM_JOB_ID": "5",
+					   "COMPSS_HOME": str(home)}
+		self.addCleanup(os.chdir, os.getcwd())
+		os.chdir(tmp)
+		with mock.patch.object(launch.subprocess, "run", fake_run), \
+				mock.patch.object(QFwSession, "capture", return_value=session), \
+				mock.patch.object(launch.socket, "gethostname", return_value="c1"), \
+				mock.patch.dict(os.environ, environment):
+			status = launch.main(["--working-dir", "w", "--tracing", "/x/app.py"])
+		return status, calls
+
+	def test_trace_is_merged_and_the_status_is_the_applications(self):
+		for merge_status in (0, 1):
+			tmp = Path(tempfile.mkdtemp()).resolve()
+			with mock.patch("builtins.print"):
+				status, calls = self.run_traced(tmp, merge_status)
+			self.assertEqual(status, 3)
+			self.assertTrue(calls[1][0].endswith("compss_gentrace"))
+			self.assertEqual(
+				calls[1][1], str(tmp / "w" / ".COMPSs" / "5" / "trace"))
+
+	def test_tracing_without_extrae_stops_before_starting(self):
+		tmp = Path(tempfile.mkdtemp()).resolve()
+		with self.assertRaisesRegex(SystemExit, "with-compss-tracing"):
+			self.run_traced(tmp, extrae=False)
 
 
 if __name__ == "__main__":

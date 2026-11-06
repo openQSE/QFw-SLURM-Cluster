@@ -43,7 +43,8 @@ export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 example_dir=${CHEMISTRY_EXAMPLE_DIR:-${QFW_SHARED_ROOT}/compss-examples/chemistry}
 chemistry=${CHEMISTRY_ROOT:-${example_dir}/chemistry_he}
 
-qfw-compss-launch --pythonpath "${chemistry}" \
+# run-local.sh --trace sets COMPSS_TRACING.
+qfw-compss-launch ${COMPSS_TRACING:+--tracing} --pythonpath "${chemistry}" \
 	--launch-option=--graph=true \
 	--launch-option=--summary \
 	"${example_dir}/he4_fmo_vqe.py" \

@@ -87,7 +87,7 @@ These are the energies from our runs, in Hartree, the usual unit in chemistry:
 | --- | --- | --- | --- | --- |
 | Single atoms (monomers) | -2.869 to -2.893 | -2.867 to -2.890 | -2.855 to -2.893 | -2.8876 |
 | Pairs of atoms (dimers) | +3.544 to -5.742 | -5.672 to -5.748 | -5.700 to -5.731 | -5.7361 |
-| **Total energy** | **+0.99, -1.62, -2.27, -4.60 and -9.89** | **-11.16 and -11.18** | **-11.28** | **-11.3155** |
+| **Total energy** | **+0.99 to -9.89, in 7 runs** | **-11.16 and -11.18** | **-11.28** | **-11.3155** |
 
 The accurate value comes from a full run of the same solver, on a simulator without
 measurement noise, which took about 3 hours on MareNostrum 5.

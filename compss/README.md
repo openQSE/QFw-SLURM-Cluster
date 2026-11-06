@@ -129,16 +129,31 @@ sbatch /workspace/qfw-container-base/my-app/my-app.sbatch
 
 ## See what your job did
 
-None of these need extra tools on the cluster:
-
 | What | How | Where |
 | --- | --- | --- |
 | **Task graph**, a picture of the tasks and how they connect | `--launch-option=--graph=true` on `qfw-compss-launch` (on in the examples) | `complete_graph.dot`, printed by `run-local.sh`. Draw it with [Graphviz](https://graphviz.org): `dot -Tpng complete_graph.dot -o graph.png` |
 | **Task summary**, how many tasks ran on each node | `--launch-option=--summary` (on in the examples) | At the end of the job's output |
 | **Dashboards**, with each quantum job's timings | Add `--telemetry` to `do_configure.sh`, then run `./do_startup.sh`. See the [telemetry guide](../telemetry/README.md) | Grafana, at http://localhost:3000 |
 
-COMPSs' detailed timeline traces for Paraver are not available, because they need
-Extrae, which the image leaves out.
+### Record a Paraver trace
+
+A trace is a detailed timeline of what every task and thread did, which you can open
+in [Paraver](https://tools.bsc.es/paraver). It needs Extrae, so build the image with
+`--with-compss-tracing` instead of `--with-compss`, then run:
+
+```bash
+./compss/run-local.sh hello --trace
+```
+
+It prints where `trace.prv` is. In your own batch script, add `--tracing` to
+`qfw-compss-launch`. In Paraver, load the trace and then
+`/opt/COMPSs/Dependencies/paraver/cfgs/compss_tasks.cfg`, copied out of the container,
+to see the tasks.
+
+The trace covers COMPSs' tasks and runtime. It does not look inside a task's QFw child
+or the simulator, so time waiting for the simulator is part of the task's bar. Tracing
+adds some overhead, so don't use traced runs to compare speeds, and if a job hits the
+shutdown bug below, its trace is lost.
 
 ## Examples
 
@@ -212,8 +227,9 @@ docker build -f Dockerfile.compss \
 ```
 
 Both this and `--with-compss` install COMPSs from the release tarball, without
-tracing, the C binding, Kafka or the monitor. COMPSs' Python binding is built
-against the Python that the QFw venv and `defw-python` use.
+the C binding, Kafka or the monitor, and without tracing unless you ask for it: add
+`--build-arg QFW_WITH_COMPSS_TRACING=1` here, or use `--with-compss-tracing`. COMPSs'
+Python binding is built against the Python that the QFw venv and `defw-python` use.
 
 ### The reservation
 

@@ -653,6 +653,7 @@ RUN set -ex \
 # defw-python child per task. See compss/README.md.
 # ----------------------------------------------------------------------
 ARG QFW_WITH_COMPSS=0
+ARG QFW_WITH_COMPSS_TRACING=0
 ARG COMPSS_VERSION=3.4
 ENV COMPSS_HOME=/opt/COMPSs \
     JAVA_HOME=/usr/lib/jvm/java-21-openjdk
@@ -661,6 +662,7 @@ COPY compss/qfw-cluster.cfg /tmp/qfw-cluster.cfg
 RUN set -ex \
     && if [ "${QFW_WITH_COMPSS}" = "1" ]; then \
         COMPSS_VERSION="${COMPSS_VERSION}" \
+        COMPSS_WITH_TRACING="${QFW_WITH_COMPSS_TRACING}" \
         COMPSS_SC_CFG=/tmp/qfw-cluster.cfg \
         bash /tmp/install-compss.sh; \
        fi \

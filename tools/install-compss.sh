@@ -11,8 +11,9 @@
 # defw-python without a version mismatch.
 #
 # Only the parts a Slurm deployment uses are kept: the runtime, the Python
-# binding and the queue-system scripts. Tracing (Extrae), the C binding, the
-# Kafka streaming backend and the monitor are left out.
+# binding and the queue-system scripts. The C binding, the Kafka streaming
+# backend and the monitor are left out. So is tracing (Extrae), unless
+# COMPSS_WITH_TRACING=1.
 
 set -euo pipefail
 
@@ -20,9 +21,14 @@ COMPSS_VERSION="${COMPSS_VERSION:-3.4}"
 COMPSS_URL="${COMPSS_URL:-https://compss.bsc.es/repo/sc/stable/COMPSs_${COMPSS_VERSION}.tar.gz}"
 COMPSS_HOME="${COMPSS_HOME:-/opt/COMPSs}"
 COMPSS_SC_CFG="${COMPSS_SC_CFG:-}"
+COMPSS_WITH_TRACING="${COMPSS_WITH_TRACING:-0}"
 
 # lsof and netstat are what launch_compss uses to find a free master port.
 dnf -y install java-21-openjdk-devel lsof net-tools
+if [[ ${COMPSS_WITH_TRACING} == 1 ]]; then
+	dnf -y install autoconf automake libtool make gcc gcc-c++ gcc-gfortran \
+		libxml2-devel
+fi
 dnf clean all
 rm -rf /var/cache/yum /var/cache/dnf
 
@@ -49,6 +55,17 @@ rm -rf "${work_dir}/COMPSs/Dependencies/kafka" \
 rm -rf "${COMPSS_HOME}/Dependencies/extrae" \
 	"${COMPSS_HOME}/Dependencies/kafka" \
 	"${COMPSS_HOME}/Tools/monitor"
+
+if [[ ${COMPSS_WITH_TRACING} == 1 ]]; then
+	# GCC 14 rejects some older C in Extrae; -fpermissive makes those warnings
+	# again. The plain PATH keeps QFw's MPI out of the build: trace merging
+	# does not need it.
+	(cd "${work_dir}/COMPSs/Dependencies" &&
+		PATH=/usr/bin:/bin:/usr/sbin:/sbin CFLAGS="-O2 -g -fpermissive" \
+		./install_extrae.sh "${work_dir}/COMPSs/Dependencies/extrae" \
+			"${COMPSS_HOME}/Dependencies/extrae" false)
+	test -x "${COMPSS_HOME}/Dependencies/extrae/bin/mpi2prv"
+fi
 
 if [[ -n "${COMPSS_SC_CFG}" ]]; then
 	install -m 0644 "${COMPSS_SC_CFG}" \
