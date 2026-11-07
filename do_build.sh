@@ -76,7 +76,7 @@ if ${DRY_RUN}; then
         set +a
         QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
         QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
-        QFW_REF="${QFW_REF:-a4f63884d20c0d59a91b25d7d286dfc12e64af4e}"
+        QFW_REF="${QFW_REF:-bc080b5f0b1c4e4e98e92847e0fc9969c9326e98}"
         QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
         QFW_SLURM_REF="${QFW_SLURM_REF:-main}"
         MQT_CORE_REPOSITORY="${MQT_CORE_REPOSITORY:-https://github.com/munich-quantum-toolkit/core.git}"
@@ -118,7 +118,7 @@ set +a
 
 QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
 QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
-QFW_REF="${QFW_REF:-a4f63884d20c0d59a91b25d7d286dfc12e64af4e}"
+QFW_REF="${QFW_REF:-bc080b5f0b1c4e4e98e92847e0fc9969c9326e98}"
 QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
 QFW_SLURM_REF="${QFW_SLURM_REF:-main}"
 MQT_CORE_REPOSITORY="${MQT_CORE_REPOSITORY:-https://github.com/munich-quantum-toolkit/core.git}"
