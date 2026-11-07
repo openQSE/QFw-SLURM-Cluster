@@ -20,6 +20,9 @@ set -euo pipefail
 COMPSS_VERSION="${COMPSS_VERSION:-3.4}"
 COMPSS_URL="${COMPSS_URL:-https://compss.bsc.es/repo/sc/stable/COMPSs_${COMPSS_VERSION}.tar.gz}"
 COMPSS_HOME="${COMPSS_HOME:-/opt/COMPSs}"
+# The tarball's installer runs as root here, so a changed file has to fail the
+# build. Another COMPSS_VERSION needs its own COMPSS_SHA256.
+COMPSS_SHA256="${COMPSS_SHA256:-32dd2b2dc8be4a0a08705f9c2c86508ba491d32addcee2d961504defeb569af4}"
 COMPSS_SC_CFG="${COMPSS_SC_CFG:-}"
 COMPSS_WITH_TRACING="${COMPSS_WITH_TRACING:-0}"
 
@@ -43,7 +46,10 @@ uv pip install --system setuptools wheel cython dill
 work_dir="$(mktemp -d)"
 trap 'rm -rf "${work_dir}"' EXIT
 
-curl -fsSL "${COMPSS_URL}" | tar -xz -C "${work_dir}"
+curl -fsSL --retry 5 --retry-all-errors -o "${work_dir}/compss.tar.gz" "${COMPSS_URL}"
+echo "${COMPSS_SHA256}  ${work_dir}/compss.tar.gz" | sha256sum -c -
+tar -xzf "${work_dir}/compss.tar.gz" -C "${work_dir}"
+rm -f "${work_dir}/compss.tar.gz"
 
 # The installer is a copy-then-build script. Removing the unused payload
 # before it runs keeps it out of the image layer entirely.

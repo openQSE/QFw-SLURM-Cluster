@@ -655,6 +655,7 @@ RUN set -ex \
 ARG QFW_WITH_COMPSS=0
 ARG QFW_WITH_COMPSS_TRACING=0
 ARG COMPSS_VERSION=3.4
+ARG COMPSS_SHA256=
 ENV COMPSS_HOME=/opt/COMPSs \
     JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 COPY tools/install-compss.sh /tmp/install-compss.sh
@@ -662,6 +663,7 @@ COPY compss/qfw-cluster.cfg /tmp/qfw-cluster.cfg
 RUN set -ex \
     && if [ "${QFW_WITH_COMPSS}" = "1" ]; then \
         COMPSS_VERSION="${COMPSS_VERSION}" \
+        COMPSS_SHA256="${COMPSS_SHA256}" \
         COMPSS_WITH_TRACING="${QFW_WITH_COMPSS_TRACING}" \
         COMPSS_SC_CFG=/tmp/qfw-cluster.cfg \
         bash /tmp/install-compss.sh; \
@@ -680,7 +682,8 @@ RUN dnf -y install tcsh \
     && uv pip install --system Jinja2
 
 # The bridge is the last layer so that editing it rebuilds only this step.
-COPY compss /opt/openqse/qfw-compss
+COPY compss/pyproject.toml /opt/openqse/qfw-compss/pyproject.toml
+COPY compss/qfw_compss /opt/openqse/qfw-compss/qfw_compss
 RUN set -ex \
     && if [ "${QFW_WITH_COMPSS}" = "1" ]; then \
         uv pip install --python "${QFW_IMAGE_VENV}" --no-deps \

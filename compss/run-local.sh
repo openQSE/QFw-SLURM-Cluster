@@ -37,10 +37,11 @@ login_home=$(docker exec slurmctld getent passwd "${app_user}" | cut -d: -f6)
 [[ ${login_home} == /workspace/home/* ]] || { echo 'User needs a shared home' >&2; exit 2; }
 host_home=${QFW_CONTAINER_BASE}/home/${login_home#/workspace/home/}
 
-# Workers from a job that was cancelled can stay behind and break the next one.
+# COMPSs workers from a job that was cancelled can stay behind and break the next
+# one. No job is running, so nothing here is in use.
 if [[ -z $(docker exec slurmctld squeue --noheader --user "${app_user}") ]]; then
     for node in c1 c2 c3; do
-        docker exec "${node}" pkill -9 -u "${app_user}" 2>/dev/null || true
+        docker exec "${node}" pkill -9 -u "${app_user}" -f 'COMPSs|compss' 2>/dev/null || true
     done
 fi
 

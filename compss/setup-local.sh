@@ -11,6 +11,16 @@ docker info >/dev/null
 if [[ $(docker inspect slurmctld --format '{{.State.Running}}' 2>/dev/null || true) != true ]]; then
     (cd "${cluster_root}" && ./do_startup.sh)
 fi
+# A rebuild does not change containers that are already running.
+wanted=$(docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" --format '{{.Id}}' 2>/dev/null || true)
+if [[ -n ${wanted} && $(docker inspect slurmctld --format '{{.Image}}') != "${wanted}" ]]; then
+    if [[ -n $(docker exec slurmctld squeue --noheader) ]]; then
+        echo 'The containers are on an older image, but jobs are running. When they end, run this again.' >&2
+        exit 2
+    fi
+    echo "Moving the cluster to ${IMAGE_NAME}:${IMAGE_TAG}"
+    (cd "${cluster_root}" && ./do_restart.sh --force-recreate && ./tools/provision-qfw-cluster.sh)
+fi
 docker exec slurmctld test -x /opt/COMPSs/Runtime/scripts/user/launch_compss || {
     echo 'The image has no COMPSs; configure it with --with-compss and rebuild' >&2
     exit 2

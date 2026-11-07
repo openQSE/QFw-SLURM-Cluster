@@ -169,14 +169,15 @@ shutdown bug below, its trace is lost.
 | The job fails | `run-local.sh` shows the end of the job's output. There is more under `~/.qfw-compss/<job>-<time>/`, which on your computer is in `shared-dir/home/user-a`: COMPSs' logs are in `.COMPSs/<job>/`, and a failed QFw connection keeps its logs in `qfw/clients/` |
 | The results printed, but the job stays `RUNNING` | A COMPSs 3.4 bug when it shuts down, seen in about 1 run in 20. The log shows a `NullPointerException` in `shutdownNotification`. Your results are fine. Cancel the job with `docker exec slurmctld scancel <job>`. `run-local.sh` clears anything left behind before its next run |
 | Everything stops or takes far too long | If your computer goes to sleep, Docker freezes too, and jobs can pass their time limit. Keep it awake during a run |
-| `The image has no COMPSs` | Build the image with `--with-compss` (step 1) |
+| `The image has no COMPSs` | The configured image was built without it. Build it with `--with-compss` (step 1). If you have only just built it, a running cluster moves to it when you run `setup-local.sh` again, unless jobs are running |
+| Every task fails with `no QPM circuit results were received` | The simulator is stuck. Restart it with `docker exec slurmctld qfw-site-services stop --target nwqsim`, then `start --target nwqsim`, and run the job again |
 
 ## What has been tested
 
-These examples have run on a slim arm64 image, on an Apple silicon laptop with
-Docker limited to 4 CPUs and 6 GB of memory, using the site NWQ-Sim simulator. The
-full image, amd64, `Dockerfile.compss` and the other quantum devices have not been
-tested.
+These examples have run on the site NWQ-Sim simulator, on a slim arm64 image on an
+Apple silicon laptop with Docker limited to 4 CPUs and 6 GB of memory, and on a full
+arm64 image built with `Dockerfile.compss`. Tracing has only run on the slim image.
+amd64 and the other quantum devices have not been tested.
 
 <details>
 <summary>How it works inside</summary>

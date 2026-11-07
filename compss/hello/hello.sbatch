@@ -10,7 +10,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=00:05:00
 #SBATCH --output=compss-hello-%j.out
-# Reserve the QPM for what the whole job sends: 8 one-qubit circuits.
+# Reserve the QPM for what the whole job sends: 8 one-qubit circuits, with room
+# for as many again.
 #SBATCH --qpu=nwqsim
 #SBATCH --workload-kind=hybrid
 #SBATCH --circ-count=16
