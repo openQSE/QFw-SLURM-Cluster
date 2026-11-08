@@ -83,11 +83,11 @@ gain more: [`hello`](../README.md#try-it-in-a-few-minutes) runs about 4 times fa
 
 These are the energies from our runs, in Hartree, the usual unit in chemistry:
 
-| | Parallel | Parallel, with the QFw fix below (2 runs) | One task at a time (1 run) | Accurate value |
+| | Parallel | Parallel, with the QFw fix below (3 runs) | One task at a time (1 run) | Accurate value |
 | --- | --- | --- | --- | --- |
-| Single atoms (monomers) | -2.869 to -2.893 | -2.867 to -2.890 | -2.855 to -2.893 | -2.8876 |
-| Pairs of atoms (dimers) | +3.544 to -5.742 | -5.672 to -5.748 | -5.700 to -5.731 | -5.7361 |
-| **Total energy** | **+0.99 to -9.89, in 7 runs** | **-11.16 and -11.18** | **-11.28** | **-11.3155** |
+| Single atoms (monomers) | -2.868 to -2.893 | -2.864 to -2.890 | -2.855 to -2.893 | -2.8876 |
+| Pairs of atoms (dimers) | +3.544 to -5.742 | -5.672 to -5.757 | -5.700 to -5.731 | -5.7361 |
+| **Total energy** | **+0.99 to -9.89, in 8 runs** | **-11.16, -11.18 and -11.28** | **-11.28** | **-11.3155** |
 
 The accurate value comes from a full run of the same solver, on a simulator without
 measurement noise, which took about 3 hours on MareNostrum 5.
@@ -103,7 +103,8 @@ one poor dimer moves the total a long way.
 
 Putting the results back in order inside QFw brought the parallel runs close to the
 accurate value, as the table shows. The fix belongs in QFw
-([openQSE/QFw#192](https://github.com/openQSE/QFw/issues/192)), so until this
+([openQSE/QFw#192](https://github.com/openQSE/QFw/issues/192), with the fix in
+[openQSE/QFw#203](https://github.com/openQSE/QFw/pull/203)), so until this
 repository builds a QFw that has it, **expect parallel runs of this example to give
 wrong energies**.
 
