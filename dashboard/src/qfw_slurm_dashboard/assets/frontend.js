@@ -138,14 +138,14 @@
       requires_hardware_confirmation: true,
     },
     {
-      name: "aws-ionq-aria-1", label: "AWS IonQ Aria-1", provider: "aws",
-      qpu: "aws-ionq-aria-1", service_target: "aws",
+      name: "aws-sv1", label: "AWS Braket SV1", provider: "aws",
+      qpu: "aws-sv1", service_target: "aws",
       service_id: "shim-aws-qpm", max_time_minutes: 15, max_shots: 256,
       requires_hardware_confirmation: true,
     },
     {
-      name: "aws-rigetti-ankaa", label: "AWS Rigetti Ankaa-3", provider: "aws",
-      qpu: "aws-rigetti-ankaa", service_target: "aws",
+      name: "aws-cepheus", label: "AWS Rigetti Cepheus-1-108Q", provider: "aws",
+      qpu: "aws-cepheus", service_target: "aws",
       service_id: "shim-aws-qpm", max_time_minutes: 15, max_shots: 256,
       requires_hardware_confirmation: true,
     },

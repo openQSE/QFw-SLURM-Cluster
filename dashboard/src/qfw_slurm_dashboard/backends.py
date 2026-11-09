@@ -77,22 +77,22 @@ BACKENDS = {
         max_shots=256,
         requires_hardware_confirmation=True,
     ),
-    "aws-ionq-aria-1": BackendSpec(
-        name="aws-ionq-aria-1",
-        label="AWS IonQ Aria-1",
+    "aws-sv1": BackendSpec(
+        name="aws-sv1",
+        label="AWS Braket SV1",
         provider="aws",
-        qpu="aws-ionq-aria-1",
+        qpu="aws-sv1",
         service_target="aws",
         service_id="shim-aws-qpm",
         max_time_minutes=15,
         max_shots=256,
         requires_hardware_confirmation=True,
     ),
-    "aws-rigetti-ankaa": BackendSpec(
-        name="aws-rigetti-ankaa",
-        label="AWS Rigetti Ankaa-3",
+    "aws-cepheus": BackendSpec(
+        name="aws-cepheus",
+        label="AWS Rigetti Cepheus-1-108Q",
         provider="aws",
-        qpu="aws-rigetti-ankaa",
+        qpu="aws-cepheus",
         service_target="aws",
         service_id="shim-aws-qpm",
         max_time_minutes=15,
@@ -112,8 +112,8 @@ BACKENDS = {
 }
 
 BACKEND_ORDER = (
-    "nwqsim", "iqm", "shim", "ibm", "aws-ionq-aria-1",
-    "aws-rigetti-ankaa", "fake-iqm",
+    "nwqsim", "iqm", "shim", "ibm", "aws-sv1",
+    "aws-cepheus", "fake-iqm",
 )
 
 

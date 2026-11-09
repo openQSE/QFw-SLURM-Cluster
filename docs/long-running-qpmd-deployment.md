@@ -159,17 +159,21 @@ qpus:
     libraries: [qdmi]
 ```
 
-The AWS service is an aggregate QPM. Both `aws-ionq-aria-1` and
-`aws-rigetti-ankaa` map to `shim-aws-qpm`. Multi-target dispatch still
+The AWS service is an aggregate QPM. Both `aws-sv1` and
+`aws-cepheus` map to `shim-aws-qpm`. Multi-target dispatch still
 requires the shim to bind the reservation target to the corresponding AWS-QDMI
 device session.
 
 As installed, the `aws` entry is a placeholder, so `shim-aws-qpm` cannot run
 circuits yet. Both public names reserve that service, and it serves the `aws`
 entry. QFw's Braket profile opens a session only when `provider-device-id` is a
-Braket device ARN, and this entry has `aws`. A working AWS line needs a real
-device entry, such as SV1 or Cepheus as in QFw's
-`examples/qfw_shim_device_access.yaml`.
+Braket device ARN, and this entry has `aws`. The `aws-sv1` and `aws-cepheus`
+entries carry the ARNs of the SV1 simulator and of Rigetti's Cepheus-1-108Q,
+the two devices QFw's `examples/qfw_shim_device_access.yaml` describes; a
+working AWS line binds the service to one of them and sets its
+`s3-results-uri`. (IonQ's Aria-1 left Braket on 2026-03-02 and Rigetti's
+Ankaa-3 was replaced by Cepheus-1-108Q on 2026-04-07, which is why the
+earlier names went.)
 
 The relative credential path resolves beside `device-access.yaml` as
 `/etc/openqse/qfw/device/qpu-users.json`.

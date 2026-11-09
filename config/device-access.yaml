@@ -38,10 +38,18 @@ qpus:
       run_circuit: [qdmi]
       get_task_timing: [qdmi]
       get_task_metadata: [qdmi]
-  aws-ionq-aria-1:
+  # Amazon Braket's SV1 state-vector simulator (34 qubits), in us-east-1.
+  # A results bucket in the device's Region is needed before a task can run:
+  # set s3-results-uri to a bucket named amazon-braket-*, see QFw's
+  # docs/recipes/run-against-aws-braket.md.
+  aws-sv1:
     provider: aws
-    provider-device-id: arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1
+    provider-device-id: arn:aws:braket:::device/quantum-simulator/amazon/sv1
+    qdmi-device-id: amazon.braket.sv1
+    aws-region: us-east-1
+    # s3-results-uri: s3://amazon-braket-<site>/qfw/sv1
     url: https://braket.us-east-1.amazonaws.com
+    num-qubits: 34
     credential-db: qpu-users.json
     libraries:
       - qdmi
@@ -51,10 +59,20 @@ qpus:
       run_circuit: [qdmi]
       get_task_timing: [qdmi]
       get_task_metadata: [qdmi]
-  aws-rigetti-ankaa:
+  # Rigetti's Cepheus-1-108Q through Braket, in us-west-1: a real QPU, billed
+  # per task and per shot. max-shots refuses a larger request before a task
+  # exists; job-timeout-seconds is how long a queued task is waited for
+  # before it is cancelled (two hours, the length of an execution window gap).
+  aws-cepheus:
     provider: aws
-    provider-device-id: arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3
+    provider-device-id: arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q
+    qdmi-device-id: amazon.braket.rigetti.cepheus-1-108q
+    aws-region: us-west-1
+    # s3-results-uri: s3://amazon-braket-<site>/qfw/cepheus
     url: https://braket.us-west-1.amazonaws.com
+    num-qubits: 108
+    max-shots: 1024
+    job-timeout-seconds: 7200
     credential-db: qpu-users.json
     libraries:
       - qdmi

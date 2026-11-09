@@ -28,14 +28,14 @@
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-ionq-aria-1": {
+        "aws-sv1": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-rigetti-ankaa": {
+        "aws-cepheus": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
@@ -78,14 +78,14 @@
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-ionq-aria-1": {
+        "aws-sv1": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-rigetti-ankaa": {
+        "aws-cepheus": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
@@ -128,14 +128,14 @@
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-ionq-aria-1": {
+        "aws-sv1": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-rigetti-ankaa": {
+        "aws-cepheus": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
