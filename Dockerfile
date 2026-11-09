@@ -224,7 +224,7 @@ ARG QFW_BUILD_JOBS=4
 # The image contains a complete release installation. A checkout mounted under
 # QFW_BASE remains an optional developer override built by do_qfw_build.sh.
 ARG QFW_REPOSITORY=https://github.com/openQSE/QFw.git
-ARG QFW_REF=9322652295c6dc5cdb88cef28624f54a8db65672
+ARG QFW_REF=e99295bc54b130e61b3a8fddae481fc52d47b768
 ARG QFW_DEFW_REPOSITORY=
 ARG QFW_SLURM_REPOSITORY=https://github.com/openQSE/qfw-slurm.git
 ARG QFW_SLURM_REF=main
