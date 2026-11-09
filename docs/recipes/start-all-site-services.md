@@ -26,7 +26,7 @@ pasqal` (see [run-pasqal-emu-free-job.md](run-pasqal-emu-free-job.md)).
   the file owned by `root:root` with mode `0600`.
 - Do not accept AWS reservations until the shim can bind the reservation's
   selected target to an AWS-QDMI device session. The cluster advertises
-  `aws-ionq-aria-1` and `aws-rigetti-ankaa`, but the current shim remains
+  `aws-sv1` and `aws-cepheus`, but the current shim remains
   single-target.
 
 The packaged credential file intentionally contains empty API keys. Never put

@@ -48,7 +48,7 @@ fi
 grep -q '\["ibm-156-nh"\] = "shim-ibm-156-nh"' "${resource_config}"
 grep -A1 '^\[resource "ibm-156-nh"\]$' "${plugin_config}" |
 	grep -q '^service_id=shim-ibm-156-nh$'
-for resource in aws-ionq-aria-1 aws-rigetti-ankaa; do
+for resource in aws-sv1 aws-cepheus; do
 	grep -q "\[\"${resource}\"\] = \"shim-aws-qpm\"" "${resource_config}"
 	grep -A1 "^\[resource \"${resource}\"\]$" "${plugin_config}" |
 		grep -q '^service_id=shim-aws-qpm$'
@@ -120,10 +120,10 @@ assert aws_service[0]["module"] == "svc_lib_qpm"
 
 assert qpus["aws"]["libraries"] == ["qdmi"]
 assert qpus["aws"]["execution-owner"] == "qdmi"
-assert qpus["aws-ionq-aria-1"]["provider-device-id"] == \
-    "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1"
-assert qpus["aws-rigetti-ankaa"]["provider-device-id"] == \
-    "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3"
+assert qpus["aws-sv1"]["provider-device-id"] == \
+    "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
+assert qpus["aws-cepheus"]["provider-device-id"] == \
+    "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q"
 
 with open(sys.argv[3], encoding="utf-8") as stream:
     users = json.load(stream)["users"]
@@ -132,7 +132,7 @@ for record in users.values():
     credential = record["devices"]["ibm-156-nh"]
     assert credential["enabled"] is True
     assert set(credential) == {"enabled", "api_key", "service_crn"}
-    for device_id in ("aws", "aws-ionq-aria-1", "aws-rigetti-ankaa"):
+    for device_id in ("aws", "aws-sv1", "aws-cepheus"):
         aws_credential = record["devices"][device_id]
         assert aws_credential["enabled"] is True
         assert set(aws_credential) == {
