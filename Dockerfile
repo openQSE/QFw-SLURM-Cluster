@@ -656,6 +656,7 @@ ARG QFW_WITH_COMPSS=0
 ARG QFW_WITH_COMPSS_TRACING=0
 ARG COMPSS_VERSION=3.4
 ARG COMPSS_SHA256=
+ARG COMPSS_URL=
 ENV COMPSS_HOME=/opt/COMPSs \
     JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 COPY tools/install-compss.sh /tmp/install-compss.sh
@@ -664,6 +665,7 @@ RUN set -ex \
     && if [ "${QFW_WITH_COMPSS}" = "1" ]; then \
         COMPSS_VERSION="${COMPSS_VERSION}" \
         COMPSS_SHA256="${COMPSS_SHA256}" \
+        COMPSS_URL="${COMPSS_URL}" \
         COMPSS_WITH_TRACING="${QFW_WITH_COMPSS_TRACING}" \
         COMPSS_SC_CFG=/tmp/qfw-cluster.cfg \
         bash /tmp/install-compss.sh; \

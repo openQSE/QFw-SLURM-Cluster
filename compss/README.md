@@ -191,7 +191,7 @@ amd64 and the other quantum devices have not been tested.
 | `qfw_compss/session.py` | `QFwSession`: the environment `qfw-srun` gives an application, captured once per job. |
 | `qfw_compss/launch.py` | `qfw-compss-launch`: captures the session and runs `launch_compss` inside the allocation. |
 | `qfw-cluster.cfg` | COMPSs' configuration for these containers: Slurm, 4 CPUs, 6 GB, workers started by `srun`. |
-| `tests/` | Tests that need neither QFw nor COMPSs. |
+| `tests/` | Tests that need Qiskit, but neither QFw nor COMPSs. |
 | `diagrams/` | The diagrams on this page. `make_diagrams.py` redraws them. |
 
 ### Why each client has a child process
@@ -231,6 +231,11 @@ Both this and `--with-compss` install COMPSs from the release tarball, without
 the C binding, Kafka or the monitor, and without tracing unless you ask for it: add
 `--build-arg QFW_WITH_COMPSS_TRACING=1` here, or use `--with-compss-tracing`. COMPSs'
 Python binding is built against the Python that the QFw venv and `defw-python` use.
+
+The tarball comes from compss.bsc.es and must match the SHA-256 pinned in
+`tools/install-compss.sh`. To build from a copy of it instead, such as on a host
+without internet access, set `COMPSS_URL`: `COMPSS_URL=<url> ./do_build.sh`, or
+`--build-arg COMPSS_URL=<url>` here.
 
 ### The reservation
 

@@ -83,16 +83,18 @@ gain more: [`hello`](../README.md#try-it-in-a-few-minutes) runs about 4 times fa
 
 These are the energies from our runs, in Hartree, the usual unit in chemistry:
 
-| | Parallel | Parallel, with the QFw fix below (3 runs) | One task at a time (1 run) | Accurate value |
+| | Parallel, with the QFw fix (5 runs) | One task at a time (1 run) | Parallel, before the fix (8 runs) | Accurate value |
 | --- | --- | --- | --- | --- |
-| Single atoms (monomers) | -2.868 to -2.893 | -2.864 to -2.890 | -2.855 to -2.893 | -2.8876 |
-| Pairs of atoms (dimers) | +3.544 to -5.742 | -5.672 to -5.757 | -5.700 to -5.731 | -5.7361 |
-| **Total energy** | **+0.99 to -9.89, in 8 runs** | **-11.16, -11.18 and -11.28** | **-11.28** | **-11.3155** |
+| Single atoms (monomers) | -2.857 to -2.890 | -2.855 to -2.893 | -2.868 to -2.893 | -2.8876 |
+| Pairs of atoms (dimers) | -5.672 to -5.757 | -5.700 to -5.731 | +3.544 to -5.742 | -5.7361 |
+| **Total energy** | **-11.13 to -11.30** | **-11.28** | **+0.99 to -9.89** | **-11.3155** |
 
 The accurate value comes from a full run of the same solver, on a simulator without
-measurement noise, which took about 3 hours on MareNostrum 5.
+measurement noise, which took about 3 hours on MareNostrum 5. Two of the runs with
+the fix used QFw e99295b, which this repository builds; the other three had the fix
+patched in by hand. One kept only its total.
 
-### The large errors: a bug in QFw
+### The large errors before the fix: a bug in QFw
 
 Each energy needs three circuits, one for each way of measuring the qubits. QFw
 assumes their results come back in the order the circuits were sent. With several
@@ -101,16 +103,15 @@ energy from such a call can be about +23 Hartree instead of about -5.7, which se
 the optimiser the wrong way. Because the total adds and subtracts all ten energies,
 one poor dimer moves the total a long way.
 
-Putting the results back in order inside QFw brought the parallel runs close to the
-accurate value, as the table shows. The fix belongs in QFw
-([openQSE/QFw#192](https://github.com/openQSE/QFw/issues/192), with the fix in
-[openQSE/QFw#203](https://github.com/openQSE/QFw/pull/203)), so until this
-repository builds a QFw that has it, **expect parallel runs of this example to give
-wrong energies**.
+QFw now puts the results back in order
+([openQSE/QFw#192](https://github.com/openQSE/QFw/issues/192), fixed by
+[openQSE/QFw#203](https://github.com/openQSE/QFw/pull/203)), and this repository
+builds a QFw that has the fix. If you build an older QFw with `--qfw-ref`, expect
+parallel runs of this example to give wrong energies.
 
 ### The small errors: a short run with measurement noise
 
-With the bug out of the way, the total is still 0.04 to 0.15 Hartree off. A quantum
+With the fix, the total is still 0.02 to 0.19 Hartree off. A quantum
 measurement is statistical, so every energy the optimiser sees has some noise in it,
 and this run also stops the optimiser early. We checked the noise with one client at
 a time:

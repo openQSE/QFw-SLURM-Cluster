@@ -102,6 +102,7 @@ if ${DRY_RUN}; then
         echo "    --build-arg QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC:-1} \\"
         echo "    --build-arg QFW_WITH_COMPSS=${QFW_WITH_COMPSS:-0} \\"
         echo "    --build-arg QFW_WITH_COMPSS_TRACING=${QFW_WITH_COMPSS_TRACING:-0} \\"
+        echo "    --build-arg COMPSS_URL=${COMPSS_URL:-} \\"
         echo "    ${SCRIPT_DIR}"
     else
         cat <<EOF
@@ -199,6 +200,7 @@ if ${NO_CACHE}; then
         --build-arg "QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}" \
         --build-arg "QFW_WITH_COMPSS=${QFW_WITH_COMPSS}" \
         --build-arg "QFW_WITH_COMPSS_TRACING=${QFW_WITH_COMPSS_TRACING}" \
+        --build-arg "COMPSS_URL=${COMPSS_URL:-}" \
         "${SCRIPT_DIR}"
 else
     docker build \
@@ -219,5 +221,6 @@ else
         --build-arg "QFW_WITH_MQT_CC=${QFW_WITH_MQT_CC}" \
         --build-arg "QFW_WITH_COMPSS=${QFW_WITH_COMPSS}" \
         --build-arg "QFW_WITH_COMPSS_TRACING=${QFW_WITH_COMPSS_TRACING}" \
+        --build-arg "COMPSS_URL=${COMPSS_URL:-}" \
         "${SCRIPT_DIR}"
 fi

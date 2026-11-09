@@ -46,10 +46,32 @@ uv pip install --system setuptools wheel cython dill
 work_dir="$(mktemp -d)"
 trap 'rm -rf "${work_dir}"' EXIT
 
-curl -fsSL --retry 5 --retry-all-errors -o "${work_dir}/compss.tar.gz" "${COMPSS_URL}"
-echo "${COMPSS_SHA256}  ${work_dir}/compss.tar.gz" | sha256sum -c -
-tar -xzf "${work_dir}/compss.tar.gz" -C "${work_dir}"
-rm -f "${work_dir}/compss.tar.gz"
+# A dropped download resumes where it stopped. curl's own --retry starts again
+# from the beginning, so each retry is a new curl call with -C -. A file that
+# still fails the checksum, such as one from a bad resume, is downloaded once
+# more from scratch.
+tarball="${work_dir}/compss.tar.gz"
+download() {
+	for _ in $(seq 1 10); do
+		if curl -fsSL --connect-timeout 30 -C - -o "${tarball}" "${COMPSS_URL}"; then
+			return 0
+		fi
+		sleep 10
+	done
+	return 1
+}
+for attempt in 1 2; do
+	download || true
+	if echo "${COMPSS_SHA256}  ${tarball}" | sha256sum -c -; then
+		break
+	fi
+	if [[ ${attempt} == 2 ]]; then
+		exit 1
+	fi
+	rm -f "${tarball}"
+done
+tar -xzf "${tarball}" -C "${work_dir}"
+rm -f "${tarball}"
 
 # The installer is a copy-then-build script. Removing the unused payload
 # before it runs keeps it out of the image layer entirely.
