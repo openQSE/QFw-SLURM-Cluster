@@ -1,7 +1,13 @@
 # FMO-VQE Workflow with StreamFlow
 
-This example runs the four He4 monomers through NWQSim and the six dimers
-through fake IQM, then collects energy and execution metadata for each fragment.
+This example runs the four He4 monomers and six dimers through NWQSim,
+then collects energy and execution metadata for each fragment.
+
+The default run checks workflow execution, not a converged He4 energy. It uses
+reduced optimizer limits and the collector marks the run `execution_check_only`.
+Energy validation requires separate convergence checks. Fake IQM is available
+as an optional [backend for integration tests](#select-a-quantum-backend) and
+returns synthetic counts.
 
 ## Run locally
 
@@ -35,7 +41,7 @@ fragment's backend, Slurm job ID, compute node and QFw reservation.
 flowchart TD
     inputs["Existing He4 input and FCIDUMP files"] --> prepare["prepare<br/>Validate inputs and separate monomers and dimers"]
     prepare --> monomers["monomers, CWL scatter<br/>Four monomer jobs<br/>Qiskit and QFw to NWQSim"]
-    prepare --> dimers["dimers, CWL scatter<br/>Six dimer jobs<br/>Qiskit and QFw to fake IQM"]
+    prepare --> dimers["dimers, CWL scatter<br/>Six dimer jobs<br/>Qiskit and QFw to NWQSim"]
     monomers --> collect["collect<br/>Wait for all ten results and run the collector"]
     dimers --> collect
     collect --> results["Fragment energies and execution metadata"]
@@ -53,7 +59,7 @@ Preparation, optimization and collection run on classical compute nodes.
 | --- | --- | --- |
 | Prepare | Available node in `normal` | Validate the input and fragment set, check fragments against the full FCIDUMP and separate monomers and dimers |
 | Monomers | Available node in `normal` per fragment | Calculate four monomers through QFw/NWQSim |
-| Dimers | Available node in `normal` per fragment | Calculate six dimers through QFw/fake IQM |
+| Dimers | Available node in `normal` per fragment | Calculate six dimers through QFw/NWQSim |
 | Collect | Available node in `normal` | Check results and provenance, run the collector and gather fragment results |
 
 There are ten separate chemistry jobs;
@@ -93,12 +99,12 @@ The default bindings are:
 - step: /monomers
   target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
 - step: /dimers
-  target: {deployment: slurm, service: chemistry-fake-iqm, locations: 1}
+  target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
 ```
 
-To run all ten fragments on NWQSim, change `/dimers` to
-`service: chemistry-nwqsim`. To use fake IQM for every fragment, change `/monomers`
-to `service: chemistry-fake-iqm`. Run setup and launch again after editing the bindings. To use IQM hardware,
+Both scatters use NWQSim by default. To test synthetic measurements, change
+`/monomers`, `/dimers` or both to `service: chemistry-fake-iqm`. Run setup and
+launch again after editing the bindings. To use IQM hardware,
 set `qfw.qpu: ornl-iqm-20q` on the selected service only after the site administrator has enabled the IQM QPM,
 configured valid credentials and confirmed the endpoint, permissions and workload
 bounds. Setup does not start IQM or submit hardware jobs. The IQM resource's provider

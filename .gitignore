@@ -53,6 +53,7 @@ docker-compose.override.yml
 .electroboy/shared/runs/*/progress/
 /shared-dir/chemistry_he/
 /shared-dir/streamflow-chemistry/
+/shared-dir/streamflow-sqd/
 /shared-dir/home/
 /streamflow/chemistry/**/__pycache__/
 /shared-dir/compss-examples/
