@@ -11,7 +11,7 @@ workflows:
       - step: /monomers
         target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
       - step: /dimers
-        target: {deployment: slurm, service: chemistry-fake-iqm, locations: 1}
+        target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
       - step: /collect
         target: {deployment: slurm, service: collect, locations: 1}
 

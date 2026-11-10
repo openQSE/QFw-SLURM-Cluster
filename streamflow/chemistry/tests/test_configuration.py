@@ -28,17 +28,18 @@ class ConfigurationTests(unittest.TestCase):
                      "fcidump": {"class": "File", "path": "FCIDUMP"},
                      "fragments": [{"class": "File", "path": "FCIDUMP-1-1"}]}
 
-    def test_default_bindings_route_monomers_to_nwqsim_and_dimers_to_fake_iqm(self):
+    def test_default_bindings_use_nwqsim_for_monomers_and_dimers(self):
         job = runner.resolve_job(self.bundle, self.case, self.application, self.config)
         self.assertEqual(job["settings_monomers"]["qfw"]["provider"], "nwqsim")
-        self.assertEqual(job["settings_dimers"]["qfw"]["provider"], "fake-iqm")
-        self.assertEqual(job["settings_dimers"]["qfw"]["resource"], "fake-iqm-20q")
-        self.assertEqual(job["settings_dimers"]["qfw"]["result_kind"], "synthetic")
+        self.assertEqual(job["settings_dimers"]["qfw"]["provider"], "nwqsim")
+        self.assertEqual(job["settings_dimers"]["qfw"]["resource"], "nwqsim")
+        self.assertEqual(job["settings_dimers"]["qfw"]["result_kind"], "simulation")
 
     def test_changing_only_dimer_binding_changes_provider(self):
-        self.config["workflows"]["chemistry"]["bindings"][2]["target"]["service"] = "chemistry-nwqsim"
+        self.config["workflows"]["chemistry"]["bindings"][2]["target"]["service"] = "chemistry-fake-iqm"
         job = runner.resolve_job(self.bundle, self.case, self.application, self.config)
-        self.assertEqual(job["settings_dimers"]["qfw"]["provider"], "nwqsim")
+        self.assertEqual(job["settings_dimers"]["qfw"]["provider"], "fake-iqm")
+        self.assertEqual(job["settings_dimers"]["qfw"]["result_kind"], "synthetic")
         self.assertEqual(job["settings_monomers"]["qfw"]["provider"], "nwqsim")
 
     def test_iqm_binding_uses_public_qpu_and_application_provider(self):

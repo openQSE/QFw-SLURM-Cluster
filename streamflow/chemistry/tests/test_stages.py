@@ -66,7 +66,7 @@ class StageTests(unittest.TestCase):
         stages.prepare(self.prepare_args)
         return self.root / "prepared"
 
-    def calculations(self, backend=None):
+    def calculations(self, backend="nwqsim"):
         prepared = self.prepared()
         manifest = json.loads((prepared / "preparation.json").read_text())
         calculations = []
@@ -206,7 +206,7 @@ class StageTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get("CHEMISTRY_TEST_SOURCE"), "Set CHEMISTRY_TEST_SOURCE to chemistry_he")
     def test_collection_combines_four_nwqsim_monomers_and_six_fake_iqm_dimers(self):
-        args = self.calculations()
+        args = self.calculations(None)
         stages.collect(args)
         result = json.loads((self.root / "results/workflow-results.json").read_text())
         self.assertEqual(result["backend"], "mixed")
