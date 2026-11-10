@@ -33,13 +33,13 @@ outputs:
     type: Directory
     outputBinding:
       glob: prepared
-  group_a:
+  monomers:
     type: File[]
     outputBinding:
-      glob: prepared/a/*
-  group_b:
+      glob: prepared/monomers/*
+  dimers:
     type: File[]
     outputBinding:
-      glob: prepared/b/*
+      glob: prepared/dimers/*
 stdout: stage.out
 stderr: stage.err

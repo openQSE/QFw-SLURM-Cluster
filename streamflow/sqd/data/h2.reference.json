@@ -1,0 +1,17 @@
+{
+  "fcidump_sha256": "49b46a79665fb5b774c92d4ba16be98112de471f5f3eae1a980138f00a492263",
+  "pyscf_version": "2.14.0",
+  "orbitals": 2,
+  "electrons": 2,
+  "determinants": 4,
+  "ecore_hartree": 0.7151043390810812,
+  "fci_total_energy_hartree": -1.1372838344885006,
+  "source": "https://github.com/qiskit-community/qcsc-prefect/blob/95385887afe0ee6e4c02598e4ab74909574315b7/algorithms/sbd/data/fcidump_H2_STO3G.txt",
+  "model": {
+    "atom": "H 0 0 0; H 0 0 0.74",
+    "basis": "sto-3g",
+    "unit": "Angstrom",
+    "charge": 0,
+    "spin": 0
+  }
+}

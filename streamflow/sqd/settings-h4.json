@@ -1,0 +1,13 @@
+{
+  "walkers": 8,
+  "iterations": 2,
+  "shots": 1024,
+  "dimension": 36,
+  "seed": 24,
+  "solver": {
+    "block": 4,
+    "iteration": 20,
+    "tolerance": 1e-8,
+    "carryover_ratio": 0.5
+  }
+}

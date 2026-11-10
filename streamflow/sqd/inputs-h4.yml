@@ -1,0 +1,12 @@
+fcidump:
+  class: File
+  path: data/h4.FCIDUMP
+config:
+  class: File
+  path: settings-h4.json
+sampler:
+  class: File
+  path: qfw_sampler.py
+solver:
+  class: File
+  path: source/algorithms/sbd/native/diag

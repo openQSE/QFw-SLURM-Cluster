@@ -8,34 +8,51 @@ workflows:
     bindings:
       - step: /prepare
         target: {deployment: slurm, service: prepare, locations: 1}
-      - step: /chemistry_a
+      - step: /monomers
         target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
-      - step: /chemistry_b
-        target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
+      - step: /dimers
+        target: {deployment: slurm, service: chemistry-fake-iqm, locations: 1}
       - step: /collect
         target: {deployment: slurm, service: collect, locations: 1}
 
 deployments:
-  cluster-login:
-    type: ssh
-    config:
-      nodes: [slurmctld]
-      username: user-a
-      sshKey: ~/.ssh/streamflow_ed25519
-      checkHostKey: true
   slurm:
     type: slurm
-    wraps: cluster-login
     workdir: work
     config:
+      maxConcurrentJobs: 4
       services:
         prepare:
-          file: slurm/prepare.sbatch
+          account: qfw-test
+          partition: normal
+          jobName: sf-prepare
+          time: '00:02:00'
         chemistry-nwqsim:
-          file: slurm/chemistry-nwqsim.sbatch
+          account: qfw-test
+          partition: normal
+          jobName: sf-chemistry
+          time: '00:10:00'
+          qfw:
+            qpu: nwqsim
+            workload-kind: hybrid
+            circ-count: 32000
+            max-qubits: 10
+            max-depth: 1000
+            max-shots: 4096
         chemistry-fake-iqm:
-          file: slurm/chemistry-fake-iqm.sbatch
-        chemistry-iqm:
-          file: slurm/chemistry-iqm.sbatch
+          account: qfw-test
+          partition: normal
+          jobName: sf-chemistry
+          time: '00:10:00'
+          qfw:
+            qpu: fake-iqm-20q
+            workload-kind: hybrid
+            circ-count: 32000
+            max-qubits: 10
+            max-depth: 1000
+            max-shots: 4096
         collect:
-          file: slurm/collect.sbatch
+          account: qfw-test
+          partition: normal
+          jobName: sf-collect
+          time: '00:05:00'

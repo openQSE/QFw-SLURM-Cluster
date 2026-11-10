@@ -66,7 +66,7 @@ class StageTests(unittest.TestCase):
         stages.prepare(self.prepare_args)
         return self.root / "prepared"
 
-    def calculations(self):
+    def calculations(self, backend=None):
         prepared = self.prepared()
         manifest = json.loads((prepared / "preparation.json").read_text())
         calculations = []
@@ -74,28 +74,30 @@ class StageTests(unittest.TestCase):
             output = self.root / f"calculation-{index}"
             output.mkdir()
             name = fragment["name"]
-            shutil.copyfile(prepared / fragment["group"] / name, output / name)
-            backend = "nwqsim" if fragment["group"] == "a" else "fake-iqm"
-            stages.write_json(output / "workflow-result.json", dict(fragment=name, backend=backend, energy=-1.0))
+            shutil.copyfile(prepared / fragment["kind"] / name, output / name)
+            provider = backend or ("nwqsim" if fragment["kind"] == "monomers" else "fake-iqm")
+            stages.write_json(output / "workflow-result.json", dict(fragment=name, backend=provider, energy=-1.0))
             stages.write_json(output / "submission.json", dict(state="completed", exit_code=0, job_id=200 + index,
-                              fragment=name, backend=backend, result_kind="simulation" if backend == "nwqsim" else "synthetic",
+                              fragment=name, backend=provider, result_kind="simulation" if provider == "nwqsim" else "synthetic",
                               input_sha256=fragment["sha256"], result_sha256=stages.digest(output / "workflow-result.json")))
             calculations.append(output)
         return argparse.Namespace(stage="collect", chemistry_source=self.source, prepared=prepared, calculations=calculations)
 
-    def test_preparation_routes_five_fragments_per_group(self):
+    def test_preparation_separates_four_monomers_and_six_dimers(self):
         prepared = self.prepared()
-        for group in ("a", "b"):
-            names = [path.name for path in (prepared / group).iterdir()]
-            self.assertEqual(len(names), 5)
-            self.assertEqual(sum("-1-" in name for name in names), 2)
-            self.assertEqual(sum("-2-" in name for name in names), 3)
+        for kind, marker, count in (("monomers", "-1-", 4), ("dimers", "-2-", 6)):
+            names = [path.name for path in (prepared / kind).iterdir()]
+            self.assertEqual(len(names), count)
+            self.assertTrue(all(marker in name for name in names))
+        manifest = json.loads((prepared / "preparation.json").read_text())
+        self.assertEqual(sum(item["kind"] == "monomers" for item in manifest["fragments"]), 4)
+        self.assertEqual(sum(item["kind"] == "dimers" for item in manifest["fragments"]), 6)
 
     def test_preparation_preserves_fragment_bytes_and_hashes(self):
         prepared = self.prepared()
         for item in json.loads((prepared / "preparation.json").read_text())["fragments"]:
-            self.assertEqual(stages.digest(prepared / item["group"] / item["name"]), item["sha256"])
-            self.assertEqual((prepared / item["group"] / item["name"]).read_bytes(), (self.root / item["name"]).read_bytes())
+            self.assertEqual(stages.digest(prepared / item["kind"] / item["name"]), item["sha256"])
+            self.assertEqual((prepared / item["kind"] / item["name"]).read_bytes(), (self.root / item["name"]).read_bytes())
 
     def test_preparation_rejects_missing_fragment(self):
         self.prepare_args.fragments = self.fragments[:-1]
@@ -203,11 +205,22 @@ class StageTests(unittest.TestCase):
             stages.collect(args)
 
     @unittest.skipUnless(os.environ.get("CHEMISTRY_TEST_SOURCE"), "Set CHEMISTRY_TEST_SOURCE to chemistry_he")
-    def test_original_collector_retains_all_fragments_and_marks_synthetic_result(self):
+    def test_collection_combines_four_nwqsim_monomers_and_six_fake_iqm_dimers(self):
         args = self.calculations()
         stages.collect(args)
         result = json.loads((self.root / "results/workflow-results.json").read_text())
-        self.assertEqual(result["backend_counts"], {"nwqsim": 5, "fake-iqm": 5})
+        self.assertEqual(result["backend"], "mixed")
+        self.assertEqual(result["backend_counts"], {"nwqsim": 4, "fake-iqm": 6})
+        self.assertEqual(result["result_kind"], "synthetic")
+        for name, fragment in result["cases"].items():
+            self.assertEqual(fragment["backend"], "nwqsim" if "-1-" in name else "fake-iqm")
+
+    @unittest.skipUnless(os.environ.get("CHEMISTRY_TEST_SOURCE"), "Set CHEMISTRY_TEST_SOURCE to chemistry_he")
+    def test_original_collector_retains_all_fragments_and_marks_synthetic_result(self):
+        args = self.calculations("fake-iqm")
+        stages.collect(args)
+        result = json.loads((self.root / "results/workflow-results.json").read_text())
+        self.assertEqual(result["backend_counts"], {"fake-iqm": 10})
         self.assertEqual(len(result["cases"]), 10)
         self.assertEqual(result["result_kind"], "synthetic")
         self.assertTrue(result["execution_check_only"])
@@ -215,17 +228,8 @@ class StageTests(unittest.TestCase):
                                        "execution_check_only", "backend_counts", "result_kind"})
 
     @unittest.skipUnless(os.environ.get("CHEMISTRY_TEST_SOURCE"), "Set CHEMISTRY_TEST_SOURCE to chemistry_he")
-    def test_collection_supports_both_bindings_using_one_provider(self):
-        args = self.calculations()
-        for calculation in args.calculations:
-            result_path = calculation / "workflow-result.json"
-            result = json.loads(result_path.read_text())
-            result["backend"] = "nwqsim"
-            stages.write_json(result_path, result)
-            path = calculation / "submission.json"
-            record = json.loads(path.read_text())
-            record.update(backend="nwqsim", result_kind="simulation", result_sha256=stages.digest(result_path))
-            stages.write_json(path, record)
+    def test_collection_retains_all_ten_nwqsim_results(self):
+        args = self.calculations("nwqsim")
         stages.collect(args)
         result = json.loads((self.root / "results/workflow-results.json").read_text())
         self.assertEqual(result["backend"], "nwqsim")
