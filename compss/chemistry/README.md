@@ -91,7 +91,7 @@ These are the energies from our runs, in Hartree, the usual unit in chemistry:
 
 The accurate value comes from a full run of the same solver, on a simulator without
 measurement noise, which took about 3 hours on MareNostrum 5. Two of the runs with
-the fix used QFw e99295b, which this repository builds; the other three had the fix
+the fix used QFw e99295b, which this repository built then; the other three had the fix
 patched in by hand. One kept only its total.
 
 ### The large errors before the fix: a bug in QFw
