@@ -27,12 +27,6 @@ cp "${repo_dir}/slurm.conf" "${repo_dir}/slurmdbd.conf" \
 cp "${repo_dir}/tools/compose-env.sh" \
 	"${repo_dir}/tools/provision-qfw-cluster.sh" "${cluster}/tools/"
 cp -R "${repo_dir}/config" "${cluster}/config"
-cat >"${cluster}/tools/setup-tierkreis-demo.sh" <<'EOF'
-#!/bin/bash
-echo "Tierkreis setup" >>"${FAKE_DOCKER_STATE}/docker.log"
-exit "${DEMO_SETUP_STATUS:-0}"
-EOF
-chmod +x "${cluster}/tools/setup-tierkreis-demo.sh"
 printf 'QFW_CONTAINER_BASE=%s\n' "${temporary}/base" >"${cluster}/qfw-install.env"
 
 # The stand-in records every call in docker.log, serves /etc/slurm from
@@ -157,8 +151,6 @@ cmp -s "${state}/volume/slurm.conf" "${cluster}/slurm.conf" ||
 	fail "the restart did not bring qec-backline-head back"
 grep -q '^Provisioned ' "${temporary}/startup.out" ||
 	fail "provisioning did not run to the end"
-[[ "$(tail -1 "${state}/docker.log")" == "Tierkreis setup" ]] ||
-	fail "tierkreis demo setup did not run after provisioning"
 
 # A second start finds nothing stale and restarts nothing.
 : >"${state}/docker.log"
@@ -170,14 +162,8 @@ fi
 if grep -q ' restart' "${state}/docker.log"; then
 	fail "the second start restarted the containers"
 fi
-if (cd "${cluster}" && DEMO_SETUP_STATUS=7 ./do_startup.sh >/dev/null 2>&1); then
-	fail "startup ignored tierkreis demo installation failure"
-fi
-
 (cd "${cluster}" && ./do_startup.sh --dry-run) >"${temporary}/dry-run.out"
 grep -q 'refresh the Slurm files in the etc_slurm volume' "${temporary}/dry-run.out" ||
 	fail "the dry run does not list the refresh"
-grep -q './tools/setup-tierkreis-demo.sh' "${temporary}/dry-run.out" ||
-	fail "the dry run does not list tierkreis demo setup"
 
 echo "test_startup_slurm_files: OK"

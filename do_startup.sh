@@ -101,7 +101,6 @@ if ${DRY_RUN}; then
     echo "  ./register_cluster.sh"
     echo "  wait for: sacctmgr --immediate list cluster to succeed in slurmdbd"
     echo "  ./tools/provision-qfw-cluster.sh"
-    echo "  ./tools/setup-tierkreis-demo.sh"
     exit 0
 fi
 
@@ -127,5 +126,3 @@ sleep 5
 wait_for_slurmdbd_ready
 
 ./tools/provision-qfw-cluster.sh
-
-./tools/setup-tierkreis-demo.sh

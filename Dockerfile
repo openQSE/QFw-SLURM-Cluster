@@ -263,7 +263,7 @@ ENV LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${LIBFABRIC_PREFIX}/lib
 # exists) sets them to 0 with do_configure.sh --slim. Nothing QFw's NWQ-Sim
 # path, the fake IQM QPM, or the qfw-slurm plugin needs is behind them: the
 # QRMI and QDMI Python bindings still come from PyPI into the QFw venv.
-#   QFW_WITH_QRMI_NATIVE  libqrmi.so and the QRMI SPANK plugin
+#   QFW_WITH_QRMI_NATIVE  Rust toolchain, libqrmi.so and the QRMI SPANK plugin
 #   QFW_WITH_TNQVM        TNQVM, XACC and ExaTN
 #   QFW_WITH_MQT_CC       MLIR and MQT Core rebuilt from source with the MLIR
 #                         compiler; without it the QFw venv keeps the PyPI
@@ -276,6 +276,7 @@ ARG RUST_VERSION=1.91.0
 ENV CARGO_HOME=/opt/qfw/rust/cargo \
     RUSTUP_HOME=/opt/qfw/rust/rustup
 RUN set -ex \
+    && if [ "${QFW_WITH_QRMI_NATIVE}" != "1" ]; then exit 0; fi \
     && mkdir -p "${CARGO_HOME}" "${RUSTUP_HOME}" \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --no-modify-path --profile minimal \

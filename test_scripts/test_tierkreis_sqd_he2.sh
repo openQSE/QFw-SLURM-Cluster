@@ -10,7 +10,10 @@ docker exec -i --user user-a --env HOME=/workspace/home/user-a \
     --workdir /workspace/qfw-container-base/tierkreis-sc-demo \
     slurmctld bash -s <<'EOF'
 set -euo pipefail
+if [[ ! -r test/sqd-e2e.py ]]; then
+    echo "Missing test/sqd-e2e.py in the demo checkout; update it and rerun ./tools/setup-tierkreis-demo.sh." >&2
+    exit 1
+fi
 source /opt/openqse/qfw/bin/qfw-activate --venv /opt/openqse/qfw-venv
-tkr run -g tkr.graphs.sqd:workflow -i examples/sqd_he2_input.json \
-    --config runtime.toml --profile qfw-slurm --timeout 86400 -o
+exec /opt/openqse/qfw-venv/bin/python test/sqd-e2e.py
 EOF

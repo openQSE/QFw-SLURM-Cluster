@@ -1,9 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cluster_root=$(cd "${script_dir}/.." && pwd)
 project=/workspace/qfw-container-base/tierkreis-sc-demo
 venv=/opt/openqse/qfw-venv
 branch=sqd-example
+
+docker info >/dev/null
+if [[ $(docker inspect slurmctld --format '{{.State.Running}}' 2>/dev/null || true) != true ]]; then
+    (cd "${cluster_root}" && ./do_startup.sh)
+fi
+
+if ! docker exec slurmctld bash -c \
+    'test -r /usr/include/nlohmann/json.hpp && command -v pkg-config >/dev/null && pkg-config --exists nlohmann_json'; then
+    echo 'Tierkreis setup requires nlohmann-json headers and pkg-config in the cluster image. Rebuild the image, then recreate the cluster containers before running this setup.' >&2
+    exit 1
+fi
 
 docker exec -i slurmctld bash -s -- "${project}" "${branch}" <<'EOF'
 set -euo pipefail
@@ -24,15 +37,10 @@ for node in slurmctld c1 c2 c3 c4 c5 c6 c7 c8; do
     docker exec -i --workdir "${project}" \
         -e UV_PROJECT_ENVIRONMENT="${venv}" \
         -e UV_CACHE_DIR="${project}/.runtime/build/uv-cache" \
-        -e CARGO_HOME="${project}/.runtime/build/cargo-home" \
-        -e CARGO_TARGET_DIR="${project}/.runtime/build/cargo-target" \
-        -e RUSTUP_HOME="${project}/.runtime/build/rustup" \
-        -e RUSTUP_TOOLCHAIN=stable -e CARGO_BUILD_JOBS=2 \
-        -e OPENSSL_armcap=0 "${node}" bash -s -- "${venv}" <<'EOF'
+        "${node}" bash -s -- "${venv}" <<'EOF'
 set -euo pipefail
 venv="$1"
 test -x "${venv}/bin/python"
-rustup toolchain install stable --profile minimal --no-self-update --no-update
 uv sync --python "${venv}/bin/python" --locked --no-dev --inexact \
     --reinstall-package tkr-fmo-control-worker --reinstall-package tkr-fmo-chemistry-worker \
     --reinstall-package tkr-fmo-quantum-worker --reinstall-package tkr-sqd-control-worker \
