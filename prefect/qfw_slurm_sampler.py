@@ -120,8 +120,14 @@ def _run(command, **kwargs):
                           capture_output=True, **kwargs).stdout
 
 
-def _job_state(job_id):
+def _job_state(job_id, submitted_after):
+    # Slurm numbers jobs from 1 again when its controller state is reset, as
+    # a cluster recreate does, but the accounting database keeps the old
+    # jobs. Until the new job reaches the database, `sacct -j` shows the old
+    # job with the same number, often COMPLETED. --starttime leaves out jobs
+    # that ended before this one was submitted.
     out = _run(["sacct", "-j", str(job_id), "-X", "-n", "-P",
+                "--starttime", submitted_after,
                 "-o", "State,ExitCode"])
     line = out.strip().splitlines()[0] if out.strip() else ""
     if not line:
@@ -180,6 +186,9 @@ def run_sampler_job(circuit, *, shots, qpu, work_dir, provider=None,
     script_file = job_dir / "qfw_sampler.slurm"
     script_file.write_text(script)
 
+    # A minute early, in case this host's clock runs ahead of slurmdbd's.
+    submitted_after = time.strftime("%Y-%m-%dT%H:%M:%S",
+                                    time.localtime(time.time() - 60))
     job_id = _run(["sbatch", "--parsable", str(script_file)]).strip().split(";")[0]
     logger(f"qfw_slurm_sampler: job {job_id} submitted for {circuit.num_qubits} "
            f"qubits, {shots} shots on {qpu} ({job_dir})")
@@ -187,7 +196,7 @@ def run_sampler_job(circuit, *, shots, qpu, work_dir, provider=None,
     deadline = time.time() + timeout
     state = None
     while time.time() < deadline:
-        state, exit_code = _job_state(job_id)
+        state, exit_code = _job_state(job_id, submitted_after)
         if state in TERMINAL_STATES:
             break
         time.sleep(poll_interval)
