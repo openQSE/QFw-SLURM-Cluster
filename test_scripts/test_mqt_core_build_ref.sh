@@ -6,7 +6,7 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 temporary="$(mktemp -d)"
 trap 'rm -rf "${temporary}"' EXIT
 cp "${repo_dir}/do_configure.sh" "${repo_dir}/do_build.sh" "${temporary}/"
-release_ref=575acd1b9ca52e4608ccf4833e7d60640913cef4
+release_ref=d76be496512c8707f165e18f152bd5f11b8a5665
 custom_ref=1111111111111111111111111111111111111111
 export DOCKER_LOG="${temporary}/docker.log"
 unset MQT_CORE_REF

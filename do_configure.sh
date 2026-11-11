@@ -9,12 +9,12 @@ DEFAULT_IMAGE_TAG="rocky10.1"
 DEFAULT_SLURM_TAG="slurm-25-05-0-1"
 DEFAULT_QFW_BUILD_JOBS="4"
 DEFAULT_QFW_REPOSITORY="https://github.com/openQSE/QFw.git"
-DEFAULT_QFW_REF="14bc8cdf29fef4846d1e327c8dac82fb7f792d03"
+DEFAULT_QFW_REF="7d3ef6c01376fd086b84062fde9da8a1522338e7"
 DEFAULT_QFW_SLURM_REPOSITORY="https://github.com/openQSE/qfw-slurm.git"
 DEFAULT_QFW_SLURM_REF="main"
 DEFAULT_MQT_CORE_REPOSITORY="https://github.com/munich-quantum-toolkit/core.git"
-# MQT Core v4.1.1, pinned to its immutable release commit.
-DEFAULT_MQT_CORE_REF="575acd1b9ca52e4608ccf4833e7d60640913cef4"
+# MQT Core v4.2.0, pinned to its immutable release commit.
+DEFAULT_MQT_CORE_REF="d76be496512c8707f165e18f152bd5f11b8a5665"
 ENV_FILE="${SCRIPT_DIR}/qfw-install.env"
 COMPOSE_ENV_FILE="${SCRIPT_DIR}/.env"
 TELEMETRY=false
