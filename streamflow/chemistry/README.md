@@ -1,8 +1,13 @@
-# StreamFlow Integration
+# FMO-VQE Workflow with StreamFlow
 
-This example runs the ten existing He4 fragment FCIDUMPs through NWQSim, then
-collects the energy and execution metadata for each fragment. GAMESS is not required.
-The optimizer limits are small to keep test runs short.
+This example runs the four He4 monomers and six dimers through NWQSim,
+then collects energy and execution metadata for each fragment.
+
+The default run checks workflow execution, not a converged He4 energy. It uses
+reduced optimizer limits and the collector marks the run `execution_check_only`.
+Energy validation requires separate convergence checks. Fake IQM is available
+as an optional [backend for integration tests](#select-a-quantum-backend) and
+returns synthetic counts.
 
 ## Run locally
 
@@ -14,37 +19,62 @@ cluster image must already be available. From `QFw-SLURM-Cluster`, run:
 ./streamflow/chemistry/run-local.sh
 ```
 
-Setup starts the virtual cluster if needed, starts the NWQSim and fake IQM services,
-installs StreamFlow 0.2.0rc3 in a separate shared-directory virtual environment and
-prepares SSH access for the application user. It copies the workflow into the shared
-directory. Run setup again after changing the workflow or its configuration.
-The application checkout is copied only when the shared copy does not exist.
+`setup-local.sh` prepares the Docker testbed. It starts the cluster if needed,
+starts NWQSim and fake IQM services, copies the workflow and installs StreamFlow
+0.2.0rc3 in a separate environment. The application checkout is copied only when
+the shared copy does not exist. Run setup once initially and again after changing
+workflow files or requirements.
+
+`run-local.sh` starts one calculation using that installed copy. It creates a
+separate run directory, invokes `run.py` as the application user inside
+`slurmctld`, saves the log and reports failures. These scripts are local helpers;
+StreamFlow's native Slurm connector submits the jobs.
 
 The launcher prints the run directory. It contains `streamflow.log`, the resolved
 configuration, `summary.json` and the collected outputs. The summary lists each
 fragment's backend, Slurm job ID, compute node and QFw reservation.
 `workflow-results.json` contains the individual fragment results. `CHEMISTRY_RUN_ID` can give the run a recognisable directory name.
 
+## Workflow
+
+```mermaid
+flowchart TD
+    inputs["Existing He4 input and FCIDUMP files"] --> prepare["prepare<br/>Validate inputs and separate monomers and dimers"]
+    prepare --> monomers["monomers, CWL scatter<br/>Four monomer jobs<br/>Qiskit and QFw to NWQSim"]
+    prepare --> dimers["dimers, CWL scatter<br/>Six dimer jobs<br/>Qiskit and QFw to NWQSim"]
+    monomers --> collect["collect<br/>Wait for all ten results and run the collector"]
+    dimers --> collect
+    collect --> results["Fragment energies and execution metadata"]
+```
+
+Preparation separates fragments by type: four monomers and six dimers.
+Each fragment becomes one Slurm job. The two scatters share a limit of four
+outstanding jobs across the deployment. Slurm chooses their compute nodes but you can also use a specific node by declaring it on the `streamflow.yml`.
+QFw sends circuits to the backend selected for each step in `streamflow.yml`.
+Preparation, optimization and collection run on classical compute nodes.
+
 ## What runs where
 
 | Step | Compute node | Work |
 | --- | --- | --- |
-| Prepare | c1 | Validate the input and fragment set, check fragments against the full FCIDUMP and prepare two groups |
-| Chemistry A | c2 | Calculate monomers 1 and 3 and dimers 1, 3 and 5 through QFw |
-| Chemistry B | c2 | Calculate monomers 2 and 4 and dimers 2, 4 and 6 through QFw |
-| Collect | c3 | Check results and provenance, run the collector and gather fragment results |
+| Prepare | Available node in `normal` | Validate the input and fragment set, check fragments against the full FCIDUMP and separate monomers and dimers |
+| Monomers | Available node in `normal` per fragment | Calculate four monomers through QFw/NWQSim |
+| Dimers | Available node in `normal` per fragment | Calculate six dimers through QFw/NWQSim |
+| Collect | Available node in `normal` | Check results and provenance, run the collector and gather fragment results |
 
-Both chemistry groups use NWQSim by default. There are ten separate chemistry jobs;
-Slurm schedules them as resources become available. The coordinator runs inside
-`slurmctld` and uses SSH and StreamFlow's native Slurm connector to submit the jobs.
+There are ten separate chemistry jobs;
+`maxConcurrentJobs: 4` limits outstanding jobs across all stages, including jobs
+pending in Slurm. Slurm selects available nodes from `normal`; no stage has a
+fixed node list. The coordinator runs inside
+`slurmctld` and uses local Slurm commands through StreamFlow's native connector.
 
-Qiskit and the optimizer run on c2. Inside the allocation, `qfw-setup`, `qfw-srun`
+Qiskit and the optimizer run on the allocated compute node. Inside the allocation, `qfw-setup`, `qfw-srun`
 and `qfw-teardown` manage the application runtime. QFw sends the circuits to the
 reserved provider. The provider service runs on its dedicated service node, such
 as `nwqsim-head`; `qfw-slurm` owns reservation and release. A service node listed
 as `idle` by `sinfo` does not prove that its quantum endpoint is operational.
 
-This follows the allocation contract in the public
+This follows the allocation contract in the
 [Workflow Manager Integration Guide](https://github.com/openQSE/qfw-slurm/blob/main/docs/workflow-manager-integration.md)
 and the service topology in [Design Overview](../../README.md#design-overview). `--qpu` belongs on
 `sbatch`, alongside the circuit, qubit, depth and shot bounds. It is not repeated
@@ -52,50 +82,51 @@ on `qfw-srun`.
 
 ## Select a quantum backend
 
-`cwl/workflow.cwl` defines dependencies and the two fragment scatters.
-`streamflow.yml` binds each chemistry step to a Slurm service. The service references
-a `.sbatch` file: `--nodelist=c2` selects the application node, while `--qpu` selects
-the public quantum resource. The runner derives the QFw provider from that selection;
+`cwl/workflow.cwl` defines dependencies and the monomer and dimer scatters.
+`streamflow.yml` binds each scatter to a Slurm service and defines all
+its resources: Slurm selects the application node from `partition: normal`,
+while `qfw.qpu` selects the public quantum resource. The runner derives the QFw provider from that selection;
 there is no backend launcher option.
 
 | StreamFlow service | Public `--qpu` | QPM service | Application provider | Status |
 | --- | --- | --- | --- | --- |
 | `chemistry-nwqsim` | `nwqsim` | `nwqsim` | `nwqsim` | Default simulator |
 | `chemistry-fake-iqm` | `fake-iqm-20q` | `fake-iqm` | `fake-iqm` | Synthetic integration test |
-| `chemistry-iqm` | `ornl-iqm-20q` | `iqm-ornl-20q` | `iqm` | Optional hardware profile, not tested |
 
 The default bindings are:
 
 ```yaml
-- step: /chemistry_a
+- step: /monomers
   target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
-- step: /chemistry_b
+- step: /dimers
   target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
 ```
 
-To test five fragments with fake IQM, change only `/chemistry_b` to
-`service: chemistry-fake-iqm`, then run setup and launch again. To use IQM hardware,
-select `chemistry-iqm` only after the site administrator has enabled the IQM QPM,
+Both scatters use NWQSim by default. To test synthetic measurements, change
+`/monomers`, `/dimers` or both to `service: chemistry-fake-iqm`. Run setup and
+launch again after editing the bindings. To use IQM hardware,
+set `qfw.qpu: ornl-iqm-20q` on the selected service only after the site administrator has enabled the IQM QPM,
 configured valid credentials and confirmed the endpoint, permissions and workload
-bounds. Setup does not start IQM or submit hardware jobs. The IQM profile's provider
+bounds. Setup does not start IQM or submit hardware jobs. The IQM resource's provider
 mapping and reservation validation are unit tested; hardware execution is not.
 
-This example does not cover the IBM, AWS, QEC or shim-specific workflows.
+Standard Slurm options use the connector's native YAML fields. The launcher
+turns the inline `qfw` options into temporary shell templates in the run directory
+because rc3 has no native fields for the QFw Slurm plugin. That launcher-only
+section is removed before StreamFlow validates the resolved configuration.
+Single-node jobs use Slurm's defaults of one task and one CPU per task.
+The existing application wrapper activates QFw when needed.
 
 `locations: 1` requests one Slurm allocation per scattered job. It does not mean
 one quantum processor or one fragment for the entire workflow. `local.yml` contains
-the login host, shared root and optimizer limits. `cases.yml` lists the inputs:
+the shared root and optimizer limits. `cases.yml` lists the inputs:
 the ten fragment files belong to one He4 case, not ten separate molecular cases.
 
 `fragment.py` calls the unchanged application's calculation and QFw lifecycle
 functions. `fragment.sh` starts and tears down the runtime for each fragment.
 The original chemistry batch script runs the whole case with one provider, which
 is why fragment execution needs this adapter. The final stage reuses
-`chemistry_he/workflow/slurm/collect-results.sbatch`. Neither GAMESS nor the
-original submission driver is executed.
-
-StreamFlow handles the declared file and directory dependencies. This testbed uses
-a shared filesystem; transfers between separate sites remain untested.
+`chemistry_he/workflow/slurm/collect-results.sbatch`.
 
 ## Tests
 
@@ -113,8 +144,8 @@ docker exec --user user-a \
 They check backend bindings, resource bounds, complete fragment sets, unchanged
 input bytes, reservation validation, failed application scripts, result writing
 before QFw shutdown, invalid energies and missing, duplicate or modified results.
-They also verify collected fragment results and the labels for simulation and
-synthetic runs. The four Docker failure tests are skipped by this command.
+They also verify the four-monomer/six-dimer split, backend routing, collected
+fragment results and labels for simulation and synthetic runs. The four Docker failure tests are skipped by this command.
 
 Run those four tests using Python 3 on the Docker host, from `QFw-SLURM-Cluster`:
 

@@ -1,0 +1,17 @@
+{
+  "fcidump_sha256": "4b3956301ffa1affd9c19365ada72b013371609dc8cc3d41ee20dcb951dd9b16",
+  "pyscf_version": "2.14.0",
+  "orbitals": 4,
+  "electrons": 4,
+  "determinants": 36,
+  "ecore_hartree": 2.29310124732,
+  "fci_total_energy_hartree": -2.1663874486347625,
+  "model": {
+    "atom": "H 0 0 0; H 0 0 1; H 0 0 2; H 0 0 3",
+    "basis": "sto-3g",
+    "unit": "Angstrom",
+    "charge": 0,
+    "spin": 0
+  },
+  "rhf_total_energy_hartree": -2.098545936998007
+}

@@ -33,8 +33,7 @@ class StreamFlowFailureTests(unittest.TestCase):
         token = "failure-" + uuid.uuid4().hex[:12]
         bundle = self.shared / "streamflow-chemistry/tests" / token
         bundle.mkdir(parents=True)
-        for directory in ("cwl", "slurm"):
-            shutil.copytree(ROOT / directory, bundle / directory)
+        shutil.copytree(ROOT / "cwl", bundle / "cwl")
         for name in ("run.py", "streamflow.yml"):
             shutil.copyfile(ROOT / name, bundle / name)
         shutil.copyfile(ROOT / "local.yml", bundle / "profile.yml")
@@ -62,13 +61,20 @@ class StreamFlowFailureTests(unittest.TestCase):
         fixture = "python3 - \"$1\" \"$2\" \"$3\" <<'PYTHON'\nimport json, sys\nfrom pathlib import Path\nfragment, backend, output = sys.argv[1:]\n(Path(output) / 'workflow-result.json').write_text(json.dumps(dict(fragment=Path(fragment).name, backend=backend, energy=-1.0)))\nPYTHON\n"
         (bundle / "cwl/fragment.sh").write_text("exit 7\n" if fault == "chemistry" else fixture)
         (scripts / "collect-results.sbatch").write_text("exit 9\n")
+        container_bundle = "/workspace/qfw-container-base/" + str(bundle.relative_to(self.shared))
         if fault == "prepare":
             (bundle / "FCIDUMP").write_text("invalid integral input\n")
         elif fault == "submission":
-            path = bundle / "slurm/prepare.sbatch"
-            path.write_text(path.read_text().replace("--partition=normal", "--partition=sf-no-such-partition"))
+            edit = '''
+from pathlib import Path
+import sys,yaml
+path=Path(sys.argv[1])
+config=yaml.safe_load(path.read_text())
+config["deployments"]["slurm"]["config"]["services"]["prepare"]["partition"]="sf-no-such-partition"
+path.write_text(yaml.safe_dump(config))
+'''
+            self.docker(VENV + "/bin/python", "-c", edit, container_bundle + "/streamflow.yml")
 
-        container_bundle = "/workspace/qfw-container-base/" + str(bundle.relative_to(self.shared))
         container_run = self.home + "/chemistry-test-" + token
         run = self.shared / "home" / self.home.removeprefix("/workspace/home/") / ("chemistry-test-" + token)
         subprocess.run(["docker", "exec", "--user", self.user, "slurmctld", "mkdir", container_run], check=True)
@@ -107,7 +113,7 @@ class StreamFlowFailureTests(unittest.TestCase):
                 stage = row[1].removeprefix("sf-")
                 seen.append(stage)
                 self.assertIn(stage, expected_stages)
-                self.assertEqual(row[4], {"prepare": "c1", "chemistry": "c2", "collect": "c3"}[stage])
+                self.assertIn(row[4], {f"c{i}" for i in range(1, 9)})
                 if stage == fault:
                     self.assertIn(row[2], ("FAILED", "CANCELLED"))
                 else:

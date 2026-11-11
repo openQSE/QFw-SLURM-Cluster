@@ -1,7 +1,6 @@
 from copy import deepcopy
 import importlib.util
 from pathlib import Path
-import shutil
 import tempfile
 import unittest
 
@@ -18,13 +17,9 @@ class ConfigurationTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.bundle = Path(self.temp.name)
-        shutil.copytree(ROOT / "slurm", self.bundle / "slurm")
         self.config = yaml.safe_load((ROOT / "streamflow.yml").read_text())
         profile_path = ROOT / "local.yml" if (ROOT / "local.yml").exists() else ROOT / "profile.yml"
         profile = yaml.safe_load(profile_path.read_text())
-        self.key = self.bundle / "key"
-        self.key.touch()
-        profile["slurm"]["ssh_key"] = str(self.key)
         (self.bundle / "profile.yml").write_text(yaml.safe_dump(profile))
         self.application = {"class": "Directory", "path": "."}
         for name in ("input.inp", "FCIDUMP", "FCIDUMP-1-1"):
@@ -33,32 +28,52 @@ class ConfigurationTests(unittest.TestCase):
                      "fcidump": {"class": "File", "path": "FCIDUMP"},
                      "fragments": [{"class": "File", "path": "FCIDUMP-1-1"}]}
 
-    def test_default_deployment_bindings_use_nwqsim_for_all_fragments(self):
+    def test_default_bindings_use_nwqsim_for_monomers_and_dimers(self):
         job = runner.resolve_job(self.bundle, self.case, self.application, self.config)
-        self.assertEqual(job["settings_a"]["qfw"]["provider"], "nwqsim")
-        self.assertEqual(job["settings_b"]["qfw"]["provider"], "nwqsim")
-        self.assertEqual(job["settings_b"]["qfw"]["resource"], "nwqsim")
-        self.assertEqual(job["settings_b"]["qfw"]["result_kind"], "simulation")
+        self.assertEqual(job["settings_monomers"]["qfw"]["provider"], "nwqsim")
+        self.assertEqual(job["settings_dimers"]["qfw"]["provider"], "nwqsim")
+        self.assertEqual(job["settings_dimers"]["qfw"]["resource"], "nwqsim")
+        self.assertEqual(job["settings_dimers"]["qfw"]["result_kind"], "simulation")
 
-    def test_changing_only_binding_changes_provider(self):
-        self.config["workflows"]["chemistry"]["bindings"][1]["target"]["service"] = "chemistry-fake-iqm"
+    def test_changing_only_dimer_binding_changes_provider(self):
+        self.config["workflows"]["chemistry"]["bindings"][2]["target"]["service"] = "chemistry-fake-iqm"
         job = runner.resolve_job(self.bundle, self.case, self.application, self.config)
-        self.assertEqual(job["settings_a"]["qfw"]["provider"], "fake-iqm")
+        self.assertEqual(job["settings_dimers"]["qfw"]["provider"], "fake-iqm")
+        self.assertEqual(job["settings_dimers"]["qfw"]["result_kind"], "synthetic")
+        self.assertEqual(job["settings_monomers"]["qfw"]["provider"], "nwqsim")
 
     def test_iqm_binding_uses_public_qpu_and_application_provider(self):
-        self.config["workflows"]["chemistry"]["bindings"][2]["target"]["service"] = "chemistry-iqm"
+        self.config["deployments"]["slurm"]["config"]["services"]["chemistry-nwqsim"]["qfw"]["qpu"] = "ornl-iqm-20q"
         job = runner.resolve_job(self.bundle, self.case, self.application, self.config)
-        self.assertEqual(job["settings_b"]["qfw"], dict(shared_root="/workspace/qfw-container-base",
+        self.assertEqual(job["settings_monomers"]["qfw"], dict(shared_root="/workspace/qfw-container-base",
                          resource="ornl-iqm-20q", provider="iqm", result_kind="hardware", shots=4096))
+
+    def test_workflow_scatters_monomers_and_dimers_separately(self):
+        workflow = yaml.safe_load((ROOT / "cwl/workflow.cwl").read_text())
+        self.assertEqual(set(workflow["steps"]), {"prepare", "monomers", "dimers", "collect"})
+        for kind in ("monomers", "dimers"):
+            step = workflow["steps"][kind]
+            self.assertEqual(step["scatter"], "fragment")
+            self.assertEqual(step["in"]["fragment"], "prepare/" + kind)
+            self.assertEqual(step["in"]["settings"], "settings_" + kind)
+        self.assertEqual(workflow["steps"]["collect"]["in"]["calculations"],
+                         dict(source=["monomers/calculation", "dimers/calculation"], linkMerge="merge_flattened"))
+        self.assertEqual([binding["step"] for binding in self.config["workflows"]["chemistry"]["bindings"]],
+                         ["/prepare", "/monomers", "/dimers", "/collect"])
 
     def test_configure_preserves_services_and_bindings(self):
         bindings = deepcopy(self.config["workflows"]["chemistry"]["bindings"])
         services = self.config["deployments"]["slurm"]["config"]["services"]
         expected = set(services)
-        runner.configure_slurm(self.bundle, self.bundle, self.config)
+        runner.configure_slurm(self.bundle, self.config)
         self.assertEqual(bindings, self.config["workflows"]["chemistry"]["bindings"])
         self.assertEqual(expected, set(services))
-        self.assertTrue(all(Path(value["file"]).is_absolute() for value in services.values()))
+        self.assertEqual(self.config["deployments"]["slurm"]["config"]["maxConcurrentJobs"], 4)
+        self.assertTrue(all("nodelist" not in service for service in services.values()))
+        self.assertIn("#SBATCH --qpu=nwqsim", Path(services["chemistry-nwqsim"]["file"]).read_text())
+        self.assertTrue(all("qfw" not in value and "script" not in value for value in services.values()))
+        self.assertEqual(set(self.config["deployments"]), {"slurm"})
+        self.assertNotIn("wraps", self.config["deployments"]["slurm"])
 
     def test_resolve_preserves_catalog_and_resolves_all_files(self):
         original = deepcopy(self.case)
@@ -80,14 +95,15 @@ class ConfigurationTests(unittest.TestCase):
             runner.resolve_job(self.bundle, self.case, self.application, self.config)
 
     def test_invalid_resource_and_bounds_are_rejected(self):
-        path = self.bundle / "slurm/chemistry-nwqsim.sbatch"
-        original = path.read_text()
-        for old, new in (("--qpu=nwqsim", "--qpu=unknown"), ("--workload-kind=hybrid", "--workload-kind=classical"),
-                         ("--max-depth=1000", "--max-depth=0"), ("--max-shots=4096", "--max-shots=16")):
-            with self.subTest(option=new):
-                path.write_text(original.replace(old, new))
+        options = self.config["deployments"]["slurm"]["config"]["services"]["chemistry-nwqsim"]["qfw"]
+        original = deepcopy(options)
+        for key, value in (("qpu", "unknown"), ("workload-kind", "classical"), ("max-depth", 0),
+                           ("max-shots", 16), ("max-shots", True)):
+            with self.subTest(option=key, value=value):
+                options.update(original)
+                options[key] = value
                 with self.assertRaises(ValueError):
-                    runner.load_backend(self.bundle, self.config, "chemistry_a")
+                    runner.load_backend(self.config, "monomers")
 
     def test_duplicate_case_names_are_rejected(self):
         (self.bundle / "cases.yml").write_text(yaml.safe_dump({"application": self.application, "cases": [self.case, self.case]}))

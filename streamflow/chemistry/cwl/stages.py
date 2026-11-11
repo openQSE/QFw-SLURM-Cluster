@@ -88,22 +88,23 @@ def prepare(args):
         if len(selected) < size:
             raise ValueError("FCIDUMP does not contain the expected final fragments")
         if size:
-            expected.extend((f"{args.fcidump.name}-{kind}-{index}", normalized(block))
+            expected.extend((kind, f"{args.fcidump.name}-{kind}-{index}", normalized(block))
                             for index, block in enumerate(selected[-size:], 1))
     supplied = {path.name: path for path in args.fragments}
-    if len(supplied) != len(args.fragments) or set(supplied) != {name for name, _ in expected}:
+    if len(supplied) != len(args.fragments) or set(supplied) != {name for _, name, _ in expected}:
         raise ValueError("Fragment inputs do not match the complete monomer/dimer set")
-    for name, block in expected:
+    for _, name, block in expected:
         if supplied[name].read_text() != block:
             raise ValueError(f"Fragment differs from its source FCIDUMP: {name}")
     output = fresh_output("prepared")
     shutil.copyfile(args.gamess_input, output / "input.inp")
     fragments = []
-    for index, (name, _) in enumerate(expected):
-        group = "a" if index % 2 == 0 else "b"
-        (output / group).mkdir(exist_ok=True)
-        shutil.copyfile(supplied[name], output / group / name)
-        fragments.append({"name": name, "group": group, "sha256": digest(supplied[name])})
+    for kind in ("monomers", "dimers"):
+        (output / kind).mkdir()
+    for kind, name, _ in expected:
+        category = "monomers" if kind == 1 else "dimers"
+        shutil.copyfile(supplied[name], output / category / name)
+        fragments.append({"name": name, "kind": category, "sha256": digest(supplied[name])})
     write_json(output / "preparation.json", {
         "case_name": args.case_name, "allocation": allocation(),
         "fragments": fragments,
@@ -165,6 +166,8 @@ def collect(args):
         records[name], results[name] = (calculation, record), result
     if set(records) != set(expected):
         raise ValueError("Missing fragment results")
+    providers = {result["backend"] for result in results.values()}
+    backend = next(iter(providers)) if len(providers) == 1 else "mixed"
     output = fresh_output("results")
     shutil.copytree(args.prepared, output / "preparation")
     lines = []
@@ -178,8 +181,6 @@ def collect(args):
         lines.append("\t".join(fields))
     plan = output / "jobs.tsv"
     plan.write_text("\n".join(lines) + "\n")
-    providers = {result["backend"] for result in results.values()}
-    backend = next(iter(providers)) if len(providers) == 1 else "mixed"
     run_script(args, output, "collect-results.sbatch", [output, backend, plan])
     path = output / "workflow-results.json"
     aggregate = json.loads(path.read_text())

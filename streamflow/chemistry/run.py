@@ -3,9 +3,7 @@
 import argparse
 from copy import deepcopy
 import json
-import os
 from pathlib import Path
-import pwd
 import re
 import subprocess
 import sys
@@ -19,7 +17,7 @@ RESOURCES = {"nwqsim": ("nwqsim", "simulation"),
              "ornl-iqm-20q": ("iqm", "hardware")}
 
 
-def load_backend(bundle, config, step):
+def load_backend(config, step):
     workflow, = config["workflows"].values()
     binding, = [item for item in workflow["bindings"] if item["step"] == "/" + step]
     target = binding["target"]
@@ -27,17 +25,16 @@ def load_backend(bundle, config, step):
     if deployment["type"] != "slurm" or target["locations"] != 1:
         raise ValueError("Each fragment requires one native Slurm location")
     service = deployment["config"]["services"][target["service"]]
-    script = (bundle / service["file"]).read_text()
-    options = dict(re.findall(r"^#SBATCH --([\w-]+)=(\S+)\s*$", script, re.MULTILINE))
+    options = service.get("qfw", {})
     resource = options.get("qpu")
     if resource not in RESOURCES or options.get("workload-kind") != "hybrid":
-        raise ValueError(f"Unsupported quantum resource or workload kind for {step}")
+        raise ValueError("Unsupported quantum resource or workload kind")
     provider, kind = RESOURCES[resource]
     for option in ("max-shots", "circ-count", "max-qubits", "max-depth"):
-        value = options.get(option, "")
-        if not value.isdecimal() or int(value) < 1:
-            raise ValueError(f"{step}: --{option} must be a positive integer")
-    if int(options["max-shots"]) != 4096:
+        value = options.get(option)
+        if type(value) is not int or value < 1:
+            raise ValueError(f"--{option} must be a positive integer")
+    if options["max-shots"] != 4096:
         raise ValueError("The chemistry estimator requires 4096 shots at its default precision")
     return dict(resource=resource, provider=provider, result_kind=kind, shots=4096)
 
@@ -47,10 +44,10 @@ def resolve_job(bundle, case, application, config):
     if any(type(value) is not int or value < 1 for value in profile["optimizer"].values()):
         raise ValueError("Optimizer iteration limits must be positive integers")
     job = deepcopy({"case": case, "application": application})
-    for group in ("a", "b"):
-        selected = load_backend(bundle, config, "chemistry_" + group)
-        job["settings_" + group] = {"qfw": dict(shared_root=profile["qfw"]["shared_root"], **selected),
-                                     "optimizer": profile["optimizer"]}
+    for kind in ("monomers", "dimers"):
+        selected = load_backend(config, kind)
+        job["settings_" + kind] = {"qfw": dict(shared_root=profile["qfw"]["shared_root"], **selected),
+                                 "optimizer": profile["optimizer"]}
     files = [job["application"], job["case"]["gamess_input"], job["case"]["fcidump"],
              *job["case"]["fragments"]]
     for item in files:
@@ -58,16 +55,15 @@ def resolve_job(bundle, case, application, config):
     return job
 
 
-def configure_slurm(bundle, run, config):
-    profile = yaml.safe_load((bundle / "profile.yml").read_text())
-    site = profile["slurm"]
+def configure_slurm(run, config):
     deployments = config["deployments"]
     deployments["slurm"]["workdir"] = str(run / "work")
-    deployments["cluster-login"]["config"].update(
-        nodes=[site["hostname"]], username=pwd.getpwuid(os.getuid()).pw_name,
-        sshKey=str(Path(site["ssh_key"]).expanduser().resolve(strict=True)), checkHostKey=True)
-    for service in deployments["slurm"]["config"]["services"].values():
-        service["file"] = str((bundle / service["file"]).resolve(strict=True))
+    for name, service in deployments["slurm"]["config"]["services"].items():
+        qfw = service.pop("qfw", {})
+        if qfw:
+            path = run / f"{name}.sh"
+            path.write_text("\n".join(["#!/bin/sh", *(f"#SBATCH --{key}={value}" for key, value in qfw.items()), "{{ streamflow_command }}\n"]))
+            service["file"] = str(path)
 
 
 def write_configuration(bundle, run):
@@ -89,7 +85,7 @@ def write_configuration(bundle, run):
         workflow["config"] = {"file": str(bundle / "cwl/workflow.cwl"), "settings": str(job_path)}
         instance["workflows"] = {name: workflow}
         instance["database"] = {"type": "sqlite", "config": {"connection": str(run / f"{name}.sqlite")}}
-        configure_slurm(bundle, run, instance)
+        configure_slurm(run, instance)
         config_path = run / f"streamflow-{name}.yml"
         config_path.write_text(yaml.safe_dump(instance, sort_keys=False))
         SfValidator().validate_file(str(config_path))
@@ -123,7 +119,7 @@ def main():
         chemistry = []
         for fragment in prepared["fragments"]:
             record = json.loads((path.parent / "fragments" / fragment["name"] / "submission.json").read_text())
-            if record["backend"] != job["settings_" + fragment["group"]]["qfw"]["provider"]:
+            if record["backend"] != job["settings_" + fragment["kind"]]["qfw"]["provider"]:
                 raise RuntimeError("Fragment backend does not match its StreamFlow binding")
             chemistry.append({"fragment": fragment["name"], **{key: record[key] for key in
                               ("job_id", "nodes", "backend", "qpu", "result_kind", "qfw_reservations")}})

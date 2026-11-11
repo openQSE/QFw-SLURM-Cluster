@@ -14,7 +14,7 @@ inputs:
         fcidump: File
         fragments: File[]
   application: Directory
-  settings_a:
+  settings_monomers:
     type:
       type: record
       fields:
@@ -34,7 +34,7 @@ inputs:
               macro_iterations: int
               amplitude_iterations: int
               orbital_iterations: int
-  settings_b:
+  settings_dimers:
     type:
       type: record
       fields:
@@ -65,24 +65,24 @@ steps:
       case: case
     out:
     - prepared
-    - group_a
-    - group_b
-  chemistry_a:
+    - monomers
+    - dimers
+  monomers:
     run: chemistry.cwl
     scatter: fragment
     in:
-      fragment: prepare/group_a
+      fragment: prepare/monomers
       application: application
-      settings: settings_a
+      settings: settings_monomers
     out:
     - calculation
-  chemistry_b:
+  dimers:
     run: chemistry.cwl
     scatter: fragment
     in:
-      fragment: prepare/group_b
+      fragment: prepare/dimers
       application: application
-      settings: settings_b
+      settings: settings_dimers
     out:
     - calculation
   collect:
@@ -92,8 +92,8 @@ steps:
       prepared: prepare/prepared
       calculations:
         source:
-        - chemistry_a/calculation
-        - chemistry_b/calculation
+        - monomers/calculation
+        - dimers/calculation
         linkMerge: merge_flattened
     out:
     - results
