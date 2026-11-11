@@ -76,11 +76,11 @@ if ${DRY_RUN}; then
         set +a
         QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
         QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
-        QFW_REF="${QFW_REF:-14bc8cdf29fef4846d1e327c8dac82fb7f792d03}"
+        QFW_REF="${QFW_REF:-7d3ef6c01376fd086b84062fde9da8a1522338e7}"
         QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
         QFW_SLURM_REF="${QFW_SLURM_REF:-main}"
         MQT_CORE_REPOSITORY="${MQT_CORE_REPOSITORY:-https://github.com/munich-quantum-toolkit/core.git}"
-        MQT_CORE_REF="${MQT_CORE_REF:-575acd1b9ca52e4608ccf4833e7d60640913cef4}"
+        MQT_CORE_REF="${MQT_CORE_REF:-d76be496512c8707f165e18f152bd5f11b8a5665}"
         echo "Would run:"
         if ${NO_CACHE}; then
             echo "  docker build \\"
@@ -119,11 +119,11 @@ set +a
 
 QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
 QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
-QFW_REF="${QFW_REF:-14bc8cdf29fef4846d1e327c8dac82fb7f792d03}"
+QFW_REF="${QFW_REF:-7d3ef6c01376fd086b84062fde9da8a1522338e7}"
 QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
 QFW_SLURM_REF="${QFW_SLURM_REF:-main}"
 MQT_CORE_REPOSITORY="${MQT_CORE_REPOSITORY:-https://github.com/munich-quantum-toolkit/core.git}"
-MQT_CORE_REF="${MQT_CORE_REF:-575acd1b9ca52e4608ccf4833e7d60640913cef4}"
+MQT_CORE_REF="${MQT_CORE_REF:-d76be496512c8707f165e18f152bd5f11b8a5665}"
 QFW_WITH_QRMI_NATIVE="${QFW_WITH_QRMI_NATIVE:-1}"
 QFW_WITH_TNQVM="${QFW_WITH_TNQVM:-1}"
 QFW_WITH_MQT_CC="${QFW_WITH_MQT_CC:-1}"

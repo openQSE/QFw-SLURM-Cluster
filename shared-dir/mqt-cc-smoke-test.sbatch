@@ -26,11 +26,21 @@ echo "[$(date)] mqt-cc-smoke-test on $(hostname)"
 "${QFW_VENV}/bin/python" - <<'PY'
 from qiskit import QuantumCircuit
 
-from mqt.core.mlir import CompilerTarget, compile_program
-from mqt.core.qdmi import ProgramFormat, open_device
+from mqt.core.mlir import (
+    CompilerTarget,
+    PayloadSpecification,
+    TargetEnvironment,
+    compile_program,
+    decode_counts,
+)
+from mqt.core.qdmi import ProgramFormat
+from mqt.core.qdmi.builtin_driver import open_device
 
 model = open_device("mqt.sc.iqm.garnet")
-target = CompilerTarget.from_device(model)
+target = TargetEnvironment(
+    CompilerTarget.from_device(model),
+    PayloadSpecification.from_program_format(ProgramFormat.QIR_BASE_STRING),
+)
 
 circuit = QuantumCircuit(3, 3)
 circuit.h(0)
@@ -39,14 +49,14 @@ circuit.x(1)
 # The fixed bit distinguishes measurement order from physical qubit order.
 circuit.measure([2, 0, 1], [0, 1, 2])
 
-compiled = compile_program(circuit, target=target, program_format=ProgramFormat.QIR_BASE_STRING)
+compiled = compile_program(circuit, target=target)
 assert compiled.program_format == ProgramFormat.QIR_BASE_STRING
 print("[mqt-cc-smoke-test] Qiskit -> mqt-cc -> QIR Base: OK")
 
 simulator = open_device("mqt.ddsim.default")
 job = simulator.submit_job(compiled.payload, compiled.program_format, 256, custom1=7)
 job.wait()
-counts = job.get_counts()
+counts = decode_counts(job.get_counts(), 3, 256, compiled.result_layout)
 assert sum(counts.values()) == 256, counts
 assert set(counts) == {"100", "111"}, counts
 print(f"[mqt-cc-smoke-test] compiled QIR -> QDMI DDSIM: {counts}")
