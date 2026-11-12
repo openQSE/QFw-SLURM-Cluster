@@ -144,13 +144,23 @@ qpus:
     provider-device-id: default
     url: https://qccsw.ccs.ornl.gov/
     credential-db: qpu-users.json
+    libraries: [qrmi, qdmi]
+    preference: qdmi
+    execution-owner: qdmi
   ibm-156-nh:
     provider: ibm
     provider-device-id: ibm_156_nh
     resource-type: IBMQiskitRuntimeService
     url: https://quantum.cloud.ibm.com/api/v1
     credential-db: qpu-users.json
-    libraries: [qrmi]
+    libraries: [qrmi, qdmi]
+    preference: qrmi
+    execution-owner: qrmi
+    caps:
+      run_circuit: [qrmi, qdmi]
+      get_backend_info: [qrmi, qdmi]
+      get_task_timing: [qrmi, qdmi]
+      get_task_metadata: [qrmi, qdmi]
   aws:
     provider: aws
     provider-device-id: aws
@@ -158,6 +168,17 @@ qpus:
     credential-db: qpu-users.json
     libraries: [qdmi]
 ```
+
+The IQM shim uses QDMI for execution and composable queries; callers may still
+select QRMI explicitly. `preference` selects composable queries, while
+`execution-owner` selects execution, task timing and metadata. Raw dynamic
+backend information remains a QRMI capability. The separate native IQM service
+is unaffected by these shim settings.
+
+IBM Cloud (`IBMQiskitRuntimeService`) enables both libraries and defaults to
+QRMI; callers can select QDMI explicitly. The on-premise `ibm-fake-lagos`
+configuration (`IBMQuantumSystem`) remains QRMI-only: IBM QDMI supports the
+Cloud API, not the on-premise API.
 
 The AWS service is an aggregate QPM. Both `aws-sv1` and
 `aws-cepheus` map to `shim-aws-qpm`. Multi-target dispatch still

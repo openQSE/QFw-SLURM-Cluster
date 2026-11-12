@@ -82,8 +82,8 @@ cp shared-dir/iqm-device-access.yaml.example shared-dir/iqm-device-access.yaml
 ```
 
 Leave the contents as they are. Tier 1 reads only the descriptor fields
-(`provider`, `provider-device-id`, `libraries`, `preference`, `caps`), so the
-`url` and `credential-db` values in the example are never dereferenced. Without
+(`provider`, `provider-device-id`, `libraries`, `preference`, `execution-owner`,
+`caps`), so the `url` and `credential-db` values in the example are never dereferenced. Without
 the file the run fails with:
 
 ```text
@@ -129,7 +129,7 @@ Expected (abridged):
 ```text
 [shim-smoke] imported frontend + drivers + descriptor + QRC: OK
 [shim-smoke] [iqm-q20]  get_device_info            -> qdmi
-[shim-smoke] [iqm-q20]  run_circuit                -> qrmi
+[shim-smoke] [iqm-q20]  run_circuit                -> qdmi
 [shim-smoke] [ibm-heron] introspection (device_info/coupling) -> qrmi (QRMI-only resource still introspects)
 [shim-smoke] [ibm-heron] get_calibration_snapshot -> NOT_IMPLEMENTED (gap map: no calibration-capable library wired)
 [shim-smoke] QRC constructed from descriptor:          OK
@@ -140,8 +140,8 @@ SHIM BIFURCATION + INTROSPECTION SMOKE: PASS
 ```
 
 This exercises descriptor-driven routing, where introspection is composable with
-QDMI preferred and execution is pinned to QRMI, the gap map, and the FoMaC to
-`qhw` normalizer with real `jsonschema` validation, all without touching
+QDMI preferred for queries and execution, explicit QRMI execution, the gap map,
+and the FoMaC to `qhw` normalizer with real `jsonschema` validation, all without touching
 hardware.
 
 ## Tier 2: hardware introspection (IQM credentials)
