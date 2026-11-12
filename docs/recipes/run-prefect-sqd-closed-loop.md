@@ -299,13 +299,14 @@ ibm-156-nh:
   credential-db: qpu-users.json
   libraries:
     - qrmi
+    - qdmi
   preference: qrmi
   execution-owner: qrmi
   caps:
-    run_circuit: [qrmi]
-    get_backend_info: [qrmi]
-    get_task_timing: [qrmi]
-    get_task_metadata: [qrmi]
+    run_circuit: [qrmi, qdmi]
+    get_backend_info: [qrmi, qdmi]
+    get_task_timing: [qrmi, qdmi]
+    get_task_metadata: [qrmi, qdmi]
 ```
 
 The corresponding entry in `config/qpu-users.json` must contain enabled IBM

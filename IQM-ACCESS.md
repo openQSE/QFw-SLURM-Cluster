@@ -233,7 +233,7 @@ instead means the environment variables did not arrive.
 Submits a one-qubit circuit — `x q[0]` then measure — through the shim to the
 QPU. No environment variables: this path reads the device-access file.
 
-Start with QRMI, the descriptor's execution owner:
+Select QRMI explicitly:
 
 ```bash
 docker exec slurmctld salloc -N 1 -p quantum --gres=qpu:1 bash -c 'source /opt/qfw/qhpc/QFw/setup/qfw_activate && cd $QFW_PATH/examples && ./qfw_shim_smoke.sh --lib qrmi --call async_run --shots 10 --circuit-run-timeout 600'

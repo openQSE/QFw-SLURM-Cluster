@@ -4,6 +4,9 @@ qpus:
     provider-device-id: default
     url: https://qccsw.ccs.ornl.gov/
     credential-db: qpu-users.json
+    libraries: [qrmi, qdmi]
+    preference: qdmi
+    execution-owner: qdmi
   fake-iqm-20q:
     provider: fake-iqm
     provider-device-id: fake-iqm-20q
@@ -18,13 +21,14 @@ qpus:
     credential-db: qpu-users.json
     libraries:
       - qrmi
+      - qdmi
     preference: qrmi
     execution-owner: qrmi
     caps:
-      run_circuit: [qrmi]
-      get_backend_info: [qrmi]
-      get_task_timing: [qrmi]
-      get_task_metadata: [qrmi]
+      run_circuit: [qrmi, qdmi]
+      get_backend_info: [qrmi, qdmi]
+      get_task_timing: [qrmi, qdmi]
+      get_task_metadata: [qrmi, qdmi]
   aws:
     provider: aws
     provider-device-id: aws

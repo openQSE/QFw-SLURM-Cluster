@@ -95,14 +95,27 @@ device = qpus["ibm-156-nh"]
 assert device["provider"] == "ibm"
 assert device["provider-device-id"] == "ibm_156_nh"
 assert device["resource-type"] == "IBMQiskitRuntimeService"
-assert device["libraries"] == ["qrmi"]
+assert device["libraries"] == ["qrmi", "qdmi"]
 assert device["preference"] == "qrmi"
 assert device["execution-owner"] == "qrmi"
 assert device["caps"] == {
-    "run_circuit": ["qrmi"],
-    "get_task_timing": ["qrmi"],
-    "get_task_metadata": ["qrmi"],
+    "run_circuit": ["qrmi", "qdmi"],
+    "get_backend_info": ["qrmi", "qdmi"],
+    "get_task_timing": ["qrmi", "qdmi"],
+    "get_task_metadata": ["qrmi", "qdmi"],
 }
+
+iqm = qpus["ornl-iqm-20q"]
+assert iqm["libraries"] == ["qrmi", "qdmi"]
+assert iqm["preference"] == "qdmi"
+assert iqm["execution-owner"] == "qdmi"
+
+on_premise = qpus["ibm-fake-lagos"]
+assert on_premise["resource-type"] == "IBMQuantumSystem"
+assert on_premise["libraries"] == ["qrmi"]
+assert on_premise["preference"] == "qrmi"
+assert on_premise["execution-owner"] == "qrmi"
+assert all(libs == ["qrmi"] for libs in on_premise["caps"].values())
 
 with open(sys.argv[2], encoding="utf-8") as stream:
     services = yaml.safe_load(stream)["services"]
