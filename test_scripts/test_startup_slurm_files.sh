@@ -162,7 +162,6 @@ fi
 if grep -q ' restart' "${state}/docker.log"; then
 	fail "the second start restarted the containers"
 fi
-
 (cd "${cluster}" && ./do_startup.sh --dry-run) >"${temporary}/dry-run.out"
 grep -q 'refresh the Slurm files in the etc_slurm volume' "${temporary}/dry-run.out" ||
 	fail "the dry run does not list the refresh"
