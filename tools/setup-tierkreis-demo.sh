@@ -5,7 +5,7 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cluster_root=$(cd "${script_dir}/.." && pwd)
 project=/workspace/qfw-container-base/tierkreis-sc-demo
 venv="${project}/.runtime/venv"
-branch=sqd-example
+commit=c5afec0a3f063229954bfa5ca4eb03a38859cb70
 
 docker info >/dev/null
 if [[ $(docker inspect slurmctld --format '{{.State.Running}}' 2>/dev/null || true) != true ]]; then
@@ -18,16 +18,17 @@ if ! docker exec slurmctld bash -c \
     exit 1
 fi
 
-docker exec -i slurmctld bash -s -- "${project}" "${branch}" <<'EOF'
+docker exec -i slurmctld bash -s -- "${project}" "${commit}" <<'EOF'
 set -euo pipefail
 export GIT_TERMINAL_PROMPT=0
 project="$1"
-branch="$2"
+commit="$2"
 if [[ ! -d "${project}/.git" ]]; then
-    git clone --branch "${branch}" --single-branch \
+    git clone --branch main --single-branch \
         https://github.com/Quantinuum/tierkreis-sc-demo.git "${project}"
 fi
-git -c safe.directory="${project}" -C "${project}" pull --ff-only origin "${branch}"
+git -c safe.directory="${project}" -C "${project}" fetch origin main
+git -c safe.directory="${project}" -C "${project}" checkout --detach "${commit}"
 install -d -o user-a -g user-a -m 0755 \
     "${project}/.runtime" "${project}/.runtime/assets" "${project}/.runtime/qfw"
 EOF
