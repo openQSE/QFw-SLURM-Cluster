@@ -146,8 +146,6 @@ credential-providers:
   # secret; the QPM's own login does the work (see pasqal-emu-free above).
   pasqal-entitlement:
     type: entitlement
-
-credential-providers:
   # The Qblox cluster has no token to present; the address in its url is the
   # whole of its access configuration.
   qblox-no-secret:
