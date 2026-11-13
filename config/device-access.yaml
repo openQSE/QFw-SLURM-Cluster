@@ -10,6 +10,11 @@ qpus:
   backline-local:
     provider: backline
     provider-device-id: backline-local
+  qblox-cluster:
+    provider: qblox
+    provider-device-id: cluster_mm
+    url: 192.168.0.2
+    credential-provider: qblox-no-secret
   ibm-156-nh:
     provider: ibm
     provider-device-id: ibm_156_nh
@@ -141,3 +146,7 @@ credential-providers:
   # secret; the QPM's own login does the work (see pasqal-emu-free above).
   pasqal-entitlement:
     type: entitlement
+  # The Qblox cluster has no token to present; the address in its url is the
+  # whole of its access configuration.
+  qblox-no-secret:
+    type: no-secret

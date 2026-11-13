@@ -42,6 +42,7 @@ RUN set -ex \
        lua \
        lua-devel \
        m4 \
+       mesa-libGL \
        ncurses-devel \
        openssl \
        openssl-devel \
