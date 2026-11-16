@@ -215,6 +215,8 @@ RUN set -ex \
        cmake \
        gcc-gfortran \
        openblas-devel \
+       pkgconf-pkg-config \
+       nlohmann-json-devel \
        swig \
     && yum clean all \
     && rm -rf /var/cache/yum
