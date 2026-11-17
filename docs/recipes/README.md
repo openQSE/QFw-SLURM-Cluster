@@ -19,6 +19,7 @@ using the virtual QFw Slurm cluster.
 | Run a Pulser program on Pasqal Cloud with your own login | [Run a Pasqal Pulser job](run-pasqal-pulser-job.md) |
 | Inspect and recover the cluster | [Inspect and recover services](inspect-and-recover-services.md) |
 | Run the Prefect-orchestrated SQD closed loop | [Run the Prefect SQD closed loop](run-prefect-sqd-closed-loop.md) |
+| Run the Tierkreis SQD He2 demo | [Run the Tierkreis SQD He2 demo](run-tierkreis-sqd.md) |
 | Run a workflow's quantum stage as a qfw-slurm job | [Run a quantum stage through qfw-slurm](run-quantum-stage-through-qfw-slurm.md) |
 | Deploy the telemetry stack on a real site, no containers | [Deploy the telemetry stack on bare metal](deploy-telemetry-baremetal.md) |
 

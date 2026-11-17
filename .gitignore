@@ -57,4 +57,5 @@ docker-compose.override.yml
 /shared-dir/home/
 /streamflow/chemistry/**/__pycache__/
 /shared-dir/compss-examples/
+/shared-dir/tierkreis-sc-demo/
 /compss/**/__pycache__/
