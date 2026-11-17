@@ -443,12 +443,17 @@ RUN set -ex \
     && if [ -f "${QFW_IMAGE_SOURCE}/setup/pulser-requirements.txt" ]; then \
         pulser_requirements="-r ${QFW_IMAGE_SOURCE}/setup/pulser-requirements.txt"; \
     fi \
+    && qblox_requirements= \
+    && if [ -f "${QFW_IMAGE_SOURCE}/setup/qblox-requirements.txt" ]; then \
+        qblox_requirements="-r ${QFW_IMAGE_SOURCE}/setup/qblox-requirements.txt"; \
+    fi \
     && uv pip install --python "${QFW_IMAGE_VENV}" \
         -r "${QFW_IMAGE_SOURCE}/setup/build-requirements.txt" \
         -r "${QFW_IMAGE_SOURCE}/setup/requirements.txt" \
         "qrmi==${QRMI_VERSION}" \
         -r "${QFW_IMAGE_SOURCE}/setup/qdmi-requirements.txt" \
         ${pulser_requirements} \
+        ${qblox_requirements} \
         --override "${QFW_IMAGE_SOURCE}/setup/overrides.txt" \
     && export PKG_CONFIG_PATH="${LIBFABRIC_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
     && PATH="${QFW_IMAGE_VENV}/bin:${PATH}" cmake \
