@@ -17,15 +17,15 @@ receivers:
 processors:
   batch:
     timeout: 1s
-  # A Qiskit client is one process per Slurm job: it reports a handful of
-  # samples and exits, and each process is a new service.instance.id. Left
-  # alone, Prometheus would hold one short series per job, and rate() and
-  # increase() see nothing in a series with a single sample. So metrics are
+  # A Qiskit client is a short process: it reports a handful of samples and
+  # exits, and each process is a new service.instance.id. Left alone,
+  # Prometheus would hold one short series per process, and rate() and
+  # increase() never count the first sample of a series. So metrics are
   # reduced to deltas (a no-op for processes that already export deltas,
-  # which the overlay asks for), the instance id is dropped, and the deltas
-  # are accumulated again into one series per service and device. Order
-  # matters: deltas are taken while the instance id still tells the series
-  # apart, and merged only after it is gone.
+  # which the overlay asks for), the instance id and the Slurm job id are
+  # dropped, and the deltas are accumulated again into one series per
+  # service and device. Order matters: deltas are taken while the instance
+  # id still tells the series apart, and merged only after it is gone.
   cumulativetodelta:
     initial_value: keep
   resource/merge-instances:
@@ -40,6 +40,31 @@ processors:
         action: delete
       - key: telemetry.sdk.language
         action: delete
+  # Metrics only. The Slurm job id stays on spans and log lines, where a job
+  # is looked up. On a metric it would start a new series for every job,
+  # which is the short-series problem again.
+  resource/metrics-per-device:
+    attributes:
+      - key: qfw.slurm.job_id
+        action: delete
+  # Once merged, the processes' points share one series, and
+  # deltatocumulative drops a point that starts before the series did
+  # (ErrOlderStart) or is not newer than the last one (ErrOutOfOrder).
+  # Clients export on their own timers, so both happen: two clients in one
+  # job lost up to 4 jobs in 10. A delta point is a count since the last
+  # export, so only its order matters here. It is stamped with the time the
+  # collector handles it, after the batch processor, which hands on one
+  # batch at a time, so the stamps rise in the order deltatocumulative
+  # sees them.
+  transform/receive-time:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        conditions:
+          - metric.aggregation_temporality == AGGREGATION_TEMPORALITY_DELTA
+        statements:
+          - set(time, Now())
+          - set(start_time, time)
   deltatocumulative:
     max_stale: 168h
 
@@ -62,7 +87,10 @@ exporters:
       enabled: true
     # Keep a series on the scrape page through a quiet spell, so the
     # dashboards' last-five-minutes panels read zero rather than nothing.
-    metric_expiration: 1h
+    # As long as deltatocumulative keeps its total: a series that left the
+    # page comes back as a new one, and increase() misses the job that
+    # brought it back.
+    metric_expiration: 168h
 
 service:
   telemetry:
@@ -75,7 +103,7 @@ service:
       exporters: [otlp_grpc/tempo]
     metrics:
       receivers: [otlp]
-      processors: [cumulativetodelta, resource/merge-instances, deltatocumulative, batch]
+      processors: [cumulativetodelta, resource/merge-instances, resource/metrics-per-device, batch, transform/receive-time, deltatocumulative]
       exporters: [prometheus]
     # The same resource trimming as for metrics: Loki would otherwise index
     # one stream per client process on service.instance.id.

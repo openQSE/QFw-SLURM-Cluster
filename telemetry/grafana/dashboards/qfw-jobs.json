@@ -309,7 +309,7 @@
     {
       "type": "stat",
       "title": "Devices reporting",
-      "description": "Distinct qfw.device.name values seen on the job counter.",
+      "description": "Distinct qfw.device.name values with a job in the time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "qfw-prometheus"
@@ -326,7 +326,7 @@
             "type": "prometheus",
             "uid": "qfw-prometheus"
           },
-          "expr": "(count(count by (qfw_device_name) (qfw_app_job_count_total))) or vector(0)",
+          "expr": "(count(count by (qfw_device_name) (increase(qfw_app_job_count_total[$__range]) > 0))) or vector(0)",
           "legendFormat": "",
           "refId": "A",
           "range": false,
