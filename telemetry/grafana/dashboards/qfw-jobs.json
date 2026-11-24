@@ -309,7 +309,7 @@
     {
       "type": "stat",
       "title": "Devices reporting",
-      "description": "Distinct qfw.device.name values seen on the job counter.",
+      "description": "Distinct qfw.device.name values with a job in the time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "qfw-prometheus"
@@ -326,7 +326,7 @@
             "type": "prometheus",
             "uid": "qfw-prometheus"
           },
-          "expr": "(count(count by (qfw_device_name) (qfw_app_job_count_total))) or vector(0)",
+          "expr": "(count(count by (qfw_device_name) (increase(qfw_app_job_count_total[$__range]) > 0))) or vector(0)",
           "legendFormat": "",
           "refId": "A",
           "range": false,
@@ -536,7 +536,7 @@
     {
       "type": "bargauge",
       "title": "Where the time goes: mean per hop, 5 min",
-      "description": "Mean duration of each instrumented hop (qfw.qpm.duration by op, qfw.backend.duration by op) against the client's end to end mean. The always-on metrics tier, so this stays live with traces sampled off. The transport rows are the two legs between the client and the QPM and the way back; with them the hops add up to the client's end to end. They appear when QFW_TELEMETRY_TRANSPORT is on.",
+      "description": "Mean duration of each instrumented hop (qfw.qpm.duration by op, qfw.backend.duration by op) against the client's end to end mean. The always-on metrics tier, so this stays live with traces sampled off. The transport rows are the two legs between the client and the QPM and the way back; with them the hops add up to the client's end to end. They appear when QFW_TELEMETRY_TRANSPORT is on. The device rows are the provider's own account of its share of backend execute (its queue, validation, compilation, execution and post-processing, and the total from created to completed), from IQM's job timeline; they appear when QFW_TELEMETRY_VENDOR is on, for the native IQM and QRMI paths, and never for QDMI, which exposes no timing.",
       "datasource": {
         "type": "prometheus",
         "uid": "qfw-prometheus"
@@ -591,6 +591,17 @@
           "refId": "D",
           "legendFormat": "transport {{qfw_transport_op}}",
           "expr": "sum by (qfw_transport_op) (rate(qfw_transport_duration_seconds_sum{qfw_device_name=~\"$device\"}[5m])) / sum by (qfw_transport_op) (rate(qfw_transport_duration_seconds_count{qfw_device_name=~\"$device\"}[5m]))"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qfw-prometheus"
+          },
+          "range": false,
+          "instant": true,
+          "refId": "E",
+          "legendFormat": "device {{qfw_vendor_phase}}",
+          "expr": "sum by (qfw_vendor_phase) (rate(qfw_vendor_duration_seconds_sum{qfw_device_name=~\"$device\"}[5m])) / sum by (qfw_vendor_phase) (rate(qfw_vendor_duration_seconds_count{qfw_device_name=~\"$device\"}[5m]))"
         }
       ],
       "fieldConfig": {
