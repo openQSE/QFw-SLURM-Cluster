@@ -149,16 +149,33 @@ Every series also carries `service_name` (`qfw-client` or `qfw-qpm`),
 OpenTelemetry SDK's own name, language and version are dropped on the way,
 so an install on a different SDK release does not split a device's series.
 
-**One series per service and device, not per process.** A Qiskit client is
-one process per Slurm job: it reports a handful of samples and exits, and
+**One series per service and device, not per process or job.** A Qiskit
+client is a short process: it reports a handful of samples and exits, and
 every process is a new `service.instance.id`. Left alone, Prometheus would
-hold one short series per job, and `rate()` and `increase()` see nothing in
-a series with a single sample. So the collector takes deltas, drops the
-instance id and accumulates the deltas again
+hold one short series per process, and `rate()` and `increase()` never
+count the first sample of a series. For a client that ran one job, that is
+everything it reported. So the collector takes deltas, drops the instance
+id and accumulates the deltas again
 (`cumulativetodelta`, `resource`, `deltatocumulative` in
 `otel-collector.yaml`), and the overlay asks QFw processes to export deltas
 in the first place. The result is one counter per client population and one
 per QPM device that behaves like a long-lived process's.
+
+Three details keep that count whole:
+
+- The Slurm job id (`qfw.slurm.job_id`) is dropped from metrics too, or
+  every job would start its own short series. Spans and log lines keep it.
+- Merged processes share one series, and `deltatocumulative` drops a point
+  that starts before its series did or is not newer than the last one.
+  Clients export on their own timers, so both happen. The collector stamps
+  each delta point with the time it handles it (`transform/receive-time`),
+  behind the batch processor, so the points always arrive in order.
+- The exporter keeps a quiet series on the scrape page for as long as
+  `deltatocumulative` keeps its total (`metric_expiration`, `max_stale`), so
+  the first job after a quiet spell is counted.
+
+`increase()` still misses the first sample of each series after the
+collector restarts.
 
 ## Logs
 
