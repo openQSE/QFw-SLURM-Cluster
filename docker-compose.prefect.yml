@@ -1,0 +1,7 @@
+# Publish the Prefect server that the qcsc-prefect SQD closed-loop recipe runs
+# on slurmctld, so its UI is reachable from the Docker host. Append this file
+# to COMPOSE_FILE in .env; it takes effect when slurmctld is recreated.
+services:
+  slurmctld:
+    ports:
+      - "127.0.0.1:4200:4200"

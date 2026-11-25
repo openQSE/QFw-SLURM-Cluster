@@ -215,6 +215,8 @@ RUN set -ex \
        cmake \
        gcc-gfortran \
        openblas-devel \
+       pkgconf-pkg-config \
+       nlohmann-json-devel \
        swig \
     && yum clean all \
     && rm -rf /var/cache/yum
@@ -315,7 +317,7 @@ ARG QFW_BUILD_JOBS=4
 # The image contains a complete release installation. A checkout mounted under
 # QFW_BASE remains an optional developer override built by do_qfw_build.sh.
 ARG QFW_REPOSITORY=https://github.com/openQSE/QFw.git
-ARG QFW_REF=main
+ARG QFW_REF=7d3ef6c01376fd086b84062fde9da8a1522338e7
 ARG QFW_DEFW_REPOSITORY=
 ARG QFW_SLURM_REPOSITORY=https://github.com/openQSE/qfw-slurm.git
 ARG QFW_SLURM_REF=main
@@ -330,9 +332,8 @@ ARG NWQSIM_PREFIX=/opt/openqse/nwqsim
 ARG TNQVM_PREFIX=/opt/openqse/tnqvm
 ARG SIMULATOR_WORK_ROOT=/tmp/qfw-simulator-build
 ARG MQT_CORE_REPOSITORY=https://github.com/munich-quantum-toolkit/core.git
-# MQT Core v4.1.1, pinned to its immutable release commit.
-ARG MQT_CORE_REF=575acd1b9ca52e4608ccf4833e7d60640913cef4
-ARG MQT_CC_VENV=/opt/openqse/mqt-cc-venv
+# MQT Core v4.2.0, pinned to its immutable release commit.
+ARG MQT_CORE_REF=d76be496512c8707f165e18f152bd5f11b8a5665
 ARG MQT_CORE_SOURCE=/tmp/mqt-core-source
 
 ENV QFW_BASE=/workspace/qfw-container-base \
@@ -348,10 +349,25 @@ ENV LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${LIBFABRIC_PREFIX}/lib
 # Lower-level interface libraries the QFw front-end shim will route to.
 # ----------------------------------------------------------------------
 
+# Optional heavy components. Each defaults to 1, which is the complete image.
+# A slim image (for example on an arm64 laptop, where no prebuilt image
+# exists) sets them to 0 with do_configure.sh --slim. Nothing QFw's NWQ-Sim
+# path, the fake IQM QPM, or the qfw-slurm plugin needs is behind them: the
+# QRMI and QDMI Python bindings still come from PyPI into the QFw venv.
+#   QFW_WITH_QRMI_NATIVE  Rust toolchain, libqrmi.so and the QRMI SPANK plugin
+#   QFW_WITH_TNQVM        TNQVM, XACC and ExaTN
+#   QFW_WITH_MQT_CC       MLIR and MQT Core rebuilt from source with the MLIR
+#                         compiler; without it the QFw venv keeps the PyPI
+#                         mqt-core wheel
+ARG QFW_WITH_QRMI_NATIVE=1
+ARG QFW_WITH_TNQVM=1
+ARG QFW_WITH_MQT_CC=1
+
 ARG RUST_VERSION=1.91.0
 ENV CARGO_HOME=/opt/qfw/rust/cargo \
     RUSTUP_HOME=/opt/qfw/rust/rustup
 RUN set -ex \
+    && if [ "${QFW_WITH_QRMI_NATIVE}" != "1" ]; then exit 0; fi \
     && mkdir -p "${CARGO_HOME}" "${RUSTUP_HOME}" \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --no-modify-path --profile minimal \
@@ -448,6 +464,7 @@ ARG QRMI_PREFIX=/opt/qfw/qrmi
 ARG QRMI_SPANK_REPO=https://github.com/qiskit-community/spank-plugins.git
 ARG QRMI_SPANK_REF=0.11.0
 RUN set -ex \
+    && if [ "${QFW_WITH_QRMI_NATIVE}" != "1" ]; then exit 0; fi \
     && git clone --depth=1 --branch "${QRMI_VERSION}" "${QRMI_REPO}" /tmp/qrmi \
     && cd /tmp/qrmi \
     && cargo build --locked --release --lib \
@@ -495,6 +512,7 @@ RUN set -ex \
     && test -x "${NWQSIM_PREFIX}/bin/circuit_runner.nwqsim"
 
 RUN set -ex \
+    && if [ "${QFW_WITH_TNQVM}" != "1" ]; then exit 0; fi \
     && "${QFW_IMAGE_SOURCE}/tools/dependencies/tnqvm/build.sh" \
         --work-dir "${SIMULATOR_WORK_ROOT}/tnqvm" \
         --prefix "${TNQVM_PREFIX}" \
@@ -504,7 +522,8 @@ RUN set -ex \
     && test -x "${TNQVM_PREFIX}/bin/circuit_runner.tnqvm" \
     && test -f "${TNQVM_PREFIX}/xacc/plugins/libtnqvm.so"
 
-# Share QFw's QDMI package pins with developer installs.
+# Share QFw's QDMI package pins with developer installs, and resolve the Pulser
+# frontend's requirements with them when the QFw ref has them.
 # DEFw finds libfabric through pkg-config. Without libfabric's .pc file on the
 # search path it still builds, as a TCP-only transport, so the last check makes
 # sure the installed library links libfabric.
@@ -518,11 +537,17 @@ RUN set -ex \
     && uv venv --python python3 "${QFW_IMAGE_VENV}" \
     && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
         pip setuptools wheel \
+    && pulser_requirements= \
+    && if [ -f "${QFW_IMAGE_SOURCE}/setup/pulser-requirements.txt" ]; then \
+        pulser_requirements="-r ${QFW_IMAGE_SOURCE}/setup/pulser-requirements.txt"; \
+    fi \
     && uv pip install --python "${QFW_IMAGE_VENV}" \
         -r "${QFW_IMAGE_SOURCE}/setup/build-requirements.txt" \
         -r "${QFW_IMAGE_SOURCE}/setup/requirements.txt" \
         "qrmi==${QRMI_VERSION}" \
         -r "${QFW_IMAGE_SOURCE}/setup/qdmi-requirements.txt" \
+        ${pulser_requirements} \
+        --override "${QFW_IMAGE_SOURCE}/setup/overrides.txt" \
     && if [ "${QFW_BUILD_DEFW2}" = ON ]; then \
         uv pip install --python "${QFW_IMAGE_VENV}" cffi; \
        fi \
@@ -595,13 +620,12 @@ RUN set -ex \
     && test -x "${QFW_IMAGE_VENV}/bin/qfw-squeue" \
     && rm -rf "${QFW_SLURM_SOURCE}" "${QFW_SLURM_BUILD}"
 
-# Keep `mqt-cc` in a separate environment because it needs Qiskit 2.5.x
-# while QFw pins Qiskit 2.2.3.
 ARG SETUP_MLIR_VERSION=v1.4.2
 ARG MLIR_VERSION=23.1.1
 ARG MLIR_PREFIX=/opt/llvm-23.1.1
 ENV MLIR_DIR=${MLIR_PREFIX}/lib/cmake/mlir
 RUN set -ex \
+    && if [ "${QFW_WITH_MQT_CC}" != "1" ]; then exit 0; fi \
     && curl -LsSf \
         "https://github.com/munich-quantum-software/setup-mlir/releases/download/${SETUP_MLIR_VERSION}/setup-mlir.sh" \
         -o /tmp/setup-mlir.sh \
@@ -611,21 +635,22 @@ RUN set -ex \
 
 ARG MQT_CORE_SOURCE_REVISION
 RUN set -ex \
+    && if [ "${QFW_WITH_MQT_CC}" != "1" ]; then exit 0; fi \
     && git clone "${MQT_CORE_REPOSITORY}" "${MQT_CORE_SOURCE}" \
     && git -C "${MQT_CORE_SOURCE}" fetch origin "${MQT_CORE_REF}" \
     && git -C "${MQT_CORE_SOURCE}" switch --detach FETCH_HEAD \
     && test "$(git -C "${MQT_CORE_SOURCE}" rev-parse HEAD)" = \
         "${MQT_CORE_SOURCE_REVISION}" \
-    && uv venv --python python3 "${MQT_CC_VENV}" \
-    && uv pip install --python "${MQT_CC_VENV}" --upgrade pip \
     && CMAKE_BUILD_PARALLEL_LEVEL="${QFW_BUILD_JOBS}" \
-        uv pip install --python "${MQT_CC_VENV}" \
-        "${MQT_CORE_SOURCE}" 'qiskit==2.5.2' \
+        uv pip install --python "${QFW_IMAGE_VENV}" \
+        --reinstall-package mqt-core "${MQT_CORE_SOURCE}" \
     && rm -rf "${MQT_CORE_SOURCE}"
 
 COPY shared-dir/mqt-cc-smoke-test.sbatch /tmp/mqt-cc-smoke-test.sbatch
 RUN set -ex \
-    && MQT_CC_VENV="${MQT_CC_VENV}" bash /tmp/mqt-cc-smoke-test.sbatch \
+    && if [ "${QFW_WITH_MQT_CC}" = "1" ]; then \
+        QFW_VENV="${QFW_IMAGE_VENV}" bash /tmp/mqt-cc-smoke-test.sbatch; \
+       fi \
     && rm /tmp/mqt-cc-smoke-test.sbatch
 
 ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
@@ -639,8 +664,7 @@ ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
     QRMI_VERSION=${QRMI_VERSION} \
     MOCHI_PREFIX=${MOCHI_PREFIX} \
     MODULEPATH=/etc/modulefiles:/usr/share/Modules/modulefiles:/usr/share/modulefiles \
-    LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${OMPI_PREFIX}/lib64:${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH} \
-    MQT_CC_VENV=${MQT_CC_VENV}
+    LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${OMPI_PREFIX}/lib64:${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH}
 
 COPY modulefiles /etc/modulefiles
 RUN set -ex \
@@ -746,11 +770,53 @@ RUN set -ex \
     && ! grep -qE '^session[[:space:]]+required[[:space:]]+pam_loginuid\.so' \
         /etc/pam.d/sshd
 
+# ----------------------------------------------------------------------
+# COMPSs (optional, QFW_WITH_COMPSS=1)
+#
+# COMPSs runs the application's task graph across the allocated nodes. Its
+# quantum tasks reach QFw through qfw_compss, which runs QFw's primitives in a
+# defw-python child per task. See compss/README.md.
+# ----------------------------------------------------------------------
+ARG QFW_WITH_COMPSS=0
+ARG QFW_WITH_COMPSS_TRACING=0
+ARG COMPSS_VERSION=3.4
+ARG COMPSS_SHA256=
+ARG COMPSS_URL=
+ENV COMPSS_HOME=/opt/COMPSs \
+    JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+COPY tools/install-compss.sh /tmp/install-compss.sh
+COPY compss/qfw-cluster.cfg /tmp/qfw-cluster.cfg
+RUN set -ex \
+    && if [ "${QFW_WITH_COMPSS}" = "1" ]; then \
+        COMPSS_VERSION="${COMPSS_VERSION}" \
+        COMPSS_SHA256="${COMPSS_SHA256}" \
+        COMPSS_URL="${COMPSS_URL}" \
+        COMPSS_WITH_TRACING="${QFW_WITH_COMPSS_TRACING}" \
+        COMPSS_SC_CFG=/tmp/qfw-cluster.cfg \
+        bash /tmp/install-compss.sh; \
+       fi \
+    && rm -f /tmp/install-compss.sh /tmp/qfw-cluster.cfg
+ENV PATH=${COMPSS_HOME}/Runtime/scripts/user:${PATH}
+
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY tools/qfw-site-services /usr/local/sbin/qfw-site-services
 COPY man/man8/qfw-site-services.8 /usr/local/share/man/man8/qfw-site-services.8
 RUN chmod 0755 /usr/local/sbin/qfw-site-services \
     && chmod 0644 /usr/local/share/man/man8/qfw-site-services.8
+RUN dnf -y install tcsh \
+    && dnf clean all \
+    && rm -rf /var/cache/yum \
+    && uv pip install --system Jinja2
+
+# The bridge is the last layer so that editing it rebuilds only this step.
+COPY compss/pyproject.toml /opt/openqse/qfw-compss/pyproject.toml
+COPY compss/qfw_compss /opt/openqse/qfw-compss/qfw_compss
+RUN set -ex \
+    && if [ "${QFW_WITH_COMPSS}" = "1" ]; then \
+        uv pip install --python "${QFW_IMAGE_VENV}" --no-deps \
+            /opt/openqse/qfw-compss \
+        && "${QFW_IMAGE_VENV}/bin/python" -c 'import qfw_compss'; \
+       fi
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 CMD ["slurmdbd"]

@@ -12,7 +12,7 @@ service_config="${repo_dir}/config/site-services.yaml"
 resource_config="${repo_dir}/config/qfw-slurm/resources.lua"
 plugin_config="${repo_dir}/config/qfw-slurm/plugin.conf"
 
-for node in nwqsim-head nwqsim-worker-1 nwqsim-worker-2 iqm-head shim-head ibm-156-nh aws fake-iqm-head; do
+for node in nwqsim-head nwqsim-worker-1 nwqsim-worker-2 iqm-head shim-head ibm-156-nh aws fake-iqm-head pasqal-head; do
 	grep -q "^NodeName=${node} " "${slurm_config}"
 	grep -q "^  ${node}:$" "${compose_config}"
 done
@@ -28,13 +28,19 @@ grep -q '^NodeName=ibm-156-nh .*qpm-shim-ibm-156-nh' "${slurm_config}"
 grep -q '^NodeName=aws .*qpm-shim-aws-qpm' "${slurm_config}"
 grep -A7 '^  aws:$' "${compose_config}" |
 	grep -q '^    container_name: aws$'
+grep -q '^NodeName=qsa-sim-head .*qpm-shim-ibm-fake-lagos' "${slurm_config}"
+grep -A7 '^  qsa-sim-head:$' "${compose_config}" |
+	grep -q '^    container_name: qsa-sim-head$'
 grep -q '^NodeName=fake-iqm-head .*qpm-fake-iqm' "${slurm_config}"
+grep -q '^NodeName=pasqal-head .*qpm-shim-pasqal-emu-free' "${slurm_config}"
+grep -A7 '^  pasqal-head:$' "${compose_config}" |
+	grep -q '^    container_name: pasqal-head$'
 grep -q '^set root /opt/qfw/openmpi$' "${repo_dir}/modulefiles/openmpi"
 grep -q '^export QFW_SIMULATOR_NODES=nwqsim-head,nwqsim-worker-1,nwqsim-worker-2$' \
 	"${user_profile}"
 
 if grep '^PartitionName=normal ' "${slurm_config}" |
-	grep -Eq 'nwqsim|iqm-head|shim-head|ibm-156-nh|aws|fake-iqm-head'; then
+	grep -Eq 'nwqsim|iqm-head|shim-head|ibm-156-nh|aws|qsa-sim-head|fake-iqm-head|pasqal-head'; then
 	echo "service node leaked into the normal partition" >&2
 	exit 1
 fi
@@ -42,11 +48,38 @@ fi
 grep -q '\["ibm-156-nh"\] = "shim-ibm-156-nh"' "${resource_config}"
 grep -A1 '^\[resource "ibm-156-nh"\]$' "${plugin_config}" |
 	grep -q '^service_id=shim-ibm-156-nh$'
-for resource in aws-ionq-aria-1 aws-rigetti-ankaa; do
+for resource in aws-sv1 aws-cepheus; do
 	grep -q "\[\"${resource}\"\] = \"shim-aws-qpm\"" "${resource_config}"
 	grep -A1 "^\[resource \"${resource}\"\]$" "${plugin_config}" |
 		grep -q '^service_id=shim-aws-qpm$'
 done
+grep -q '\["ibm-fake-lagos"\] = "shim-ibm-fake-lagos"' "${resource_config}"
+grep -A1 '^\[resource "ibm-fake-lagos"\]$' "${plugin_config}" |
+	grep -q '^service_id=shim-ibm-fake-lagos$'
+grep -q '\["pasqal-emu-free"\] = "shim-pasqal-emu-free"' "${resource_config}"
+grep -A1 '^\[resource "pasqal-emu-free"\]$' "${plugin_config}" |
+	grep -q '^service_id=shim-pasqal-emu-free$'
+# The Pasqal QPM runs as the service and admits users by entitlement: the
+# device names the provider, the provider binds no secret, the service
+# requires a credential binding, and every test user is entitled.
+grep -A9 '^  pasqal-emu-free:$' "${device_config}" |
+	grep -q '^    resource-type: PasqalCloud$'
+grep -A9 '^  pasqal-emu-free:$' "${device_config}" |
+	grep -q '^    credential-provider: pasqal-entitlement$'
+grep -A3 '^  pasqal-entitlement:$' "${device_config}" |
+	grep -q '^    type: entitlement$'
+grep -A1 '^  - name: shim-pasqal-emu-free$' "${service_config}" |
+	grep -q '^    credential-mode: required$'
+python3 - "${credential_config}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    users = json.load(stream)["users"]
+assert users
+for name, record in users.items():
+    assert record["devices"]["pasqal-emu-free"] == {"enabled": True}, name
+PY
 grep -q '/etc/openqse/qfw/services/site-services.yaml:0644' \
 	"${repo_dir}/tools/provision-qfw-cluster.sh"
 python3 - "${device_config}" "${service_config}" \
@@ -62,14 +95,27 @@ device = qpus["ibm-156-nh"]
 assert device["provider"] == "ibm"
 assert device["provider-device-id"] == "ibm_156_nh"
 assert device["resource-type"] == "IBMQiskitRuntimeService"
-assert device["libraries"] == ["qrmi"]
+assert device["libraries"] == ["qrmi", "qdmi"]
 assert device["preference"] == "qrmi"
 assert device["execution-owner"] == "qrmi"
 assert device["caps"] == {
-    "run_circuit": ["qrmi"],
-    "get_task_timing": ["qrmi"],
-    "get_task_metadata": ["qrmi"],
+    "run_circuit": ["qrmi", "qdmi"],
+    "get_backend_info": ["qrmi", "qdmi"],
+    "get_task_timing": ["qrmi", "qdmi"],
+    "get_task_metadata": ["qrmi", "qdmi"],
 }
+
+iqm = qpus["ornl-iqm-20q"]
+assert iqm["libraries"] == ["qrmi", "qdmi"]
+assert iqm["preference"] == "qdmi"
+assert iqm["execution-owner"] == "qdmi"
+
+on_premise = qpus["ibm-fake-lagos"]
+assert on_premise["resource-type"] == "IBMQuantumSystem"
+assert on_premise["libraries"] == ["qrmi"]
+assert on_premise["preference"] == "qrmi"
+assert on_premise["execution-owner"] == "qrmi"
+assert all(libs == ["qrmi"] for libs in on_premise["caps"].values())
 
 with open(sys.argv[2], encoding="utf-8") as stream:
     services = yaml.safe_load(stream)["services"]
@@ -87,10 +133,10 @@ assert aws_service[0]["module"] == "svc_lib_qpm"
 
 assert qpus["aws"]["libraries"] == ["qdmi"]
 assert qpus["aws"]["execution-owner"] == "qdmi"
-assert qpus["aws-ionq-aria-1"]["provider-device-id"] == \
-    "arn:aws:braket:us-east-1::device/qpu/ionq/Aria-1"
-assert qpus["aws-rigetti-ankaa"]["provider-device-id"] == \
-    "arn:aws:braket:us-west-1::device/qpu/rigetti/Ankaa-3"
+assert qpus["aws-sv1"]["provider-device-id"] == \
+    "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
+assert qpus["aws-cepheus"]["provider-device-id"] == \
+    "arn:aws:braket:us-west-1::device/qpu/rigetti/Cepheus-1-108Q"
 
 with open(sys.argv[3], encoding="utf-8") as stream:
     users = json.load(stream)["users"]
@@ -99,7 +145,7 @@ for record in users.values():
     credential = record["devices"]["ibm-156-nh"]
     assert credential["enabled"] is True
     assert set(credential) == {"enabled", "api_key", "service_crn"}
-    for device_id in ("aws", "aws-ionq-aria-1", "aws-rigetti-ankaa"):
+    for device_id in ("aws", "aws-sv1", "aws-cepheus"):
         aws_credential = record["devices"][device_id]
         assert aws_credential["enabled"] is True
         assert set(aws_credential) == {

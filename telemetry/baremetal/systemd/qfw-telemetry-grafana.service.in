@@ -1,0 +1,17 @@
+[Unit]
+Description=QFw telemetry: Grafana (the dashboards)
+Documentation=file:@PREFIX@/etc/grafana.ini
+After=network-online.target qfw-telemetry-prometheus.service qfw-telemetry-tempo.service qfw-telemetry-loki.service
+Wants=network-online.target qfw-telemetry-prometheus.service qfw-telemetry-tempo.service qfw-telemetry-loki.service
+
+[Service]
+@USER_LINE@
+EnvironmentFile=@PREFIX@/etc/grafana.env
+ExecStart=@PREFIX@/lib/grafana/bin/grafana server --homepath=@PREFIX@/lib/grafana --config=@PREFIX@/etc/grafana.ini
+WorkingDirectory=@PREFIX@/lib/grafana
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=@WANTED_BY@

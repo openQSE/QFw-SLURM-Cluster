@@ -2,8 +2,18 @@
 
 This is the canonical administrator workflow. It starts the directory service
 on `slurmctld`, a three-node NWQSim DVM and QPMd, the IQM QPMd, IQM shim QPMd,
-IBM shim QPMd, AWS QPMd, fake IQM QPMd, and QFw Slurm gateway. The QPMd
-service nodes remain outside application allocations.
+IBM shim QPMd, AWS QPMd, fake IQM QPMd, and QFw Slurm gateway. The QPMd service
+nodes remain outside application allocations.
+
+The QSA simulator QPMd (`qsa-sim-head`) is opt-in: the `all` target neither
+starts nor reports it. Start it with
+`qfw-site-services start --target qsa-sim` (see
+[start-ibm-qsa-sim.md](start-ibm-qsa-sim.md)); `stop` stops it when it is
+running.
+
+The Pasqal QPMd (`pasqal-head`) is opt-in in the same way, because it runs
+with the operator's Pasqal Cloud login: `qfw-site-services start --target
+pasqal` (see [run-pasqal-emu-free-job.md](run-pasqal-emu-free-job.md)).
 
 ## Prerequisites
 
@@ -16,7 +26,7 @@ service nodes remain outside application allocations.
   the file owned by `root:root` with mode `0600`.
 - Do not accept AWS reservations until the shim can bind the reservation's
   selected target to an AWS-QDMI device session. The cluster advertises
-  `aws-ionq-aria-1` and `aws-rigetti-ankaa`, but the current shim remains
+  `aws-sv1` and `aws-cepheus`, but the current shim remains
   single-target.
 
 The packaged credential file intentionally contains empty API keys. Never put

@@ -82,8 +82,8 @@ def main() -> int:
             ">Submit All (0)<",
             '<option value="ibm">IBM</option>',
             '<option value="aws">AWS</option>',
-            '<option value="aws-ionq-aria-1">AWS IonQ Aria-1</option>',
-            '<option value="aws-rigetti-ankaa">AWS Rigetti Ankaa-3</option>',
+            '<option value="aws-sv1">AWS Braket SV1</option>',
+            '<option value="aws-cepheus">AWS Rigetti Cepheus-1-108Q</option>',
         )
         missing = [value for value in required if value not in html]
         forbidden = (

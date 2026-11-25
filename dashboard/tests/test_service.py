@@ -323,7 +323,7 @@ def test_running_experiments_include_active_submission_thread(tmp_path) -> None:
 
 
 @pytest.mark.parametrize(
-    "backend", ("iqm", "ibm", "aws-ionq-aria-1", "aws-rigetti-ankaa")
+    "backend", ("iqm", "ibm", "aws-sv1", "aws-cepheus")
 )
 def test_hardware_submission_requires_confirmation(tmp_path, backend) -> None:
     with pytest.raises(PermissionError, match="confirmation"):
@@ -436,21 +436,21 @@ def test_backend_catalog_drives_batch_script_qpu_and_provider(tmp_path) -> None:
     assert "#SBATCH --qpu=ibm-156-nh" in ibm_preview
     assert "--backend ibm" in ibm_preview
 
-    aria_preview = service(tmp_path).command_preview({
+    sv1_preview = service(tmp_path).command_preview({
         "identity": "user-a",
-        "backend": "aws-ionq-aria-1",
+        "backend": "aws-sv1",
         "submit_real_hardware": True,
     })
-    assert "#SBATCH --qpu=aws-ionq-aria-1" in aria_preview
-    assert "--backend aws" in aria_preview
+    assert "#SBATCH --qpu=aws-sv1" in sv1_preview
+    assert "--backend aws" in sv1_preview
 
-    ankaa_preview = service(tmp_path).command_preview({
+    cepheus_preview = service(tmp_path).command_preview({
         "identity": "user-a",
-        "backend": "aws-rigetti-ankaa",
+        "backend": "aws-cepheus",
         "submit_real_hardware": True,
     })
-    assert "#SBATCH --qpu=aws-rigetti-ankaa" in ankaa_preview
-    assert "--backend aws" in ankaa_preview
+    assert "#SBATCH --qpu=aws-cepheus" in cepheus_preview
+    assert "--backend aws" in cepheus_preview
 
 
 def test_submission_writes_and_submits_batch_file(tmp_path) -> None:

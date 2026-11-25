@@ -1,0 +1,35 @@
+# Add COMPSs and the qfw_compss bridge to an existing cluster image, such as a
+# pulled GHCR release, without rebuilding it. The main Dockerfile does the
+# same with QFW_WITH_COMPSS=1. See compss/README.md.
+#
+#   docker build -f Dockerfile.compss \
+#     --build-arg BASE_IMAGE=ghcr.io/openqse/qfw-slurm-cluster:<tag> \
+#     -t qfw-slurm-cluster:<tag>-compss .
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+ARG COMPSS_VERSION=3.4
+ARG COMPSS_SHA256=
+ARG COMPSS_URL=
+ARG QFW_WITH_COMPSS_TRACING=0
+ENV COMPSS_HOME=/opt/COMPSs \
+    JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+COPY tools/install-compss.sh /tmp/install-compss.sh
+COPY compss/qfw-cluster.cfg /tmp/qfw-cluster.cfg
+RUN set -ex \
+    && COMPSS_VERSION="${COMPSS_VERSION}" \
+        COMPSS_SHA256="${COMPSS_SHA256}" \
+        COMPSS_URL="${COMPSS_URL}" \
+        COMPSS_WITH_TRACING="${QFW_WITH_COMPSS_TRACING}" \
+        COMPSS_SC_CFG=/tmp/qfw-cluster.cfg \
+        bash /tmp/install-compss.sh \
+    && rm -f /tmp/install-compss.sh /tmp/qfw-cluster.cfg
+ENV PATH=${COMPSS_HOME}/Runtime/scripts/user:${PATH}
+
+COPY compss/pyproject.toml /opt/openqse/qfw-compss/pyproject.toml
+COPY compss/qfw_compss /opt/openqse/qfw-compss/qfw_compss
+RUN set -ex \
+    && uv pip install --python "${QFW_IMAGE_VENV}" --no-deps \
+        /opt/openqse/qfw-compss \
+    && "${QFW_IMAGE_VENV}/bin/python" -c 'import qfw_compss'

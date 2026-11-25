@@ -1,0 +1,58 @@
+version: v1.0
+workflows:
+  chemistry:
+    type: cwl
+    config:
+      file: cwl/workflow.cwl
+      settings: cases.yml
+    bindings:
+      - step: /prepare
+        target: {deployment: slurm, service: prepare, locations: 1}
+      - step: /monomers
+        target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
+      - step: /dimers
+        target: {deployment: slurm, service: chemistry-nwqsim, locations: 1}
+      - step: /collect
+        target: {deployment: slurm, service: collect, locations: 1}
+
+deployments:
+  slurm:
+    type: slurm
+    workdir: work
+    config:
+      maxConcurrentJobs: 4
+      services:
+        prepare:
+          account: qfw-test
+          partition: normal
+          jobName: sf-prepare
+          time: '00:02:00'
+        chemistry-nwqsim:
+          account: qfw-test
+          partition: normal
+          jobName: sf-chemistry
+          time: '00:10:00'
+          qfw:
+            qpu: nwqsim
+            workload-kind: hybrid
+            circ-count: 32000
+            max-qubits: 10
+            max-depth: 1000
+            max-shots: 4096
+        chemistry-fake-iqm:
+          account: qfw-test
+          partition: normal
+          jobName: sf-chemistry
+          time: '00:10:00'
+          qfw:
+            qpu: fake-iqm-20q
+            workload-kind: hybrid
+            circ-count: 32000
+            max-qubits: 10
+            max-depth: 1000
+            max-shots: 4096
+        collect:
+          account: qfw-test
+          partition: normal
+          jobName: sf-collect
+          time: '00:05:00'

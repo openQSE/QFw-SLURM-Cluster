@@ -1,0 +1,6 @@
+[Unit]
+Description=QFw telemetry stack (collector, Prometheus, Tempo, Loki, Grafana)
+Wants=qfw-telemetry-tempo.service qfw-telemetry-loki.service qfw-telemetry-prometheus.service qfw-telemetry-otelcol.service qfw-telemetry-grafana.service
+
+[Install]
+WantedBy=@WANTED_BY@

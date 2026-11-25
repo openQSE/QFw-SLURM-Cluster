@@ -10,8 +10,12 @@ qfw-site-services \- manage the virtual cluster QFw service plane
 .SH DESCRIPTION
 .B qfw-site-services
 starts and stops the administrator-owned site directory, NWQSim DVM and QPM,
-IQM QPM, IQM shim QPM, IBM shim QPM, AWS QPM, fake IQM QPM, and QFw Slurm
-gateway used by the virtual cluster.
+IQM QPM, IQM shim QPM, IBM shim QPM, AWS QPM, fake IQM QPM,
+and QFw Slurm gateway used by the virtual cluster.
+The QSA simulator QPM is opt-in: the
+.B all
+target does not start or report it.  Start it explicitly with
+.BR "\-\-target qsa-sim" .
 The command runs on
 .B slurmctld
 as root and invokes the installed QFw service managers on their assigned
@@ -31,7 +35,8 @@ target is those three, and the other targets are rejected.
 Start the selected target.  The default
 .B all
 target starts the directory service, NWQSim service, IQM service, shim service,
-IBM shim service, AWS service, fake IQM service, and gateway in dependency
+IBM shim service, AWS service, fake IQM service, and
+gateway in dependency
 order.  Partial aggregate startup failure removes only components created by
 that invocation.
 A target that is not ready is stopped to clean retained runtime state before it
@@ -49,7 +54,8 @@ for diagnosis.
 .TP
 .B stop
 Stop the selected target.  The default aggregate action stops the gateway,
-fake IQM QPM, AWS QPM, IBM shim QPM, IQM shim QPM, IQM QPM, NWQSim QPM and DVM,
+fake IQM QPM, QSA simulator QPM (only when it is running), AWS QPM, IBM shim QPM,
+IQM shim QPM, IQM QPM, NWQSim QPM and DVM,
 then the directory service.  A targeted directory stop is rejected while the
 gateway or a managed QPM remains ready.
 .TP
@@ -70,6 +76,7 @@ Select
 .BR shim ,
 .BR ibm ,
 .BR aws ,
+.BR qsa-sim ,
 .BR fake-iqm ,
 or
 .BR gateway .
@@ -97,6 +104,7 @@ The command accepts administrator overrides through
 .BR QFW_SHIM_NODE ,
 .BR QFW_IBM_NODE ,
 .BR QFW_AWS_NODE ,
+.BR QFW_QSA_SIM_NODE ,
 .BR QFW_FAKE_IQM_NODE ,
 .BR QFW_SIMULATOR_NODES ,
 .BR QFW_GATEWAY_HOST ,

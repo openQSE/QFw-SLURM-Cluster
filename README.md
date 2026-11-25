@@ -25,6 +25,7 @@ SLURM SPANK plugin) and [QDMI] (via IQM's `iqm-qdmi` reference implementation).
 - [Build And Run QFw](#build-and-run-qfw)
 - [Running Against The IQM QPU](IQM-ACCESS.md) — credentials, remote access, hardware smoke tests
 - [Telemetry Dashboard (Optional)](#telemetry-dashboard-optional)
+- [COMPSs + QFw](compss/README.md) — run Python applications in parallel across the cluster, with tasks that use QFw
 - [Design Overview](#design-overview)
 - [Detailed Reference](#detailed-reference)
 - [Troubleshooting](#troubleshooting)
@@ -116,6 +117,16 @@ docker pull ghcr.io/openqse/qfw-slurm-cluster:20260503-v1.0
 
 Do not run `./do_build.sh` in the prebuilt-image workflow unless you intend to
 rebuild the image locally.
+
+Prebuilt images are amd64 only. On other hosts, such as Apple silicon, a slim
+build leaves out the native QRMI build, TNQVM and the MQT compiler, none of
+which the NWQ-Sim path needs. `--with-compss` adds COMPSs, for running Python
+applications in parallel; see [compss/README.md](compss/README.md):
+
+```bash
+./do_configure.sh --slim --with-compss --image-tag rocky10.1-compss
+./do_build.sh
+```
 
 For a private GHCR image, log in first with a GitHub token that has
 `read:packages` access:
@@ -221,6 +232,8 @@ Everything about the stack, what reports and how, the dashboards, the
 Prometheus metric names and troubleshooting is in
 [telemetry/README.md](telemetry/README.md). Without the overlay nothing in
 QFw changes.
+For a site without containers, the same stack installs on one host as plain
+processes: [Deploy the telemetry stack on bare metal](docs/recipes/deploy-telemetry-baremetal.md).
 
 ## Build And Run [QFw]
 
@@ -294,7 +307,6 @@ shared-dir/
   benchmarks/   # optional benchmark outputs
   rocm/         # optional ROCm prefix for ROCm/HIP builds
   mqt-core/     # optional active MQT Core checkout
-  mqt-cc-venv/  # optional compiler Python venv created inside the container
 ```
 
 1. Configure the host mount and clone [QFw] and MQT Core:
@@ -551,8 +563,10 @@ Other important shared paths are:
 
 The `/etc/slurm` volume is important. The Docker image copies repository [Slurm]
 configuration into `/etc/slurm` during build, but once the named volume exists,
-the volume overrides the image-baked files. Use `./update_slurmfiles.sh` to
-refresh live [Slurm] config without rebuilding:
+the volume overrides the image-baked files. `./do_startup.sh` refreshes the
+files in the volume that differ from the checkout before it provisions, and
+restarts the containers when it does. Use `./update_slurmfiles.sh` to refresh
+live [Slurm] config by hand without rebuilding:
 
 ```bash
 ./update_slurmfiles.sh slurm.conf
@@ -713,6 +727,10 @@ docker compose --env-file qfw-install.env restart
 ./register_cluster.sh
 ```
 
+`./do_startup.sh` does this refresh itself for every one of `slurm.conf`,
+`slurmdbd.conf`, `cgroup.conf`, `rest.conf` and `gres.conf` that differs from
+the checkout, before it registers and provisions.
+
 Rebuild the image only when you change image contents, such as:
 
 - `Dockerfile`
@@ -766,12 +784,21 @@ If [Slurm] config changes are not visible inside the running containers:
 ./update_slurmfiles.sh slurm.conf gres.conf rest.conf cgroup.conf
 ```
 
-If the mounted developer venvs came from an older image:
+If `./tools/provision-qfw-cluster.sh` reports that a container is not running
+(older checkouts failed instead with Docker's `is not running` or podman's
+`container state improper`), the cluster was created before that node was
+added: the volume's `slurm.conf` has no entry for it, so its `slurmd` exits at
+once. `./do_startup.sh` refreshes the volume, restarts the containers and
+provisions:
 
 ```bash
-docker exec slurmctld rm -rf \
-  /workspace/qfw-container-base/qfw-venv \
-  /workspace/qfw-container-base/mqt-cc-venv
+./do_startup.sh
+```
+
+To rebuild the mounted developer venv from scratch:
+
+```bash
+docker exec slurmctld rm -rf /workspace/qfw-container-base/qfw-venv
 ./do_qfw_build.sh
 ```
 

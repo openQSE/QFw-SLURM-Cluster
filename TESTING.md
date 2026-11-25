@@ -82,8 +82,8 @@ cp shared-dir/iqm-device-access.yaml.example shared-dir/iqm-device-access.yaml
 ```
 
 Leave the contents as they are. Tier 1 reads only the descriptor fields
-(`provider`, `provider-device-id`, `libraries`, `preference`, `caps`), so the
-`url` and `credential-db` values in the example are never dereferenced. Without
+(`provider`, `provider-device-id`, `libraries`, `preference`, `execution-owner`,
+`caps`), so the `url` and `credential-db` values in the example are never dereferenced. Without
 the file the run fails with:
 
 ```text
@@ -129,7 +129,7 @@ Expected (abridged):
 ```text
 [shim-smoke] imported frontend + drivers + descriptor + QRC: OK
 [shim-smoke] [iqm-q20]  get_device_info            -> qdmi
-[shim-smoke] [iqm-q20]  run_circuit                -> qrmi
+[shim-smoke] [iqm-q20]  run_circuit                -> qdmi
 [shim-smoke] [ibm-heron] introspection (device_info/coupling) -> qrmi (QRMI-only resource still introspects)
 [shim-smoke] [ibm-heron] get_calibration_snapshot -> NOT_IMPLEMENTED (gap map: no calibration-capable library wired)
 [shim-smoke] QRC constructed from descriptor:          OK
@@ -140,8 +140,8 @@ SHIM BIFURCATION + INTROSPECTION SMOKE: PASS
 ```
 
 This exercises descriptor-driven routing, where introspection is composable with
-QDMI preferred and execution is pinned to QRMI, the gap map, and the FoMaC to
-`qhw` normalizer with real `jsonschema` validation, all without touching
+QDMI preferred for queries and execution, explicit QRMI execution, the gap map,
+and the FoMaC to `qhw` normalizer with real `jsonschema` validation, all without touching
 hardware.
 
 ## Tier 2: hardware introspection (IQM credentials)
@@ -287,11 +287,11 @@ durable, edit `config/` on the host and delete the installed copy so the next
 
 ## `mqt-cc` smoke test (no credentials)
 
-The image builds MQT Core from the ref selected by `do_configure.sh` and installs
-it with Qiskit at `/opt/openqse/mqt-cc-venv`. This separate
-environment allows the compiler and QFw to use different Qiskit versions.
+The image installs MQT Core, built from the ref selected by `do_configure.sh`,
+into the same Python environment as QFw (`/opt/openqse/qfw-venv`). QFw's
+requirements provide the Qiskit 2.5.x that the MQT compiler needs.
 `do_qfw_build.sh` builds the mounted MQT Core checkout into
-`/workspace/qfw-container-base/mqt-cc-venv` unless `--skip-venv` is used.
+`/workspace/qfw-container-base/qfw-venv` unless `--skip-venv` is used.
 
 `shared-dir/mqt-cc-smoke-test.sbatch` compiles a Qiskit circuit for
 MQT Core's bundled IQM Garnet model to QIR Base. It uses QDMI to read the
@@ -307,7 +307,7 @@ docker exec -w /workspace/qfw-container-base slurmctld \
 ```
 
 For the developer environment, add
-`-e MQT_CC_VENV=/workspace/qfw-container-base/mqt-cc-venv` to `docker exec`.
+`-e QFW_VENV=/workspace/qfw-container-base/qfw-venv` to `docker exec`.
 To test on a Slurm application node, submit from inside `slurmctld`:
 
 ```bash

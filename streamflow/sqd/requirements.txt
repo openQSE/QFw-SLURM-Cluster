@@ -1,0 +1,3 @@
+streamflow==0.2.0rc3
+cwltool==3.2.20260720092025
+PyYAML==6.0.3
