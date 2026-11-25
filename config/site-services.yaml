@@ -31,6 +31,21 @@ services:
     provider-launch:
       type: internal
 
+  # Client-executed: reserves Backline controllers, decoders and transports and
+  # returns a placement; the application runs the program itself.
+  - name: backline-local
+    credential-mode: no-secret
+    module: svc_backline_qpm
+    load-modules: svc_backline_qpm,api_launcher
+    environment-modules:
+      - backline
+    agent-prefix: qpm_backline
+    device-id: backline-local
+    listen-port: 8690
+    telnet-port: 8691
+    provider-launch:
+      type: internal
+
   - name: iqm-ornl-20q
     credential-mode: required
     module: svc_iqm_qpm
@@ -72,5 +87,33 @@ services:
     device-id: aws
     listen-port: 8790
     telnet-port: 8791
+    provider-launch:
+      type: qrmi-qdmi
+
+  - name: shim-ibm-fake-lagos
+    credential-mode: required
+    module: svc_lib_qpm
+    load-modules: svc_lib_qpm,api_launcher
+    agent-prefix: qpm_shim_qsa_sim
+    device-id: ibm-fake-lagos
+    listen-port: 8890
+    telnet-port: 8891
+    provider-launch:
+      type: qrmi-qdmi
+
+  # Pasqal Cloud's EMU_FREE emulator through QRMI or pasqal-qdmi (the device's
+  # libraries in device-access.yaml). Opt-in: qfw-site-services
+  # starts it only with --target pasqal, because it needs the operator's
+  # Pasqal login (the .pasqal/config under PASQAL_CONFIG_ROOT, see
+  # docs/recipes/run-pasqal-emu-free-job.md). Users are admitted by their
+  # enabled entry in qpu-users.json and run under the service's login.
+  - name: shim-pasqal-emu-free
+    credential-mode: required
+    module: svc_lib_qpm
+    load-modules: svc_lib_qpm,api_launcher
+    agent-prefix: qpm_shim_pasqal
+    device-id: pasqal-emu-free
+    listen-port: 8990
+    telnet-port: 8991
     provider-launch:
       type: qrmi-qdmi

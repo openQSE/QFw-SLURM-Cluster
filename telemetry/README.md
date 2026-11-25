@@ -29,6 +29,11 @@ every instrumentation site in QFw is a boolean test.
 
 ## Starting it
 
+This section is the container cluster. For a real site without containers,
+`baremetal/` installs the same stack as plain processes on one host from the
+same configurations; the recipe is
+[docs/recipes/deploy-telemetry-baremetal.md](../docs/recipes/deploy-telemetry-baremetal.md).
+
 On a cluster that is already running:
 
 ```bash
@@ -66,6 +71,7 @@ The overlay sets these on every container that runs QFw code:
 | `QFW_TELEMETRY_SAMPLE` | `always` (`QFW_TELEMETRY_SAMPLE` overrides) | Trace sampling. `always` for a demo or a benchmark; a ratio or `off` for production, where the metrics stay on regardless |
 | `QFW_TELEMETRY_TRANSPORT` | `1` (`QFW_TELEMETRY_TRANSPORT` overrides) | The transport extension: spans and a histogram for the client's run RPC, the QPM's completion-event push and the way back. Off in QFw by default; on here so the per-hop view adds up to the end to end |
 | `QFW_TELEMETRY_LOGS` | `debug` (`QFW_TELEMETRY_LOGS` overrides) | The logs tier: what QFw's processes log at that level or above, each line with the trace and span ids current when it was written, kept in Loki. `error` for production, `all` to include DEFw's transport internals. See [Logs](#logs) |
+| `QFW_TELEMETRY_VENDOR` | `1` (`QFW_TELEMETRY_VENDOR` overrides) | The vendor timeline extension: the provider's own phase times (queue, validation, compilation, execution, post-processing, total) on the execute span and in `qfw.vendor.duration`, from IQM's job timeline. On the QRMI path it costs one more request to the provider per job, which is why it is a flag. Nothing on the QDMI path, whose job interface exposes no timing |
 | `OTEL_METRIC_EXPORT_INTERVAL` | `5000` (`QFW_TELEMETRY_METRIC_INTERVAL_MS` overrides) | Milliseconds between metric exports |
 | `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` | `delta` | Each export carries what happened since the last one, not totals since the process started. See the note on short-lived clients below |
 
@@ -143,16 +149,33 @@ Every series also carries `service_name` (`qfw-client` or `qfw-qpm`),
 OpenTelemetry SDK's own name, language and version are dropped on the way,
 so an install on a different SDK release does not split a device's series.
 
-**One series per service and device, not per process.** A Qiskit client is
-one process per Slurm job: it reports a handful of samples and exits, and
+**One series per service and device, not per process or job.** A Qiskit
+client is a short process: it reports a handful of samples and exits, and
 every process is a new `service.instance.id`. Left alone, Prometheus would
-hold one short series per job, and `rate()` and `increase()` see nothing in
-a series with a single sample. So the collector takes deltas, drops the
-instance id and accumulates the deltas again
+hold one short series per process, and `rate()` and `increase()` never
+count the first sample of a series. For a client that ran one job, that is
+everything it reported. So the collector takes deltas, drops the instance
+id and accumulates the deltas again
 (`cumulativetodelta`, `resource`, `deltatocumulative` in
 `otel-collector.yaml`), and the overlay asks QFw processes to export deltas
 in the first place. The result is one counter per client population and one
 per QPM device that behaves like a long-lived process's.
+
+Three details keep that count whole:
+
+- The Slurm job id (`qfw.slurm.job_id`) is dropped from metrics too, or
+  every job would start its own short series. Spans and log lines keep it.
+- Merged processes share one series, and `deltatocumulative` drops a point
+  that starts before its series did or is not newer than the last one.
+  Clients export on their own timers, so both happen. The collector stamps
+  each delta point with the time it handles it (`transform/receive-time`),
+  behind the batch processor, so the points always arrive in order.
+- The exporter keeps a quiet series on the scrape page for as long as
+  `deltatocumulative` keeps its total (`metric_expiration`, `max_stale`), so
+  the first job after a quiet spell is counted.
+
+`increase()` still misses the first sample of each series after the
+collector restarts.
 
 ## Logs
 

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qfw-compss"
+version = "0.1.0"
+description = "Use QFw QPMs from PyCOMPSs tasks"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[project.scripts]
+qfw-compss-launch = "qfw_compss.launch:main"
+
+[tool.setuptools]
+packages = ["qfw_compss"]

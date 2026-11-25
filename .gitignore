@@ -10,6 +10,15 @@ docker-compose.override.yml
 /shared-dir/iqm-device-access.yaml
 /shared-dir/iqm-creds.json
 
+# IBM QSA simulator values for qsa-sim-head (see
+# docs/recipes/start-ibm-qsa-sim.md).
+/shared-dir/qsa-sim-device-access.yaml
+/shared-dir/qsa-sim-creds.json
+
+# The Pasqal Cloud login the pasqal-head site QPM runs with: a .pasqal/config
+# under this directory (see docs/recipes/run-pasqal-emu-free-job.md).
+/shared-dir/pasqal/
+
 # Local diagnostic output
 /shared-dir/qrmi_target_dump.json
 
@@ -35,4 +44,18 @@ docker-compose.override.yml
 
 # MQT Core developer override
 /shared-dir/mqt-core/
-/shared-dir/mqt-cc-venv/
+
+# Licensed GAMESS source, build products, and calculation output.
+/shared-dir/gamess/
+
+# ElectroBoy local runtime state
+.electroboy/local/
+.electroboy/shared/runs/*/progress/
+/shared-dir/chemistry_he/
+/shared-dir/streamflow-chemistry/
+/shared-dir/streamflow-sqd/
+/shared-dir/home/
+/streamflow/chemistry/**/__pycache__/
+/shared-dir/compss-examples/
+/shared-dir/tierkreis-sc-demo/
+/compss/**/__pycache__/

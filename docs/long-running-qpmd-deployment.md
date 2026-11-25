@@ -144,13 +144,23 @@ qpus:
     provider-device-id: default
     url: https://qccsw.ccs.ornl.gov/
     credential-db: qpu-users.json
+    libraries: [qrmi, qdmi]
+    preference: qdmi
+    execution-owner: qdmi
   ibm-156-nh:
     provider: ibm
     provider-device-id: ibm_156_nh
     resource-type: IBMQiskitRuntimeService
     url: https://quantum.cloud.ibm.com/api/v1
     credential-db: qpu-users.json
-    libraries: [qrmi]
+    libraries: [qrmi, qdmi]
+    preference: qrmi
+    execution-owner: qrmi
+    caps:
+      run_circuit: [qrmi, qdmi]
+      get_backend_info: [qrmi, qdmi]
+      get_task_timing: [qrmi, qdmi]
+      get_task_metadata: [qrmi, qdmi]
   aws:
     provider: aws
     provider-device-id: aws
@@ -159,10 +169,32 @@ qpus:
     libraries: [qdmi]
 ```
 
-The AWS service is an aggregate QPM. Both `aws-ionq-aria-1` and
-`aws-rigetti-ankaa` map to `shim-aws-qpm`. Multi-target dispatch still
+The IQM shim uses QDMI for execution and composable queries; callers may still
+select QRMI explicitly. `preference` selects composable queries, while
+`execution-owner` selects execution, task timing and metadata. Raw dynamic
+backend information remains a QRMI capability. The separate native IQM service
+is unaffected by these shim settings.
+
+IBM Cloud (`IBMQiskitRuntimeService`) enables both libraries and defaults to
+QRMI; callers can select QDMI explicitly. The on-premise `ibm-fake-lagos`
+configuration (`IBMQuantumSystem`) remains QRMI-only: IBM QDMI supports the
+Cloud API, not the on-premise API.
+
+The AWS service is an aggregate QPM. Both `aws-sv1` and
+`aws-cepheus` map to `shim-aws-qpm`. Multi-target dispatch still
 requires the shim to bind the reservation target to the corresponding AWS-QDMI
 device session.
+
+As installed, the `aws` entry is a placeholder, so `shim-aws-qpm` cannot run
+circuits yet. Both public names reserve that service, and it serves the `aws`
+entry. QFw's Braket profile opens a session only when `provider-device-id` is a
+Braket device ARN, and this entry has `aws`. The `aws-sv1` and `aws-cepheus`
+entries carry the ARNs of the SV1 simulator and of Rigetti's Cepheus-1-108Q,
+the two devices QFw's `examples/qfw_shim_device_access.yaml` describes; a
+working AWS line binds the service to one of them and sets its
+`s3-results-uri`. (IonQ's Aria-1 left Braket on 2026-03-02 and Rigetti's
+Ankaa-3 was replaced by Cepheus-1-108Q on 2026-04-07, which is why the
+earlier names went.)
 
 The relative credential path resolves beside `device-access.yaml` as
 `/etc/openqse/qfw/device/qpu-users.json`.

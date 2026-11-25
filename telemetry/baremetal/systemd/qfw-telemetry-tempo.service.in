@@ -1,0 +1,16 @@
+[Unit]
+Description=QFw telemetry: Tempo (traces)
+Documentation=file:@PREFIX@/etc/tempo.yaml
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+@USER_LINE@
+ExecStart=@PREFIX@/bin/tempo -config.file=@PREFIX@/etc/tempo.yaml
+WorkingDirectory=@PREFIX@
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=@WANTED_BY@

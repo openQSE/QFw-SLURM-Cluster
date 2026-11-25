@@ -1,0 +1,17 @@
+#%Module1.0
+##
+## Backline (PennyLane + Catalyst) venv on the shared QFw volume, created by
+## tools/install-backline-venv.sh. Loaded by the backline-local QPM, so its
+## inventory finds the decoder libraries, and by Backline applications.
+##
+
+proc ModulesHelp { } {
+    puts stderr "Adds the shared Backline virtual environment to the environment."
+}
+
+module-whatis "Backline for QFw"
+
+set venv /workspace/qfw-container-base/backline-venv
+
+setenv BACKLINE_VENV  $venv
+setenv CATALYST_LIB   $venv/lib/python3.12/site-packages/catalyst/lib

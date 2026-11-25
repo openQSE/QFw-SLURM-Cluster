@@ -27,7 +27,7 @@ services:
         SLURM_TAG: ${SLURM_TAG}
         QFW_BUILD_JOBS: ${QFW_BUILD_JOBS:-4}
         QFW_REPOSITORY: ${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}
-        QFW_REF: ${QFW_REF:-main}
+        QFW_REF: ${QFW_REF:-7d3ef6c01376fd086b84062fde9da8a1522338e7}
         QFW_SLURM_REPOSITORY: ${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}
         QFW_SLURM_REF: ${QFW_SLURM_REF:-main}
     command: ["slurmdbd"]
@@ -473,6 +473,75 @@ services:
     command: ["slurmd"]
     hostname: fake-iqm-head
     container_name: fake-iqm-head
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home:z
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
+  qec-backline-head:
+    <<: *slurmd-resources
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: qec-backline-head
+    container_name: qec-backline-head
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home:z
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
+  qsa-sim-head:
+    <<: *slurmd-resources
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: qsa-sim-head
+    container_name: qsa-sim-head
+    volumes:
+      - root_ssh:/root/.ssh
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - ./shared-dir:/mnt:z
+      - ${QFW_CONTAINER_BASE}:/workspace/qfw-container-base:z
+      - ${QFW_CONTAINER_BASE}/home:/workspace/home:z
+    expose:
+      - "6818"
+    depends_on:
+      - "slurmctld"
+    networks:
+      - slurm-network
+
+  pasqal-head:
+    <<: *slurmd-resources
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    init: true
+    command: ["slurmd"]
+    hostname: pasqal-head
+    container_name: pasqal-head
     volumes:
       - root_ssh:/root/.ssh
       - etc_munge:/etc/munge

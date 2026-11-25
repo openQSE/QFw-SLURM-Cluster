@@ -1,0 +1,6 @@
+qfw:
+  shared_root: /workspace/qfw-container-base
+optimizer:
+  macro_iterations: 1
+  amplitude_iterations: 18
+  orbital_iterations: 1

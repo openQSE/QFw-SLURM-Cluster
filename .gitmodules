@@ -2,3 +2,6 @@
 	path = dashboard/external/electroboy
 	url = https://github.com/openQSE/electroboy.git
 	branch = main
+[submodule "compss/chemistry/chemistry_he"]
+	path = compss/chemistry/chemistry_he
+	url = https://github.com/openQSE/chemistry_he.git

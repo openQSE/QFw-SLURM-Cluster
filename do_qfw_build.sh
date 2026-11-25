@@ -21,7 +21,6 @@ the tree being built is your own shared-dir/QFw checkout:
   build tree          \${QFW_BASE}/qfw-build
   install tree        \${QFW_BASE}/qfw-install
   mqt-core source     \${QFW_BASE}/mqt-core
-  mqt-cc venv         \${QFW_BASE}/mqt-cc-venv
 
 To build a second checkout under the shared mount into its own prefix, set
 QFW_DEV_SRC, QFW_DEV_BUILD and QFW_DEV_PREFIX (and QFW_DEV_VENV to use another
@@ -169,6 +168,11 @@ if [ "${QFW_SKIP_VENV}" != "true" ]; then
         echo "Select a QFw checkout containing the shared QDMI requirements." >&2
         exit 1
     fi
+    if [ ! -f "${QFW_SRC}/setup/overrides.txt" ]; then
+        echo "No dependency overrides at ${QFW_SRC}/setup/overrides.txt." >&2
+        echo "This file may be empty but must exist for do_qfw_build.sh to work." >&2
+        exit 1
+    fi
     if [ ! -f "${MQT_CORE_SRC}/pyproject.toml" ]; then
         echo "No MQT Core checkout at ${MQT_CORE_SRC}." >&2
         echo "Clone it onto the shared mount from the host:" >&2
@@ -202,17 +206,43 @@ if [ "${QFW_SKIP_VENV}" != "true" ]; then
     else
         echo "No QRMI version pin available; installing unpinned qrmi" >&2
     fi
+    # The Pulser frontend's requirements, in QFw checkouts that have them.
+    # The list is expanded with ${...+...} below because bash 3.2, which the
+    # host-side build test runs this under, rejects an empty array under set -u.
+    pulser_requirements=()
+    if [ -f "${QFW_SRC}/setup/pulser-requirements.txt" ]; then
+        pulser_requirements=(-r "${QFW_SRC}/setup/pulser-requirements.txt")
+    fi
     # QHW packages are copied into site-packages. QFw's requirements supply
     # their dependencies, including jsonschema.
     uv pip install \
         -r "${QFW_SRC}/setup/build-requirements.txt" \
         -r "${QFW_SRC}/setup/requirements.txt" \
         -r "${QFW_SRC}/setup/qdmi-requirements.txt" \
+        ${pulser_requirements[@]+"${pulser_requirements[@]}"} \
+        --override "${QFW_SRC}/setup/overrides.txt" \
         "${qrmi_requirement}"
 
     # DEFw v2 builds its Python binding only when cffi is there to build it.
     if [ "${QFW_BUILD_DEFW2}" = "true" ]; then
         uv pip install cffi
+    fi
+
+    # Replace the released MQT Core wheel with the mounted checkout so mqt-cc
+    # is built from it. Qiskit 2.5.x is already in this venv.
+    CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" \
+        uv pip install --reinstall-package mqt-core "${MQT_CORE_SRC}"
+
+    # The QDMI shim adapters run on this same mqt-core, so a checkout that is
+    # not the pinned release changes them as well.
+    mqt_core_pin="$(sed -n 's/^mqt-core\(\[[^]]*\]\)\{0,1\}==\([^ ;#]*\).*/\2/p' \
+        "${QFW_SRC}/setup/qdmi-requirements.txt" | head -n 1)"
+    mqt_core_installed="$(uv pip show mqt-core 2>/dev/null |
+        sed -n 's/^Version: *//p' || true)"
+
+    if [ -n "${mqt_core_pin}" ] && [ "${mqt_core_installed}" != "${mqt_core_pin}" ]; then
+        echo "WARNING: mqt-core ${mqt_core_installed:-unknown} from ${MQT_CORE_SRC} is installed," >&2
+        echo "         but setup/qdmi-requirements.txt pins ${mqt_core_pin}." >&2
     fi
 else
     # shellcheck disable=SC1091
@@ -256,16 +286,6 @@ if [ "${QFW_BUILD_DEFW2}" = "true" ]; then
         echo "v2 builds it only when cffi is in ${QFW_VENV}." >&2
         exit 1
     fi
-fi
-
-if [ "${QFW_SKIP_VENV}" != "true" ]; then
-    # Build mqt-cc from the mounted checkout, apart from QFw's SDK dependencies.
-    mqt_cc_venv="${QFW_BASE}/mqt-cc-venv"
-    [ -d "${mqt_cc_venv}" ] || uv venv --python python3 "${mqt_cc_venv}"
-    uv pip install --python "${mqt_cc_venv}" --upgrade pip
-    CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" \
-        uv pip install --python "${mqt_cc_venv}" \
-        "${MQT_CORE_SRC}" 'qiskit==2.5.2'
 fi
 
 echo

@@ -1,0 +1,48 @@
+version: v1.0
+workflows:
+  sqd:
+    type: cwl
+    config:
+      file: cwl/workflow.cwl
+      settings: inputs.yml
+    bindings:
+      - step: /prepare
+        target: {deployment: slurm, service: classical, locations: 1}
+      - step: /iteration
+        target: {deployment: slurm, service: classical, locations: 1}
+      - step: /iteration/sample
+        target: {deployment: slurm, service: quantum, locations: 1}
+      - step: /iteration/solve
+        target: {deployment: slurm, service: solver, locations: 1}
+deployments:
+  slurm:
+    type: slurm
+    workdir: work
+    config:
+      maxConcurrentJobs: 4
+      services:
+        classical:
+          account: qfw-test
+          partition: normal
+          jobName: sqd-classical
+          time: '00:05:00'
+        quantum:
+          account: qfw-test
+          partition: normal
+          jobName: sqd-quantum
+          time: '00:05:00'
+          qfw:
+            qpu: nwqsim
+            workload-kind: quantum
+            circ-count: 1
+            max-qubits: 8
+            max-depth: 512
+            max-shots: 4096
+        solver:
+          account: qfw-test
+          partition: normal
+          jobName: sqd-sbd
+          time: '00:05:00'
+          nodes: '2'
+          ntasks: 2
+          ntasksPerNode: 1

@@ -1,0 +1,16 @@
+[Unit]
+Description=QFw telemetry: Prometheus (metrics)
+Documentation=file:@PREFIX@/etc/prometheus.yml
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+@USER_LINE@
+ExecStart=@PREFIX@/bin/prometheus --config.file=@PREFIX@/etc/prometheus.yml --storage.tsdb.path=@PREFIX@/data/prometheus --storage.tsdb.retention.time=15d --web.enable-remote-write-receiver --web.listen-address=127.0.0.1:9090
+WorkingDirectory=@PREFIX@
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=@WANTED_BY@

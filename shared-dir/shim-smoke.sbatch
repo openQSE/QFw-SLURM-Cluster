@@ -14,7 +14,7 @@
 #   - routing is DESCRIPTOR-DRIVEN and PER-RESOURCE:
 #       * IQM q20 (qrmi+qdmi): introspection is composable -- both QRMI (via
 #         target()) and QDMI serve it; the descriptor preference (default QDMI)
-#         / env override breaks the tie. Execution -> QRMI (reservation owner).
+#         / env override breaks the tie. Execution -> QDMI (configured owner).
 #       * a QRMI-only resource: introspection is served by QRMI; a call no
 #         wired library covers -> NOT_IMPLEMENTED (the gap map)
 #   - svc_qrc.QRC builds the Frontend from the resolved descriptor
@@ -69,14 +69,15 @@ def check(call, expected):
 check("get_device_info", "qdmi")          # composable (qdmi+qrmi); QDMI preferred
 check("get_coupling_graph", "qdmi")       # composable (qdmi+qrmi); QDMI preferred
 check("get_calibration_snapshot", "qdmi")
-check("run_circuit", "qrmi")              # execution -> QRMI (reservation owner)
-check("get_task_metadata", "qrmi")
-check("get_backend_info", "qrmi")         # QRMI-only facet (descriptor a7e50bf)
+check("run_circuit", "qdmi")
+check("get_task_timing", "qdmi")
+check("get_task_metadata", "qdmi")
+check("get_backend_info", "qdmi")
+check("get_dynamic_backend_info", "qrmi")
+assert fe.route("run_circuit", lib="qrmi").name == "qrmi"
 
 # env preference overrides the descriptor preference; introspection is
 # composable, so it flips to QRMI too (confirming QRMI serves introspection).
-# Use a genuinely composable call here: get_backend_info is QRMI-only now, so
-# asserting it routes to qrmi under the override would pass vacuously.
 os.environ["QFW_QPU_IFACE_PREF"] = "qrmi"
 fe2 = Frontend([QrmiDriver(desc), QdmiDriver(desc)], desc)
 assert fe2.route("get_coupling_graph").name == "qrmi", "env preference not honored"

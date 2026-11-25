@@ -6,13 +6,22 @@ using the virtual QFw Slurm cluster.
 | Goal | Recipe |
 | --- | --- |
 | Build and start the cluster | [Build and start the cluster](build-and-start-cluster.md) |
+| Build and run licensed GAMESS | [Build and run GAMESS](build-and-run-gamess.md) |
 | Start the complete site service plane | [Start all site services](start-all-site-services.md) |
 | Start only the directory and NWQSim QPMd | [Start the NWQSim QPM](start-nwqsim-qpm.md) |
 | Start only the directory and IQM QPMd | [Start the IQM QPM](start-iqm-qpm.md) |
+| Start IBM QSA simulator and QSA QPMd  | [Start the IBM QSA simulator](start-ibm-qsa-sim.md) |
+| Start the Pasqal EMU_FREE QPMd and run a Pulser job | [Run a Pulser job on Pasqal EMU_FREE](run-pasqal-emu-free-job.md) |
 | Run a normal NWQSim application job | [Run an NWQSim job](run-nwqsim-job.md) |
 | Run a guarded real-IQM application job | [Run an IQM job](run-iqm-job.md) |
+| Run a circuit against an IBM Quantum System device | [Run an IBM job](run-ibm-job.md) |
 | Run a heterogeneous application job | [Run a heterogeneous NWQSim job](run-heterogeneous-nwqsim-job.md) |
+| Run a Pulser program on Pasqal Cloud with your own login | [Run a Pasqal Pulser job](run-pasqal-pulser-job.md) |
 | Inspect and recover the cluster | [Inspect and recover services](inspect-and-recover-services.md) |
+| Run the Prefect-orchestrated SQD closed loop | [Run the Prefect SQD closed loop](run-prefect-sqd-closed-loop.md) |
+| Run the Tierkreis SQD He2 demo | [Run the Tierkreis SQD He2 demo](run-tierkreis-sqd.md) |
+| Run a workflow's quantum stage as a qfw-slurm job | [Run a quantum stage through qfw-slurm](run-quantum-stage-through-qfw-slurm.md) |
+| Deploy the telemetry stack on a real site, no containers | [Deploy the telemetry stack on bare metal](deploy-telemetry-baremetal.md) |
 | Run QFw on the DEFw v2 prototype beside v1 | [Run QFw on DEFw v2](run-qfw-on-defw2.md) |
 
 The commands assume the image-contained installations:

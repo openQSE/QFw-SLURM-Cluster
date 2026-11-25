@@ -1,0 +1,16 @@
+[Unit]
+Description=QFw telemetry: Loki (logs)
+Documentation=file:@PREFIX@/etc/loki.yaml
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+@USER_LINE@
+ExecStart=@PREFIX@/bin/loki -config.file=@PREFIX@/etc/loki.yaml
+WorkingDirectory=@PREFIX@
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=@WANTED_BY@

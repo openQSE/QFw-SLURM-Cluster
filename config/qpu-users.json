@@ -10,6 +10,12 @@
         "fake-iqm-20q": {
           "enabled": true
         },
+        "backline-local": {
+          "enabled": true
+        },
+        "pasqal-emu-free": {
+          "enabled": true
+        },
         "ibm-156-nh": {
           "enabled": true,
           "api_key": "",
@@ -22,19 +28,25 @@
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-ionq-aria-1": {
+        "aws-sv1": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-rigetti-ankaa": {
+        "aws-cepheus": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
           "aws_secret_access_key": "",
           "aws_session_token": ""
+        },
+        "ibm-fake-lagos": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": ""
         }
       }
     },
@@ -48,42 +60,10 @@
         "fake-iqm-20q": {
           "enabled": true
         },
-        "ibm-156-nh": {
-          "enabled": true,
-          "api_key": "",
-          "service_crn": ""
+        "backline-local": {
+          "enabled": true
         },
-        "aws": {
-          "enabled": true,
-          "api_key": "",
-          "aws_access_key_id": "",
-          "aws_secret_access_key": "",
-          "aws_session_token": ""
-        },
-        "aws-ionq-aria-1": {
-          "enabled": true,
-          "api_key": "",
-          "aws_access_key_id": "",
-          "aws_secret_access_key": "",
-          "aws_session_token": ""
-        },
-        "aws-rigetti-ankaa": {
-          "enabled": true,
-          "api_key": "",
-          "aws_access_key_id": "",
-          "aws_secret_access_key": "",
-          "aws_session_token": ""
-        }
-      }
-    },
-    "user-c": {
-      "enabled": true,
-      "devices": {
-        "ornl-iqm-20q": {
-          "enabled": true,
-          "api_key": ""
-        },
-        "fake-iqm-20q": {
+        "pasqal-emu-free": {
           "enabled": true
         },
         "ibm-156-nh": {
@@ -98,19 +78,75 @@
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-ionq-aria-1": {
+        "aws-sv1": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
           "aws_secret_access_key": "",
           "aws_session_token": ""
         },
-        "aws-rigetti-ankaa": {
+        "aws-cepheus": {
           "enabled": true,
           "api_key": "",
           "aws_access_key_id": "",
           "aws_secret_access_key": "",
           "aws_session_token": ""
+        },
+        "ibm-fake-lagos": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": ""
+        }
+      }
+    },
+    "user-c": {
+      "enabled": true,
+      "devices": {
+        "ornl-iqm-20q": {
+          "enabled": true,
+          "api_key": ""
+        },
+        "fake-iqm-20q": {
+          "enabled": true
+        },
+        "backline-local": {
+          "enabled": true
+        },
+        "pasqal-emu-free": {
+          "enabled": true
+        },
+        "ibm-156-nh": {
+          "enabled": true,
+          "api_key": "",
+          "service_crn": ""
+        },
+        "aws": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "aws-sv1": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "aws-cepheus": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": "",
+          "aws_session_token": ""
+        },
+        "ibm-fake-lagos": {
+          "enabled": true,
+          "api_key": "",
+          "aws_access_key_id": "",
+          "aws_secret_access_key": ""
         }
       }
     }

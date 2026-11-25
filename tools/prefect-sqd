@@ -1,0 +1,280 @@
+#!/bin/bash
+
+# Operate the qcsc-prefect SQD closed-loop workflow on the running cluster:
+# the Prefect server and served deployment on slurmctld, the Prefect blocks
+# the workflow reads, and flow runs. Everything runs as the application user
+# that tools/provision-prefect.sh provisioned. See
+# docs/recipes/run-prefect-sqd-closed-loop.md.
+
+set -euo pipefail
+
+user="${QFW_PREFECT_USER:-user-a}"
+container="${QFW_PREFECT_CONTAINER:-slurmctld}"
+workspace="${QFW_PREFECT_ROOT:-/workspace/qfw-container-base/qfw-prefect}"
+venv="${QFW_PREFECT_VENV:-${workspace}/venv}"
+checkout="${QCSC_PREFECT_DIR:-${workspace}/qcsc-prefect}"
+qfw_slurm_bin="${QFW_SLURM_BIN:-${workspace}/bin}"
+prefix="${QFW_PREFECT_PREFIX:-/opt/openqse/qfw}"
+# The QFw device the QFwResource block names, and the device-access file it
+# reads in the workflow process. The block only records them.
+device="${QFW_PREFECT_DEVICE:-ornl-iqm-20q}"
+device_access="${QFW_PREFECT_DEVICE_ACCESS:-/etc/openqse/qfw/device/device-access.yaml}"
+# Slurm placement of the SBD solver jobs. The work directory must be visible
+# on the compute nodes; the user's home on the shared workspace is.
+work_dir="${SBD_WORK_DIR:-}"
+mpiprocs="${SBD_MPIPROCS:-4}"
+walltime="${SBD_WALLTIME:-00:15:00}"
+account="${SBD_ACCOUNT:-qfw-test}"
+partition="${SBD_PARTITION:-normal}"
+
+usage() {
+	cat <<EOF
+Usage: tools/prefect-sqd ACTION [ARGS]
+
+Actions:
+  start                 Start the Prefect server and serve the SQD deployment.
+  blocks                Create the Slurm SBD blocks and the QFw resource block.
+  run [SOURCE] [DIM] [ITERATIONS]
+                        Submit a flow run and wait for it. SOURCE is random
+                        (default) or qfw; DIM is the SQD subspace dimension
+                        (default 10000); ITERATIONS the differential-evolution
+                        iterations (default 1).
+  status                Show server health, deployments, recent runs and jobs.
+  stop [serve]          Stop the served deployment and the Prefect server, or
+                        only the served deployment.
+
+Environment:
+  QFW_PREFECT_USER, QFW_PREFECT_ROOT, QFW_PREFECT_VENV, QCSC_PREFECT_DIR,
+  QFW_PREFECT_DEVICE, QFW_SLURM_BIN, QFW_PREFECT_DEVICE_ACCESS, SBD_WORK_DIR,
+  SBD_MPIPROCS, SBD_WALLTIME, SBD_ACCOUNT, SBD_PARTITION, SBD_TASK_RUNNER (ray or concurrent),
+  SBD_FCIDUMP, SBD_SHOTS, PREFECT_RAY_NUM_CPUS.
+EOF
+}
+
+die() {
+	echo "prefect-sqd: $*" >&2
+	exit 1
+}
+
+[[ $# -ge 1 ]] || { usage >&2; exit 2; }
+action="$1"
+shift
+
+docker inspect --format '{{.State.Running}}' "${container}" 2>/dev/null |
+	grep -qx true || die "container ${container} is not running"
+
+# Run a container-side script as the application user with the workflow
+# venv activated through qfw-activate, which also puts QFw's own packages on
+# PYTHONPATH. Prefect settings come from the environment, not a profile.
+in_container() {
+	docker exec -i -u "${user}" \
+		-e "ACTION=${ACTION}" \
+		-e "PREFECT_VENV=${venv}" \
+		-e "QCSC_DIR=${checkout}" \
+		-e "PREFIX_DIR=${prefix}" \
+		-e "QFW_SLURM_BIN=${qfw_slurm_bin}" \
+		-e "QFW_DEVICE=${device}" \
+		-e "QFW_DEVICE_ACCESS=${device_access}" \
+		-e "SBD_WORK_DIR=${work_dir}" \
+		-e "SBD_MPIPROCS=${mpiprocs}" \
+		-e "SBD_WALLTIME=${walltime}" \
+		-e "SBD_ACCOUNT=${account}" \
+		-e "SBD_PARTITION=${partition}" \
+		-e "SBD_TASK_RUNNER=${SBD_TASK_RUNNER:-}" \
+		-e "SBD_FCIDUMP=${SBD_FCIDUMP:-}" \
+		-e "SBD_SHOTS=${SBD_SHOTS:-}" \
+		-e "PREFECT_RAY_NUM_CPUS=${PREFECT_RAY_NUM_CPUS:-}" \
+		-e "ARG1=${1:-}" \
+		-e "ARG2=${2:-}" \
+		-e "ARG3=${3:-}" \
+		"${container}" bash -s <<'INNER'
+set -euo pipefail
+export QFW_RUN_BASE_DIR="${QFW_RUN_BASE_DIR:-${HOME}/qfw-runs}"
+mkdir -p "${QFW_RUN_BASE_DIR}"
+set +u
+# shellcheck disable=SC1091
+source "${PREFIX_DIR}/bin/qfw-activate" --venv "${PREFECT_VENV}"
+set -u
+export PREFECT_API_URL="http://127.0.0.1:4200/api"
+export PREFECT_SERVER_ANALYTICS_ENABLED=false
+export DO_NOT_TRACK=1
+# The QFw resource block initializes DEFw when imported; keep its logging
+# to errors, as QFw's own batch scripts do.
+export DEFW_LOG_LEVEL="${DEFW_LOG_LEVEL:-error}"
+export DEFW_PY_LOGLEVEL="${DEFW_PY_LOGLEVEL:-critical}"
+[[ -n "${SBD_TASK_RUNNER}" ]] || unset SBD_TASK_RUNNER
+[[ -n "${PREFECT_RAY_NUM_CPUS}" ]] || unset PREFECT_RAY_NUM_CPUS
+deployment="riken-sqd-de/riken_sqd_de"
+serve_log="${HOME}/sbd-deploy.log"
+serve_pid="${HOME}/sbd-deploy.pid"
+
+say() {
+	printf 'prefect-sqd: %s\n' "$*"
+}
+
+healthy() {
+	curl -s -m 3 "${PREFECT_API_URL}/health" 2>/dev/null | grep -q true
+}
+
+serving() {
+	[[ -r "${serve_pid}" ]] && kill -0 "$(cat "${serve_pid}")" 2>/dev/null
+}
+
+do_start() {
+	if healthy; then
+		say "Prefect server already answers at ${PREFECT_API_URL}"
+	else
+		# A pid file left by a server that died makes "prefect server start"
+		# refuse with "a server is already running"; clear it first.
+		local pid_file="${PREFECT_HOME:-${HOME}/.prefect}/server.pid"
+		if [[ -r "${pid_file}" ]] && ! kill -0 "$(cat "${pid_file}")" 2>/dev/null; then
+			say "removing the stale server pid file"
+			rm -f "${pid_file}"
+		fi
+		say "starting the Prefect server"
+		prefect server start --host 0.0.0.0 --background >/dev/null
+		for _ in $(seq 1 60); do
+			healthy && break
+			sleep 1
+		done
+		healthy || { say "the Prefect server did not become healthy"; exit 1; }
+	fi
+	if serving; then
+		say "deployment already served by PID $(cat "${serve_pid}")"
+	else
+		say "serving the SQD deployment (log: ${serve_log})"
+		nohup sbd-deploy >"${serve_log}" 2>&1 &
+		echo $! >"${serve_pid}"
+		for _ in $(seq 1 60); do
+			grep -q "being served" "${serve_log}" 2>/dev/null && break
+			serving || { cat "${serve_log}"; exit 1; }
+			sleep 1
+		done
+	fi
+	prefect deployment ls 2>/dev/null | grep -F "${deployment}" ||
+		{ say "deployment ${deployment} is not registered"; exit 1; }
+}
+
+do_blocks() {
+	healthy || { say "start the Prefect server first"; exit 1; }
+	local config="${HOME}/sbd_blocks.toml"
+	local work_dir="${SBD_WORK_DIR:-${HOME}/sbd_jobs}"
+	mkdir -p "${work_dir}"
+	cat >"${config}" <<EOF
+# Generated by tools/prefect-sqd blocks. SBD solver placement on this cluster.
+hpc_target = "slurm"
+project = "${SBD_ACCOUNT}"
+queue = "${SBD_PARTITION}"
+work_dir = "${work_dir}"
+sbd_executable = "${QCSC_DIR}/algorithms/sbd/native/diag"
+
+launcher = "srun"
+walltime = "${SBD_WALLTIME}"
+num_nodes = 1
+mpiprocs = ${SBD_MPIPROCS}
+modules = []
+mpi_options = []
+
+command_block_name = "cmd-sbd-diag"
+execution_profile_block_name = "exec-sbd-mpi"
+hpc_profile_block_name = "hpc-slurm-sbd"
+solver_block_name = "davidson-solver"
+options_variable_name = "sqd_options"
+
+# The tutorial's fast, low-accuracy solver preset.
+task_comm_size = 1
+adet_comm_size = 1
+bdet_comm_size = 1
+block = 4
+iteration = 1
+tolerance = 0.01
+carryover_ratio = 0.1
+solver_mode = "cpu"
+EOF
+	say "creating the Slurm SBD blocks from ${config}"
+	(cd "${QCSC_DIR}" && python algorithms/sbd/create_blocks.py --config "${config}")
+	# QFw initializes DEFw at import, which installs signal handlers, so the
+	# block type must be registered from the main thread, not through
+	# "prefect block register".
+	say "registering the QFwResource block type"
+	python -c 'from sbd.qfw_resource import QFwResource; QFwResource.register_type_and_schema()'
+	say "creating the QFw resource block for ${QFW_DEVICE}"
+	(cd "${QCSC_DIR}" && python algorithms/sbd/create_qfw_block.py \
+		--device-id "${QFW_DEVICE}" --device-access-config "${QFW_DEVICE_ACCESS}")
+	prefect block ls
+}
+
+do_run() {
+	serving || { say "the deployment is not served; run start first"; exit 1; }
+	local source="${ARG1:-random}" dim="${ARG2:-10000}"
+	local iterations="${ARG3:-1}"
+	case "${source}" in
+		random|qfw) ;;
+		*) say "SOURCE must be random or qfw"; exit 2 ;;
+	esac
+	local params
+	params=$(cat <<EOF
+{"parameters": {
+  "fcidump": "${QCSC_DIR}/${SBD_FCIDUMP:-algorithms/sbd/data/fcidump_N2_MO.txt}",
+  "sqd_dim": ${dim},
+  "quantum_source": "${source}",
+  "random_seed": 24,
+  "circ_params": {"use_reset_mitigation": false},
+  "de_params": {"num_walkers": 4, "iterations": ${iterations}},
+  "solver_block_ref": "sbd_solver_job/davidson-solver"
+}}
+EOF
+)
+	say "submitting a ${source} run (sqd_dim ${dim}, ${iterations} iteration(s))"
+	prefect deployment run "${deployment}" --params "${params}" --watch
+}
+
+do_status() {
+	if healthy; then
+		say "Prefect server healthy at ${PREFECT_API_URL}"
+	else
+		say "Prefect server not answering at ${PREFECT_API_URL}"
+		exit 0
+	fi
+	if serving; then
+		say "deployment served by PID $(cat "${serve_pid}")"
+	else
+		say "deployment not served"
+	fi
+	prefect deployment ls
+	prefect flow-run ls --limit 5
+	squeue -u "$(id -un)"
+}
+
+do_stop() {
+	if serving; then
+		say "stopping the served deployment"
+		kill "$(cat "${serve_pid}")" || true
+	fi
+	rm -f "${serve_pid}"
+	[[ "${ARG1:-}" == "serve" ]] && return 0
+	if healthy; then
+		say "stopping the Prefect server"
+		prefect server stop >/dev/null
+	fi
+}
+
+case "${ACTION}" in
+	start) do_start ;;
+	blocks) do_blocks ;;
+	run) do_run ;;
+	status) do_status ;;
+	stop) do_stop ;;
+esac
+INNER
+}
+
+case "${action}" in
+	start|blocks|status|run|stop)
+		ACTION="${action}" in_container "$@" ;;
+	-h|--help|help)
+		usage ;;
+	*)
+		usage >&2
+		exit 2 ;;
+esac
