@@ -149,6 +149,8 @@ run_qfw() {
 
 	# The forwarded assignments go over as words of their own, preceded by
 	# how many there are, and quote_command below quotes them with the rest.
+	# The list is expanded with ${...+...} because bash 3.2, which the
+	# host-side test runs this under, rejects an empty array under set -u.
 	local -a forwarded=()
 	local name
 	for name in "${QFW_FORWARDED_VARIABLES[@]}"; do
@@ -169,7 +171,7 @@ run_qfw() {
 			"${QFW_SIMULATOR_NODES}" \
 			"${QFW_DEFW_VERSION}" \
 			"${#forwarded[@]}" \
-			"${forwarded[@]}" \
+			${forwarded[@]+"${forwarded[@]}"} \
 			"$@")" <<'EOF'
 set -uo pipefail
 
