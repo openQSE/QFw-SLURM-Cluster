@@ -2,31 +2,11 @@
 
 set -uo pipefail
 
-# Which DEFw the plane runs on: unset or 1 for v1, 2 for the DEFw v2
-# prototype. The v2 plane runs beside the v1 plane, so it has a site
-# configuration and a run root of its own. It runs the directory and the
-# QPMs of the default plane. It has no gateway, which is a DEFw v1 client,
-# and none of the opt-in QPMs, which have not been tried on v2. ssh hands a
-# remote command a bare environment, so the version is forwarded
-# explicitly, like the settings below.
-QFW_DEFW_VERSION="${QFW_DEFW_VERSION:-}"
-if [[ "${QFW_DEFW_VERSION}" == 2 ]]; then
-	plane_suffix=-defw2
-	plane_components="directory nwqsim iqm shim ibm aws fake-iqm"
-	plane_optional=""
-else
-	plane_suffix=
-	plane_components="directory nwqsim iqm shim ibm aws fake-iqm gateway"
-	# Opt-in: "all" starts and reports the plane without these, and each
-	# is started and reported only when it is the target.
-	plane_optional="qsa-sim backline pasqal"
-fi
-
 QFW_INSTALL_PREFIX="${QFW_INSTALL_PREFIX:-/opt/openqse/qfw}"
 QFW_VENV="${QFW_VENV:-/opt/openqse/qfw-venv}"
 QFW_SHARED_ROOT="${QFW_SHARED_ROOT:-/workspace/qfw-container-base}"
-QFW_SITE_CONFIG="${QFW_SITE_CONFIG:-/etc/openqse/qfw/site${plane_suffix}.yaml}"
-QFW_SITE_RUN_ROOT="${QFW_SITE_RUN_ROOT:-/var/lib/qfw-site-services${plane_suffix}}"
+QFW_SITE_CONFIG="${QFW_SITE_CONFIG:-/etc/openqse/qfw/site.yaml}"
+QFW_SITE_RUN_ROOT="${QFW_SITE_RUN_ROOT:-/var/lib/qfw-site-services}"
 QFW_DIR_NODE="${QFW_DIR_NODE:-slurmctld}"
 QFW_NWQSIM_NODE="${QFW_NWQSIM_NODE:-nwqsim-head}"
 QFW_IQM_NODE="${QFW_IQM_NODE:-iqm-head}"
@@ -89,32 +69,12 @@ Options:
              default /mnt/pasqal, see docs/recipes/run-pasqal-emu-free-job.md)
   --json     Emit one machine-readable status document
   --dry-run  Print the commands without executing them
-
-With QFW_DEFW_VERSION=2, manage the DEFw v2 prototype's plane instead. It
-runs beside the v1 plane, from /etc/openqse/qfw/site-defw2.yaml, and its
-targets are all, directory, nwqsim, iqm, shim, ibm, aws and fake-iqm. It has
-no gateway and none of the opt-in targets.
 EOF
 }
 
 die() {
 	echo "qfw-site-services: $*" >&2
 	exit 1
-}
-
-# Whether the plane in use has COMPONENT, its opt-in components included.
-in_plane() {
-	[[ " ${plane_components} ${plane_optional} " == *" $1 "* ]]
-}
-
-# Whether the selected target covers COMPONENT. all covers the plane without
-# its opt-in components, which only their own target selects.
-selects() {
-	if [[ "${target}" == all ]]; then
-		[[ " ${plane_components} " == *" $1 "* ]]
-	else
-		[[ "${target}" == "$1" ]]
-	fi
 }
 
 quote_command() {
@@ -127,6 +87,10 @@ quote_command() {
 # qfw-activate does not set these, so without forwarding them the service
 # plane would run with telemetry off while everything else on the cluster
 # reports. See docker-compose.telemetry.yml in the cluster repository.
+#
+# ssh joins its arguments into one command line that the remote shell parses
+# again, so each assignment goes over as its own shell-quoted word, preceded
+# by how many there are.
 QFW_FORWARDED_VARIABLES=(
 	QFW_TELEMETRY QFW_TELEMETRY_ENDPOINT QFW_TELEMETRY_SAMPLE
 	QFW_TELEMETRY_DIR QFW_TELEMETRY_TRANSPORT QFW_TELEMETRY_LOGS
@@ -139,6 +103,20 @@ QFW_FORWARDED_VARIABLES=(
 	PASQAL_CONFIG_ROOT PASQAL_AUTHFILE
 )
 
+forwarded_env_args() {
+	local -a assignments=()
+	local name
+	for name in "${QFW_FORWARDED_VARIABLES[@]}"; do
+		if [[ -n "${!name:-}" ]]; then
+			assignments+=("${name}=${!name}")
+		fi
+	done
+	printf '%s\n' "${#assignments[@]}"
+	if (( ${#assignments[@]} > 0 )); then
+		printf '%q\n' "${assignments[@]}"
+	fi
+}
+
 run_qfw() {
 	local node="$1"
 	shift
@@ -148,32 +126,21 @@ run_qfw() {
 		return 0
 	fi
 
-	# The forwarded assignments go over as words of their own, preceded by
-	# how many there are, and quote_command below quotes them with the rest.
-	# The list is expanded with ${...+...} because bash 3.2, which the
-	# host-side test runs this under, rejects an empty array under set -u.
 	local -a forwarded=()
-	local name
-	for name in "${QFW_FORWARDED_VARIABLES[@]}"; do
-		if [[ -n "${!name:-}" ]]; then
-			forwarded+=("${name}=${!name}")
-		fi
-	done
+	local word
+	while IFS= read -r word; do
+		forwarded+=("${word}")
+	done < <(forwarded_env_args)
 
-	# ssh hands the remote shell one command line, so each argument is
-	# quoted for it. Unquoted, an empty argument vanishes and every one
-	# after it moves up a place. QFW_DEFW_VERSION is empty on the v1 plane.
 	ssh -o BatchMode=yes -o ConnectTimeout=10 "root@${node}" \
-		"/bin/bash -s -- $(quote_command \
-			"${QFW_INSTALL_PREFIX}" \
-			"${QFW_VENV}" \
-			"${QFW_SHARED_ROOT}" \
-			"${QFW_SITE_CONFIG}" \
-			"${QFW_SIMULATOR_NODES}" \
-			"${QFW_DEFW_VERSION}" \
-			"${#forwarded[@]}" \
-			${forwarded[@]+"${forwarded[@]}"} \
-			"$@")" <<'EOF'
+		/bin/bash -s -- \
+		"${QFW_INSTALL_PREFIX}" \
+		"${QFW_VENV}" \
+		"${QFW_SHARED_ROOT}" \
+		"${QFW_SITE_CONFIG}" \
+		"${QFW_SIMULATOR_NODES}" \
+		"${forwarded[@]}" \
+		"$@" <<'EOF'
 set -uo pipefail
 
 qfw_prefix="$1"
@@ -181,16 +148,12 @@ qfw_venv="$2"
 qfw_shared_root="$3"
 qfw_site_config="$4"
 qfw_simulator_nodes="$5"
-qfw_defw_version="$6"
-qfw_forwarded_count="$7"
-shift 7
+qfw_forwarded_count="$6"
+shift 6
 
 export QFW_SHARED_ROOT="${qfw_shared_root}"
 export QFW_SITE_CONFIG="${qfw_site_config}"
 export QFW_SIMULATOR_NODES="${qfw_simulator_nodes}"
-if [[ -n "${qfw_defw_version}" ]]; then
-	export QFW_DEFW_VERSION="${qfw_defw_version}"
-fi
 while (( qfw_forwarded_count > 0 )); do
 	export "$1"
 	shift
@@ -244,22 +207,21 @@ run_gateway() {
 		return 0
 	fi
 
-	# Quoted for the remote shell, as in run_qfw.
 	ssh -o BatchMode=yes -o ConnectTimeout=10 \
 		"root@${QFW_GATEWAY_HOST}" \
-		"/bin/bash -s -- $(quote_command \
-			"${gateway_action}" \
-			"${QFW_SITE_RUN_ROOT}" \
-			"${gateway_pid_file}" \
-			"${gateway_log_file}" \
-			"${QFW_GATEWAY_LOG_DIR}" \
-			"${QFW_GATEWAY_USER}" \
-			"${QFW_INSTALL_PREFIX}" \
-			"${QFW_VENV}" \
-			"${QFW_SHARED_ROOT}" \
-			"${QFW_GATEWAY_CONFIG}" \
-			"${QFW_GATEWAY_HOST}" \
-			"${QFW_GATEWAY_PORT}")" <<'EOF'
+		/bin/bash -s -- \
+		"${gateway_action}" \
+		"${QFW_SITE_RUN_ROOT}" \
+		"${gateway_pid_file}" \
+		"${gateway_log_file}" \
+		"${QFW_GATEWAY_LOG_DIR}" \
+		"${QFW_GATEWAY_USER}" \
+		"${QFW_INSTALL_PREFIX}" \
+		"${QFW_VENV}" \
+		"${QFW_SHARED_ROOT}" \
+		"${QFW_GATEWAY_CONFIG}" \
+		"${QFW_GATEWAY_HOST}" \
+		"${QFW_GATEWAY_PORT}" <<'EOF'
 set -uo pipefail
 
 action="$1"
@@ -530,31 +492,31 @@ require_directory_dependents_stopped() {
 	if nwqsim_ready >/dev/null 2>&1; then
 		active+=(nwqsim)
 	fi
-	if in_plane iqm && iqm_ready >/dev/null 2>&1; then
+	if iqm_ready >/dev/null 2>&1; then
 		active+=(iqm)
 	fi
-	if in_plane shim && shim_ready >/dev/null 2>&1; then
+	if shim_ready >/dev/null 2>&1; then
 		active+=(shim)
 	fi
-	if in_plane ibm && ibm_ready >/dev/null 2>&1; then
+	if ibm_ready >/dev/null 2>&1; then
 		active+=(ibm)
 	fi
-	if in_plane aws && aws_ready >/dev/null 2>&1; then
+	if aws_ready >/dev/null 2>&1; then
 		active+=(aws)
 	fi
-	if in_plane qsa-sim && qsa_sim_ready >/dev/null 2>&1; then
+	if qsa_sim_ready >/dev/null 2>&1; then
 		active+=(qsa-sim)
 	fi
 	if fake_iqm_ready >/dev/null 2>&1; then
 		active+=(fake-iqm)
 	fi
-	if in_plane backline && backline_ready >/dev/null 2>&1; then
+	if backline_ready >/dev/null 2>&1; then
 		active+=(backline)
 	fi
-	if in_plane pasqal && pasqal_ready >/dev/null 2>&1; then
+	if pasqal_ready >/dev/null 2>&1; then
 		active+=(pasqal)
 	fi
-	if in_plane gateway && gateway_managed_ready >/dev/null 2>&1; then
+	if gateway_managed_ready >/dev/null 2>&1; then
 		active+=(gateway)
 	fi
 	if (( ${#active[@]} == 0 )); then
@@ -749,8 +711,7 @@ start_services() {
 		ibm_ready >/dev/null 2>&1 && ibm_was_ready=true
 		aws_ready >/dev/null 2>&1 && aws_was_ready=true
 		fake_iqm_ready >/dev/null 2>&1 && fake_iqm_was_ready=true
-		in_plane gateway && gateway_managed_ready >/dev/null 2>&1 &&
-			gateway_was_ready=true
+		gateway_managed_ready >/dev/null 2>&1 && gateway_was_ready=true
 
 		# A live dependent cannot be assumed to be registered with a newly
 		# created directory incarnation. Recreate those dependents in normal
@@ -766,10 +727,10 @@ start_services() {
 			fi
 			# qsa-sim is opt-in, so "all" does not restart it; probe it
 			# only here, where a live one would be stale.
-			if in_plane qsa-sim && qsa_sim_ready >/dev/null 2>&1; then
+			if qsa_sim_ready >/dev/null 2>&1; then
 				stop_qsa_sim || return 1
 			fi
-			if in_plane pasqal && pasqal_ready >/dev/null 2>&1; then
+			if pasqal_ready >/dev/null 2>&1; then
 				stop_pasqal || return 1
 			fi
 			if ${aws_was_ready}; then
@@ -851,7 +812,7 @@ start_services() {
 	fi
 	${fake_iqm_was_ready} || fake_iqm_started=true
 
-	if in_plane gateway && ! start_gateway; then
+	if ! start_gateway; then
 		${fake_iqm_started} && stop_fake_iqm >/dev/null 2>&1 || true
 		${aws_started} && stop_aws >/dev/null 2>&1 || true
 		${ibm_started} && stop_ibm >/dev/null 2>&1 || true
@@ -884,96 +845,134 @@ service_status() {
 	local pasqal_output="" pasqal_status=-1
 	local fake_iqm_output="" fake_iqm_status=-1
 	local gateway_output="" gateway_status=-1
-	local selected="${target}"
 
-	[[ "${target}" == all ]] && selected="${plane_components}"
 	if ${dry_run}; then
-		selects directory && directory_ready
-		selects nwqsim && nwqsim_ready
-		selects iqm && iqm_ready
-		selects shim && shim_ready
-		selects ibm && ibm_ready
-		selects aws && aws_ready
-		selects qsa-sim && qsa_sim_ready
-		selects pasqal && pasqal_ready
-		selects fake-iqm && fake_iqm_ready
-		selects gateway && gateway_managed_ready
+		case "${target}" in
+		all|directory) directory_ready ;;
+		esac
+		case "${target}" in
+		all|nwqsim) nwqsim_ready ;;
+		esac
+		case "${target}" in
+		all|iqm) iqm_ready ;;
+		esac
+		case "${target}" in
+		all|shim) shim_ready ;;
+		esac
+		case "${target}" in
+		all|ibm) ibm_ready ;;
+		esac
+		case "${target}" in
+		all|aws) aws_ready ;;
+		esac
+		case "${target}" in
+		qsa-sim) qsa_sim_ready ;;
+		esac
+		case "${target}" in
+		pasqal) pasqal_ready ;;
+		esac
+		case "${target}" in
+		all|fake-iqm) fake_iqm_ready ;;
+		esac
+		case "${target}" in
+		all|gateway) gateway_managed_ready ;;
+		esac
 		return 0
 	fi
 
-	if selects directory; then
+	case "${target}" in
+	all|directory)
 		if directory_output="$(directory_ready 2>&1)"; then
 			directory_status=0
 		else
 			directory_status=$?
 		fi
-	fi
-	if selects nwqsim; then
+		;;
+	esac
+	case "${target}" in
+	all|nwqsim)
 		if nwqsim_output="$(nwqsim_ready 2>&1)"; then
 			nwqsim_status=0
 		else
 			nwqsim_status=$?
 		fi
-	fi
-	if selects iqm; then
+		;;
+	esac
+	case "${target}" in
+	all|iqm)
 		if iqm_output="$(iqm_ready 2>&1)"; then
 			iqm_status=0
 		else
 			iqm_status=$?
 		fi
-	fi
-	if selects shim; then
+		;;
+	esac
+	case "${target}" in
+	all|shim)
 		if shim_output="$(shim_ready 2>&1)"; then
 			shim_status=0
 		else
 			shim_status=$?
 		fi
-	fi
-	if selects ibm; then
+		;;
+	esac
+	case "${target}" in
+	all|ibm)
 		if ibm_output="$(ibm_ready 2>&1)"; then
 			ibm_status=0
 		else
 			ibm_status=$?
 		fi
-	fi
-	if selects aws; then
+		;;
+	esac
+	case "${target}" in
+	all|aws)
 		if aws_output="$(aws_ready 2>&1)"; then
 			aws_status=0
 		else
 			aws_status=$?
 		fi
-	fi
-	if selects qsa-sim; then
+		;;
+	esac
+	case "${target}" in
+	qsa-sim)
 		if qsa_sim_output="$(qsa_sim_ready 2>&1)"; then
 			qsa_sim_status=0
 		else
 			qsa_sim_status=$?
 		fi
-	fi
-	if selects pasqal; then
+		;;
+	esac
+	case "${target}" in
+	pasqal)
 		if pasqal_output="$(pasqal_ready 2>&1)"; then
 			pasqal_status=0
 		else
 			pasqal_status=$?
 		fi
-	fi
-	if selects fake-iqm; then
+		;;
+	esac
+	case "${target}" in
+	all|fake-iqm)
 		if fake_iqm_output="$(fake_iqm_ready 2>&1)"; then
 			fake_iqm_status=0
 		else
 			fake_iqm_status=$?
 		fi
-	fi
-	if selects gateway; then
+		;;
+	esac
+	case "${target}" in
+	all|gateway)
 		if gateway_output="$(gateway_managed_ready 2>&1)"; then
 			gateway_status=0
 		else
 			gateway_status=$?
 		fi
-	fi
+		;;
+	esac
 
 	python3 - \
-		"${json_status}" "${selected}" \
+		"${json_status}" "${target}" \
 		"${directory_status}" "${directory_output}" \
 		"${nwqsim_status}" "${nwqsim_output}" \
 		"${iqm_status}" "${iqm_output}" \
@@ -988,7 +987,7 @@ import json
 import sys
 
 json_output = sys.argv[1] == "true"
-selected = sys.argv[2].split()
+target = sys.argv[2]
 values = {
     "directory": ("Directory", int(sys.argv[3]), sys.argv[4]),
     "nwqsim": ("NWQSim", int(sys.argv[5]), sys.argv[6]),
@@ -1001,6 +1000,11 @@ values = {
     "gateway": ("Gateway", int(sys.argv[19]), sys.argv[20]),
     "pasqal": ("Pasqal", int(sys.argv[21]), sys.argv[22]),
 }
+# qsa-sim and pasqal are opt-in, so the aggregate view leaves them out.
+selected = (
+    [name for name in values if name not in ("qsa-sim", "pasqal")]
+    if target == "all" else [target]
+)
 
 
 def first_document(text):
@@ -1105,20 +1109,15 @@ PY
 stop_services() {
 	local status=0
 
-	if in_plane gateway; then
-		stop_gateway || status=1
-	fi
+	stop_gateway || status=1
 	stop_fake_iqm || status=1
-	if in_plane backline &&
-			{ ${dry_run} || backline_ready >/dev/null 2>&1; }; then
+	if ${dry_run} || backline_ready >/dev/null 2>&1; then
 		stop_backline || status=1
 	fi
-	if in_plane qsa-sim &&
-			{ ${dry_run} || qsa_sim_ready >/dev/null 2>&1; }; then
+	if ${dry_run} || qsa_sim_ready >/dev/null 2>&1; then
 		stop_qsa_sim || status=1
 	fi
-	if in_plane pasqal &&
-			{ ${dry_run} || pasqal_ready >/dev/null 2>&1; }; then
+	if ${dry_run} || pasqal_ready >/dev/null 2>&1; then
 		stop_pasqal || status=1
 	fi
 	stop_aws || status=1
@@ -1232,18 +1231,10 @@ main() {
 		usage >&2
 		return 2
 	}
-	case "${QFW_DEFW_VERSION}" in
-	""|1|2) ;;
-	*) die "QFW_DEFW_VERSION must be 1 or 2, not ${QFW_DEFW_VERSION}" ;;
-	esac
 	case "${target}" in
 	all|directory|nwqsim|iqm|shim|ibm|aws|qsa-sim|fake-iqm|backline|pasqal|gateway) ;;
 	*) die "unknown target: ${target}" ;;
 	esac
-	if [[ "${target}" != all ]] && ! in_plane "${target}"; then
-		die "the DEFw v2 plane has no ${target}." \
-			"Its targets are all, ${plane_components// /, }."
-	fi
 	if ! ${dry_run} && [[ ${EUID} -ne 0 ]]; then
 		die "must run as root"
 	fi
