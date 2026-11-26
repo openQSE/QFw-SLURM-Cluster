@@ -317,7 +317,7 @@ ARG QFW_BUILD_JOBS=4
 # The image contains a complete release installation. A checkout mounted under
 # QFW_BASE remains an optional developer override built by do_qfw_build.sh.
 ARG QFW_REPOSITORY=https://github.com/openQSE/QFw.git
-ARG QFW_REF=7d3ef6c01376fd086b84062fde9da8a1522338e7
+ARG QFW_REF=554b0e0986a195593844e7d42001edebd9866a2b
 ARG QFW_DEFW_REPOSITORY=
 ARG QFW_SLURM_REPOSITORY=https://github.com/openQSE/qfw-slurm.git
 ARG QFW_SLURM_REF=main
@@ -332,8 +332,8 @@ ARG NWQSIM_PREFIX=/opt/openqse/nwqsim
 ARG TNQVM_PREFIX=/opt/openqse/tnqvm
 ARG SIMULATOR_WORK_ROOT=/tmp/qfw-simulator-build
 ARG MQT_CORE_REPOSITORY=https://github.com/munich-quantum-toolkit/core.git
-# MQT Core v4.2.0, pinned to its immutable release commit.
-ARG MQT_CORE_REF=d76be496512c8707f165e18f152bd5f11b8a5665
+# MQT Core v4.2.1, pinned to its immutable release commit.
+ARG MQT_CORE_REF=020cb98c2acb4d62a15193f09e1ec6774460c867
 ARG MQT_CORE_SOURCE=/tmp/mqt-core-source
 
 ENV QFW_BASE=/workspace/qfw-container-base \
