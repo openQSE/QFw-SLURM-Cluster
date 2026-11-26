@@ -487,7 +487,12 @@ RUN set -ex \
 # Obtain QFw solely as the versioned source for the independent simulator
 # builders and the official QFw installation. QFw's CMake install does not
 # invoke either simulator builder.
+# QFW_BUILD_DEFW2=ON, the default, also builds DEFw v2 into the install, for
+# QFW_DEFW_VERSION=2. It needs a QFW_REF that has v2, as the default one
+# does. OFF is for a QFW_REF without it. A ref without v2 stops the build
+# here, before the simulators, rather than at the end of the QFw build.
 ARG QFW_SOURCE_REVISION
+ARG QFW_BUILD_DEFW2=ON
 RUN set -ex \
     && git -c url.https://github.com/.insteadOf=git@github.com: \
         clone "${QFW_REPOSITORY}" "${QFW_IMAGE_SOURCE}" \
@@ -501,7 +506,13 @@ RUN set -ex \
        fi \
     && git -C "${QFW_IMAGE_SOURCE}" \
         -c url.https://github.com/.insteadOf=git@github.com: \
-        submodule update --init --recursive
+        submodule update --init --recursive \
+    && if [ "${QFW_BUILD_DEFW2}" = ON ] \
+        && ! grep -q QFW_BUILD_DEFW2 "${QFW_IMAGE_SOURCE}/CMakeLists.txt"; then \
+        echo "QFW_REF ${QFW_REF} has no DEFw v2 to build." \
+            "Use a QFW_REF that has it, or set QFW_BUILD_DEFW2=OFF." >&2; \
+        exit 1; \
+       fi
 
 RUN set -ex \
     && "${QFW_IMAGE_SOURCE}/tools/dependencies/nwqsim/build.sh" \
@@ -527,12 +538,9 @@ RUN set -ex \
 # DEFw finds libfabric through pkg-config. Without libfabric's .pc file on the
 # search path it still builds, as a TCP-only transport, so the last check makes
 # sure the installed library links libfabric.
-# QFW_BUILD_DEFW2=ON also builds the DEFw v2 prototype into the install, for
-# QFW_DEFW_VERSION=2. It needs a QFW_REF that has v2, such as QFw's
-# defw2-prototype branch. v2 finds Margo through pkg-config too, and builds
+# With QFW_BUILD_DEFW2=ON, v2 finds Margo through pkg-config too, and builds
 # its Python binding only when cffi is there to build it, so a v2 image
 # checks that the binding imports.
-ARG QFW_BUILD_DEFW2=OFF
 RUN set -ex \
     && uv venv --python python3 "${QFW_IMAGE_VENV}" \
     && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
