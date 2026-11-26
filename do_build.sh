@@ -12,9 +12,10 @@ Usage: $(basename "$0") [--dry-run] [--force] [--no-cache]
 Build the configured container image. If ${ENV_FILE} does not exist yet,
 run ./do_configure.sh first with its default settings.
 
-QFW_BUILD_DEFW2=ON, in the environment or ${ENV_FILE}, also builds the DEFw
-v2 prototype into the image's QFw. It needs a QFW_REF that has v2, such as
-defw2-prototype.
+The image's QFw is built with DEFw v2, which a run chooses with
+QFW_DEFW_VERSION=2. That needs a QFW_REF that has v2, as the default one
+does. QFW_BUILD_DEFW2=OFF, in the environment or ${ENV_FILE}, leaves v2 out,
+for a QFW_REF without it.
 
 Options:
   --dry-run   Print the install/bootstrap and docker build steps without running them
@@ -80,12 +81,12 @@ if ${DRY_RUN}; then
         set +a
         QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
         QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
-        QFW_REF="${QFW_REF:-7d3ef6c01376fd086b84062fde9da8a1522338e7}"
-        QFW_BUILD_DEFW2="${QFW_BUILD_DEFW2:-OFF}"
+        QFW_REF="${QFW_REF:-554b0e0986a195593844e7d42001edebd9866a2b}"
+        QFW_BUILD_DEFW2="${QFW_BUILD_DEFW2:-ON}"
         QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
         QFW_SLURM_REF="${QFW_SLURM_REF:-main}"
         MQT_CORE_REPOSITORY="${MQT_CORE_REPOSITORY:-https://github.com/munich-quantum-toolkit/core.git}"
-        MQT_CORE_REF="${MQT_CORE_REF:-d76be496512c8707f165e18f152bd5f11b8a5665}"
+        MQT_CORE_REF="${MQT_CORE_REF:-020cb98c2acb4d62a15193f09e1ec6774460c867}"
         echo "Would run:"
         if ${NO_CACHE}; then
             echo "  docker build \\"
@@ -125,12 +126,12 @@ set +a
 
 QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
 QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
-QFW_REF="${QFW_REF:-7d3ef6c01376fd086b84062fde9da8a1522338e7}"
-QFW_BUILD_DEFW2="${QFW_BUILD_DEFW2:-OFF}"
+QFW_REF="${QFW_REF:-554b0e0986a195593844e7d42001edebd9866a2b}"
+QFW_BUILD_DEFW2="${QFW_BUILD_DEFW2:-ON}"
 QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
 QFW_SLURM_REF="${QFW_SLURM_REF:-main}"
 MQT_CORE_REPOSITORY="${MQT_CORE_REPOSITORY:-https://github.com/munich-quantum-toolkit/core.git}"
-MQT_CORE_REF="${MQT_CORE_REF:-d76be496512c8707f165e18f152bd5f11b8a5665}"
+MQT_CORE_REF="${MQT_CORE_REF:-020cb98c2acb4d62a15193f09e1ec6774460c867}"
 QFW_WITH_QRMI_NATIVE="${QFW_WITH_QRMI_NATIVE:-1}"
 QFW_WITH_TNQVM="${QFW_WITH_TNQVM:-1}"
 QFW_WITH_MQT_CC="${QFW_WITH_MQT_CC:-1}"

@@ -73,6 +73,10 @@ MQT Core sources installed into the image come from the refs passed to
 `do_configure.sh`. Release builds should pass matching QFw and qfw-slurm
 release tags explicitly.
 
+The image's QFw is built with DEFw v2 beside v1, which the default QFw ref
+has. A QFw ref without v2 stops the build with a message. To build from one,
+set `QFW_BUILD_DEFW2=OFF` in the environment or in `qfw-install.env`.
+
 If `--prefix` is omitted, `do_configure.sh` creates and uses:
 
 ```text
@@ -240,9 +244,10 @@ processes: [Deploy the telemetry stack on bare metal](docs/recipes/deploy-teleme
 <details open>
 <summary>Use the official image installation</summary>
 
-Every cluster image contains QFw, DEFw, the QFw Python environment, NWQ-Sim,
-TNQVM, libfabric, the Mochi RPC stack for the DEFw v2 prototype, and their
-environment modulefiles. Enter `slurmctld`,
+Every cluster image contains QFw, DEFw v1 and v2, the QFw Python environment,
+NWQ-Sim, TNQVM, libfabric, the Mochi RPC stack that DEFw v2 runs on, and their
+environment modulefiles. A run is on v1 unless it sets `QFW_DEFW_VERSION=2`:
+[Run QFw on DEFw v2](docs/recipes/run-qfw-on-defw2.md). Enter `slurmctld`,
 activate QFw, and run a test without any separate build step:
 
 ```bash
@@ -441,7 +446,8 @@ The image builds and installs:
 - [Mochi] RPC stack for the DEFw v2 prototype under `/opt/qfw/mochi`: Argobots,
   Mercury with its `hg_rate`, `hg_bw_read` and `hg_bw_write` benchmarks, and
   Margo, loaded with `module load libfabric mochi`
-- [QFw] and [DEFw] under `/opt/openqse/qfw`
+- [QFw] and [DEFw] under `/opt/openqse/qfw`, with DEFw v2 beside v1:
+  `defw2-python`, `defw2-dirsvc` and the `defw2` Python package
 - [QFw] Python venv under `/opt/openqse/qfw-venv`
 - [NWQ-Sim] under `/opt/openqse/nwqsim`
 - [TNQVM], XACC, and ExaTN under `/opt/openqse/tnqvm`
