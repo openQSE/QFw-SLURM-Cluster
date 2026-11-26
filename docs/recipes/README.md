@@ -22,7 +22,6 @@ using the virtual QFw Slurm cluster.
 | Run the Tierkreis SQD He2 demo | [Run the Tierkreis SQD He2 demo](run-tierkreis-sqd.md) |
 | Run a workflow's quantum stage as a qfw-slurm job | [Run a quantum stage through qfw-slurm](run-quantum-stage-through-qfw-slurm.md) |
 | Deploy the telemetry stack on a real site, no containers | [Deploy the telemetry stack on bare metal](deploy-telemetry-baremetal.md) |
-| Run QFw on the DEFw v2 prototype beside v1 | [Run QFw on DEFw v2](run-qfw-on-defw2.md) |
 
 The commands assume the image-contained installations:
 
