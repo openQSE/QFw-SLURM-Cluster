@@ -19,19 +19,24 @@ cd /path/to/QFw-SLURM-Cluster
 Put the quantum options on heterogeneous group 0, which runs the application:
 
 ```bash
-salloc --partition=normal --nodes=1 --ntasks=1 --time=00:15:00 \
+salloc --account=qfw-test --partition=normal --nodes=1 --ntasks=1 \
+  --time=00:15:00 \
   --qpu=nwqsim \
   --workload-kind=hybrid \
   --circ-count=1 \
   --max-qubits=5 \
   --max-depth=20 \
   --max-shots=1024 \
-  : --partition=normal --nodes=1 --ntasks=1 --time=00:15:00
+  : --account=qfw-test --partition=normal --nodes=1 --ntasks=1 \
+  --time=00:15:00
 ```
 
 Run `man 7 qfw-slurm` and `man salloc` for the QPM and heterogeneous option
 contracts. Slurm grants the complete heterogeneous allocation only after QPMd
 accepts the final reservation.
+
+Every job must name an account. qfw-slurm rejects one that does not, even
+when the user has a default account. The test users are in `qfw-test`.
 
 ## Run in Group 0
 

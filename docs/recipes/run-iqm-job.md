@@ -26,7 +26,8 @@ cd /path/to/QFw-SLURM-Cluster
 Inside `slurmctld`:
 
 ```bash
-salloc --partition=normal \
+salloc --account=qfw-test \
+  --partition=normal \
   --nodes=1 \
   --ntasks=1 \
   --time=00:20:00 \
@@ -39,6 +40,9 @@ salloc --partition=normal \
 ```
 
 Run `man 7 qfw-slurm` for allocation-time QPM requirements.
+
+Every job must name an account. qfw-slurm rejects one that does not, even
+when the user has a default account. The test users are in `qfw-test`.
 
 ## Run the Chemistry Test
 

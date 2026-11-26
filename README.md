@@ -171,16 +171,18 @@ scontrol show nodes
 squeue
 ```
 
-Run a simple [Slurm] command:
+Run a simple [Slurm] command. Every job must name an account: qfw-slurm rejects
+one that does not, even when the user has a default account. Root's account is
+`root`, and the test users' is `qfw-test`:
 
 ```bash
-srun -N1 -n1 hostname
+srun --account=root -N1 -n1 hostname
 ```
 
 Allocate two nodes interactively:
 
 ```bash
-salloc -N2 -n2
+salloc --account=root -N2 -n2
 srun hostname
 ```
 
@@ -246,7 +248,7 @@ activate QFw, and run a test without any separate build step:
 
 ```bash
 ./do_ssh.sh
-salloc --nodes=1 --ntasks=1 --time=00:30:00
+salloc --account=root --nodes=1 --ntasks=1 --time=00:30:00
 export QFW_SHARED_ROOT=/workspace/qfw-container-base
 export QFW_RUN_BASE_DIR="${QFW_SHARED_ROOT}/qfw-runs"
 source "${QFW_PREFIX}/bin/qfw-activate" --venv "${QFW_VENV}"
@@ -615,7 +617,7 @@ module load rocm
 Run an MPI sanity check through [Slurm]:
 
 ```bash
-srun -N2 -n2 \
+srun --account=root -N2 -n2 \
   /opt/qfw/osu-micro-benchmarks/libexec/osu-micro-benchmarks/mpi/pt2pt/osu_latency
 ```
 
@@ -641,21 +643,21 @@ Submit a simple batch job from inside `slurmctld`:
 
 ```bash
 cd /data
-sbatch --wrap="hostname"
+sbatch --account=root --wrap="hostname"
 cat /data/slurm-<jobid>.out
 ```
 
 Submit a script from the host-managed shared directory:
 
 ```bash
-sbatch /mnt/simple.sbatch
+sbatch --account=root /mnt/simple.sbatch
 ```
 
 Run commands immediately:
 
 ```bash
-srun -N1 -n1 hostname
-srun -N2 -n2 hostname
+srun --account=root -N1 -n1 hostname
+srun --account=root -N2 -n2 hostname
 ```
 
 The [Slurm] REST daemon is exposed on:
