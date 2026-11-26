@@ -5,14 +5,14 @@ set -uo pipefail
 # Which DEFw the plane runs on: unset or 1 for v1, 2 for the DEFw v2
 # prototype. The v2 plane runs beside the v1 plane, so it has a site
 # configuration and a run root of its own. It runs the directory and the
-# two QPMs that have been tried on v2. The hardware QPMs have not, and the
-# gateway is a DEFw v1 client. ssh hands a remote command a bare
-# environment, so the version is forwarded explicitly, like the settings
-# below.
+# QPMs of the default plane. It has no gateway, which is a DEFw v1 client,
+# and none of the opt-in QPMs, which have not been tried on v2. ssh hands a
+# remote command a bare environment, so the version is forwarded
+# explicitly, like the settings below.
 QFW_DEFW_VERSION="${QFW_DEFW_VERSION:-}"
 if [[ "${QFW_DEFW_VERSION}" == 2 ]]; then
 	plane_suffix=-defw2
-	plane_components="directory nwqsim fake-iqm"
+	plane_components="directory nwqsim iqm shim ibm aws fake-iqm"
 	plane_optional=""
 else
 	plane_suffix=
@@ -92,7 +92,8 @@ Options:
 
 With QFW_DEFW_VERSION=2, manage the DEFw v2 prototype's plane instead. It
 runs beside the v1 plane, from /etc/openqse/qfw/site-defw2.yaml, and its
-targets are all, directory, nwqsim and fake-iqm.
+targets are all, directory, nwqsim, iqm, shim, ibm, aws and fake-iqm. It has
+no gateway and none of the opt-in targets.
 EOF
 }
 
@@ -748,7 +749,8 @@ start_services() {
 		ibm_ready >/dev/null 2>&1 && ibm_was_ready=true
 		aws_ready >/dev/null 2>&1 && aws_was_ready=true
 		fake_iqm_ready >/dev/null 2>&1 && fake_iqm_was_ready=true
-		gateway_managed_ready >/dev/null 2>&1 && gateway_was_ready=true
+		in_plane gateway && gateway_managed_ready >/dev/null 2>&1 &&
+			gateway_was_ready=true
 
 		# A live dependent cannot be assumed to be registered with a newly
 		# created directory incarnation. Recreate those dependents in normal
@@ -764,10 +766,10 @@ start_services() {
 			fi
 			# qsa-sim is opt-in, so "all" does not restart it; probe it
 			# only here, where a live one would be stale.
-			if qsa_sim_ready >/dev/null 2>&1; then
+			if in_plane qsa-sim && qsa_sim_ready >/dev/null 2>&1; then
 				stop_qsa_sim || return 1
 			fi
-			if pasqal_ready >/dev/null 2>&1; then
+			if in_plane pasqal && pasqal_ready >/dev/null 2>&1; then
 				stop_pasqal || return 1
 			fi
 			if ${aws_was_ready}; then
@@ -849,7 +851,7 @@ start_services() {
 	fi
 	${fake_iqm_was_ready} || fake_iqm_started=true
 
-	if ! start_gateway; then
+	if in_plane gateway && ! start_gateway; then
 		${fake_iqm_started} && stop_fake_iqm >/dev/null 2>&1 || true
 		${aws_started} && stop_aws >/dev/null 2>&1 || true
 		${ibm_started} && stop_ibm >/dev/null 2>&1 || true
@@ -865,57 +867,6 @@ start_services() {
 		# would be a claim about a plane that was never touched. It printed
 		# that even with SSH to the nodes completely broken, which reads as
 		# progress to anyone working through a startup failure.
-		echo "Dry run: printed the startup plan, started nothing."
-		return 0
-	fi
-	echo "QFw site services are ready."
-}
-
-# start_services for the DEFw v2 plane, which has no gateway and only the
-# QPMs that run on v2. The rules are the same. A directory that was not
-# ready means a new directory incarnation, so live QPMs are stopped first,
-# and a failure stops only what this invocation started.
-start_defw2_services() {
-	local directory_started=false
-	local nwqsim_started=false
-	local directory_was_ready=false
-	local nwqsim_was_ready=false
-	local fake_iqm_was_ready=false
-
-	if ${dry_run}; then
-		echo "NWQSim simulator nodes: ${QFW_SIMULATOR_NODES}"
-	else
-		directory_ready >/dev/null 2>&1 && directory_was_ready=true
-		nwqsim_ready >/dev/null 2>&1 && nwqsim_was_ready=true
-		fake_iqm_ready >/dev/null 2>&1 && fake_iqm_was_ready=true
-		if ! ${directory_was_ready}; then
-			if ${fake_iqm_was_ready}; then
-				stop_fake_iqm || return 1
-			fi
-			if ${nwqsim_was_ready}; then
-				stop_nwqsim || return 1
-				nwqsim_was_ready=false
-			fi
-		fi
-	fi
-
-	if ! start_directory; then
-		return 1
-	fi
-	${directory_was_ready} || directory_started=true
-
-	if ! start_nwqsim; then
-		${directory_started} && stop_directory >/dev/null 2>&1 || true
-		return 1
-	fi
-	${nwqsim_was_ready} || nwqsim_started=true
-
-	if ! start_fake_iqm; then
-		${nwqsim_started} && stop_nwqsim >/dev/null 2>&1 || true
-		${directory_started} && stop_directory >/dev/null 2>&1 || true
-		return 1
-	fi
-	if ${dry_run}; then
 		echo "Dry run: printed the startup plan, started nothing."
 		return 0
 	fi
@@ -1154,30 +1105,26 @@ PY
 stop_services() {
 	local status=0
 
-	stop_gateway || status=1
+	if in_plane gateway; then
+		stop_gateway || status=1
+	fi
 	stop_fake_iqm || status=1
-	if ${dry_run} || backline_ready >/dev/null 2>&1; then
+	if in_plane backline &&
+			{ ${dry_run} || backline_ready >/dev/null 2>&1; }; then
 		stop_backline || status=1
 	fi
-	if ${dry_run} || qsa_sim_ready >/dev/null 2>&1; then
+	if in_plane qsa-sim &&
+			{ ${dry_run} || qsa_sim_ready >/dev/null 2>&1; }; then
 		stop_qsa_sim || status=1
 	fi
-	if ${dry_run} || pasqal_ready >/dev/null 2>&1; then
+	if in_plane pasqal &&
+			{ ${dry_run} || pasqal_ready >/dev/null 2>&1; }; then
 		stop_pasqal || status=1
 	fi
 	stop_aws || status=1
 	stop_ibm || status=1
 	stop_shim || status=1
 	stop_iqm || status=1
-	stop_nwqsim || status=1
-	stop_directory || status=1
-	return "${status}"
-}
-
-stop_defw2_services() {
-	local status=0
-
-	stop_fake_iqm || status=1
 	stop_nwqsim || status=1
 	stop_directory || status=1
 	return "${status}"
@@ -1194,13 +1141,7 @@ target_status() {
 
 start_target() {
 	case "${target}" in
-	all)
-		if [[ "${QFW_DEFW_VERSION}" == 2 ]]; then
-			start_defw2_services
-		else
-			start_services
-		fi
-		;;
+	all) start_services ;;
 	directory) start_directory ;;
 	nwqsim) start_nwqsim ;;
 	iqm) start_iqm ;;
@@ -1217,13 +1158,7 @@ start_target() {
 
 stop_target() {
 	case "${target}" in
-	all)
-		if [[ "${QFW_DEFW_VERSION}" == 2 ]]; then
-			stop_defw2_services
-		else
-			stop_services
-		fi
-		;;
+	all) stop_services ;;
 	directory)
 		require_directory_dependents_stopped || return 1
 		stop_directory

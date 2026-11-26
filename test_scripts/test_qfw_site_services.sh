@@ -635,13 +635,17 @@ grep -q '^  ssh: connect to host slurmctld port 22: Connection refused$' \
 grep -q '^NWQSim: UP$' "${temporary}/unknown-reason.out"
 
 # QFW_DEFW_VERSION=2 selects the DEFw v2 plane. It runs beside the v1 plane,
-# from a site configuration and a run root of its own, and has only the
-# directory and the QPMs that run on v2.
+# from a site configuration and a run root of its own. It has the directory
+# and the QPMs of the default plane, and no gateway.
 QFW_DEFW_VERSION=2 "${command}" --dry-run start >"${temporary}/v2-start.out"
 cat >"${temporary}/v2-start.expected" <<'EOF'
 NWQSim simulator nodes: nwqsim-head,nwqsim-worker-1,nwqsim-worker-2
 slurmctld: qfw-dir-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/directory --site-config /etc/openqse/qfw/site-defw2.yaml --timeout 300 
 nwqsim-head: qfw-qpm-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/qpm/nwqsim --site-config /etc/openqse/qfw/site-defw2.yaml --service-id nwqsim --timeout 300 
+iqm-head: qfw-qpm-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/qpm/iqm-ornl-20q --site-config /etc/openqse/qfw/site-defw2.yaml --service-id iqm-ornl-20q --timeout 300 
+shim-head: qfw-qpm-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-ornl-20q --site-config /etc/openqse/qfw/site-defw2.yaml --service-id shim-ornl-20q --timeout 300 
+ibm-156-nh: qfw-qpm-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-ibm-156-nh --site-config /etc/openqse/qfw/site-defw2.yaml --service-id shim-ibm-156-nh --timeout 300 
+aws: qfw-qpm-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-aws-qpm --site-config /etc/openqse/qfw/site-defw2.yaml --service-id shim-aws-qpm --timeout 300 
 fake-iqm-head: qfw-qpm-svc start --scope site --run-dir /var/lib/qfw-site-services-defw2/qpm/fake-iqm --site-config /etc/openqse/qfw/site-defw2.yaml --service-id fake-iqm --timeout 300 
 Dry run: printed the startup plan, started nothing.
 EOF
@@ -650,6 +654,10 @@ cmp "${temporary}/v2-start.expected" "${temporary}/v2-start.out"
 QFW_DEFW_VERSION=2 "${command}" --dry-run stop >"${temporary}/v2-stop.out"
 cat >"${temporary}/v2-stop.expected" <<'EOF'
 fake-iqm-head: qfw-qpm-svc stop --run-dir /var/lib/qfw-site-services-defw2/qpm/fake-iqm 
+aws: qfw-qpm-svc stop --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-aws-qpm 
+ibm-156-nh: qfw-qpm-svc stop --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-ibm-156-nh 
+shim-head: qfw-qpm-svc stop --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-ornl-20q 
+iqm-head: qfw-qpm-svc stop --run-dir /var/lib/qfw-site-services-defw2/qpm/iqm-ornl-20q 
 nwqsim-head: qfw-qpm-svc stop --run-dir /var/lib/qfw-site-services-defw2/qpm/nwqsim 
 slurmctld: qfw-dir-svc stop --run-dir /var/lib/qfw-site-services-defw2/directory 
 EOF
@@ -659,11 +667,17 @@ QFW_DEFW_VERSION=2 "${command}" --dry-run status >"${temporary}/v2-status.out"
 cat >"${temporary}/v2-status.expected" <<'EOF'
 slurmctld: qfw-dir-svc status --run-dir /var/lib/qfw-site-services-defw2/directory 
 nwqsim-head: qfw-qpm-svc status --run-dir /var/lib/qfw-site-services-defw2/qpm/nwqsim 
+iqm-head: qfw-qpm-svc status --run-dir /var/lib/qfw-site-services-defw2/qpm/iqm-ornl-20q 
+shim-head: qfw-qpm-svc status --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-ornl-20q 
+ibm-156-nh: qfw-qpm-svc status --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-ibm-156-nh 
+aws: qfw-qpm-svc status --run-dir /var/lib/qfw-site-services-defw2/qpm/shim-aws-qpm 
 fake-iqm-head: qfw-qpm-svc status --run-dir /var/lib/qfw-site-services-defw2/qpm/fake-iqm 
 EOF
 cmp "${temporary}/v2-status.expected" "${temporary}/v2-status.out"
 
-for target in iqm shim ibm aws gateway; do
+# The gateway is a DEFw v1 client, and the opt-in QPMs have not been tried
+# on v2, so the v2 plane has none of them.
+for target in gateway qsa-sim backline pasqal; do
 	if QFW_DEFW_VERSION=2 "${command}" --dry-run start --target "${target}" \
 		>/dev/null 2>"${temporary}/v2-${target}.err"; then
 		echo "the v2 plane unexpectedly accepted ${target}" >&2
@@ -710,7 +724,7 @@ grep -q '^version=2 site=/etc/openqse/qfw/site-defw2.yaml$' \
 grep -q '^<two words><>$' "${temporary}/forwarded-1.out"
 
 # A v2 status reports the v2 plane alone, and asks nothing of the components
-# it does not have.
+# it does not have: the gateway and the opt-in QPMs.
 : >"${temporary}/v2-asked.calls"
 (
 	QFW_DEFW_VERSION=2
@@ -720,11 +734,14 @@ grep -q '^<two words><>$' "${temporary}/forwarded-1.out"
 	json_status=true
 	directory_ready() { echo '{"state":"ready"}'; }
 	nwqsim_ready() { echo '{"state":"ready"}'; }
+	iqm_ready() { echo '{"state":"ready"}'; }
+	shim_ready() { echo '{"state":"ready"}'; }
+	ibm_ready() { echo '{"state":"ready"}'; }
+	aws_ready() { echo '{"state":"ready"}'; }
 	fake_iqm_ready() { echo '{"state":"ready"}'; }
-	iqm_ready() { echo iqm >>"${temporary}/v2-asked.calls"; }
-	shim_ready() { echo shim >>"${temporary}/v2-asked.calls"; }
-	ibm_ready() { echo ibm >>"${temporary}/v2-asked.calls"; }
-	aws_ready() { echo aws >>"${temporary}/v2-asked.calls"; }
+	qsa_sim_ready() { echo qsa-sim >>"${temporary}/v2-asked.calls"; }
+	backline_ready() { echo backline >>"${temporary}/v2-asked.calls"; }
+	pasqal_ready() { echo pasqal >>"${temporary}/v2-asked.calls"; }
 	gateway_managed_ready() { echo gateway >>"${temporary}/v2-asked.calls"; }
 	service_status
 ) >"${temporary}/v2-health.json"
@@ -735,50 +752,98 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     status = json.load(stream)
 assert status["state"] == "up"
-assert list(status["services"]) == ["directory", "fake-iqm", "nwqsim"]
+assert list(status["services"]) == [
+    "aws", "directory", "fake-iqm", "ibm", "iqm", "nwqsim", "shim"]
 PY
 [[ ! -s "${temporary}/v2-asked.calls" ]]
 
-# Nor does a live v1 QPM or gateway hold up a v2 directory stop.
+# A live gateway or opt-in QPM, which the v2 plane does not have, does not
+# hold up a v2 directory stop. A live QPM of the plane does.
 (
 	QFW_DEFW_VERSION=2
 	source "${command}"
 	dry_run=false
 	nwqsim_ready() { return 1; }
+	iqm_ready() { return 1; }
+	shim_ready() { return 1; }
+	ibm_ready() { return 1; }
+	aws_ready() { return 1; }
 	fake_iqm_ready() { return 1; }
-	iqm_ready() { return 0; }
-	shim_ready() { return 0; }
-	ibm_ready() { return 0; }
-	aws_ready() { return 0; }
+	qsa_sim_ready() { return 0; }
+	backline_ready() { return 0; }
+	pasqal_ready() { return 0; }
 	gateway_managed_ready() { return 0; }
 	require_directory_dependents_stopped
 )
+(
+	QFW_DEFW_VERSION=2
+	source "${command}"
+	dry_run=false
+	nwqsim_ready() { return 1; }
+	iqm_ready() { return 1; }
+	shim_ready() { return 0; }
+	ibm_ready() { return 1; }
+	aws_ready() { return 1; }
+	fake_iqm_ready() { return 1; }
+	! require_directory_dependents_stopped \
+		2>"${temporary}/v2-dependents.err"
+)
+grep -q 'stop directory dependents first: shim$' \
+	"${temporary}/v2-dependents.err"
 
 # The v2 start follows the v1 rules. A directory that was not ready is a new
-# incarnation, so live QPMs are stopped and started again after it.
+# incarnation, so live QPMs are stopped and started again after it. Nothing
+# is asked of the gateway.
 (
 	QFW_DEFW_VERSION=2
 	source "${command}"
 	dry_run=false
 	directory_up=false
 	nwqsim_up=true
+	iqm_up=true
+	shim_up=true
+	ibm_up=true
+	aws_up=true
 	fake_iqm_up=true
 	directory_ready() { ${directory_up}; }
 	nwqsim_ready() { ${nwqsim_up}; }
+	iqm_ready() { ${iqm_up}; }
+	shim_ready() { ${shim_up}; }
+	ibm_ready() { ${ibm_up}; }
+	aws_ready() { ${aws_up}; }
 	fake_iqm_ready() { ${fake_iqm_up}; }
+	gateway_managed_ready() { echo asked-gateway; }
 	stop_fake_iqm() { echo stop-fake-iqm; fake_iqm_up=false; }
+	stop_aws() { echo stop-aws; aws_up=false; }
+	stop_ibm() { echo stop-ibm; ibm_up=false; }
+	stop_shim() { echo stop-shim; shim_up=false; }
+	stop_iqm() { echo stop-iqm; iqm_up=false; }
 	stop_nwqsim() { echo stop-nwqsim; nwqsim_up=false; }
 	stop_directory() { echo stop-directory; directory_up=false; }
+	stop_gateway() { echo stop-gateway; }
 	start_directory() { echo start-directory; directory_up=true; }
 	start_nwqsim() { echo start-nwqsim; nwqsim_up=true; }
+	start_iqm() { echo start-iqm; iqm_up=true; }
+	start_shim() { echo start-shim; shim_up=true; }
+	start_ibm() { echo start-ibm; ibm_up=true; }
+	start_aws() { echo start-aws; aws_up=true; }
 	start_fake_iqm() { echo start-fake-iqm; fake_iqm_up=true; }
+	start_gateway() { echo start-gateway; }
 	start_target
 ) >"${temporary}/v2-partial-state.out"
 cat >"${temporary}/v2-partial-state.expected" <<'EOF'
 stop-fake-iqm
+stop-aws
+stop-ibm
+stop-shim
+stop-iqm
 stop-nwqsim
 start-directory
 start-nwqsim
+start-iqm
+start-shim
+start-ibm
+start-aws
 start-fake-iqm
 QFw site services are ready.
 EOF
@@ -795,10 +860,23 @@ cmp "${temporary}/v2-partial-state.expected" \
 	events="${temporary}/v2-rollback.out"
 	directory_ready() { return 0; }
 	nwqsim_ready() { return 1; }
+	iqm_ready() { return 1; }
+	shim_ready() { return 1; }
+	ibm_ready() { return 1; }
+	aws_ready() { return 1; }
 	fake_iqm_ready() { return 1; }
 	start_directory() { echo start-directory >>"${events}"; }
 	start_nwqsim() { echo start-nwqsim >>"${events}"; }
+	start_iqm() { echo start-iqm >>"${events}"; }
+	start_shim() { echo start-shim >>"${events}"; }
+	start_ibm() { echo start-ibm >>"${events}"; }
+	start_aws() { echo start-aws >>"${events}"; }
 	start_fake_iqm() { echo fail-fake-iqm >>"${events}"; return 1; }
+	start_gateway() { echo start-gateway >>"${events}"; }
+	stop_aws() { echo stop-aws >>"${events}"; }
+	stop_ibm() { echo stop-ibm >>"${events}"; }
+	stop_shim() { echo stop-shim >>"${events}"; }
+	stop_iqm() { echo stop-iqm >>"${events}"; }
 	stop_nwqsim() { echo stop-nwqsim >>"${events}"; }
 	stop_directory() { echo stop-directory >>"${events}"; }
 	! start_target
@@ -806,7 +884,15 @@ cmp "${temporary}/v2-partial-state.expected" \
 cat >"${temporary}/v2-rollback.expected" <<'EOF'
 start-directory
 start-nwqsim
+start-iqm
+start-shim
+start-ibm
+start-aws
 fail-fake-iqm
+stop-aws
+stop-ibm
+stop-shim
+stop-iqm
 stop-nwqsim
 EOF
 cmp "${temporary}/v2-rollback.expected" "${temporary}/v2-rollback.out"

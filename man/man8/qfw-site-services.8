@@ -25,10 +25,11 @@ With
 .B QFW_DEFW_VERSION=2
 the command manages the DEFw v2 prototype's service plane instead.  It runs
 beside the v1 plane, with a site configuration, ports, and a run root of its
-own, and has only the directory service, the NWQSim QPM, and the fake IQM QPM.
-Its
+own.  It has the directory service and the QPMs of the default plane: NWQSim,
+IQM, the shim, IBM, AWS, and the fake IQM.  Its
 .B all
-target is those three, and the other targets are rejected.
+target is those seven.  It has no gateway, and the gateway and opt-in targets
+are rejected.
 .SH ACTIONS
 .TP
 .B start
