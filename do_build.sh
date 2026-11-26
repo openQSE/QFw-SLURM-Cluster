@@ -12,11 +12,6 @@ Usage: $(basename "$0") [--dry-run] [--force] [--no-cache]
 Build the configured container image. If ${ENV_FILE} does not exist yet,
 run ./do_configure.sh first with its default settings.
 
-The image's QFw is built with DEFw v2, which a run chooses with
-QFW_DEFW_VERSION=2. That needs a QFW_REF that has v2, as the default one
-does. QFW_BUILD_DEFW2=OFF, in the environment or ${ENV_FILE}, leaves v2 out,
-for a QFW_REF without it.
-
 Options:
   --dry-run   Print the install/bootstrap and docker build steps without running them
   --force     Stop and remove the current compose stack, then rebuild with --no-cache
@@ -82,7 +77,6 @@ if ${DRY_RUN}; then
         QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
         QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
         QFW_REF="${QFW_REF:-554b0e0986a195593844e7d42001edebd9866a2b}"
-        QFW_BUILD_DEFW2="${QFW_BUILD_DEFW2:-ON}"
         QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
         QFW_SLURM_REF="${QFW_SLURM_REF:-main}"
         MQT_CORE_REPOSITORY="${MQT_CORE_REPOSITORY:-https://github.com/munich-quantum-toolkit/core.git}"
@@ -99,7 +93,6 @@ if ${DRY_RUN}; then
         echo "    --build-arg QFW_BUILD_JOBS=${QFW_BUILD_JOBS} \\"
         echo "    --build-arg QFW_REPOSITORY=${QFW_REPOSITORY} \\"
         echo "    --build-arg QFW_REF=${QFW_REF} \\"
-        echo "    --build-arg QFW_BUILD_DEFW2=${QFW_BUILD_DEFW2} \\"
         echo "    --build-arg QFW_SLURM_REPOSITORY=${QFW_SLURM_REPOSITORY} \\"
         echo "    --build-arg QFW_SLURM_REF=${QFW_SLURM_REF} \\"
         echo "    --build-arg MQT_CORE_REPOSITORY=${MQT_CORE_REPOSITORY} \\"
@@ -127,7 +120,6 @@ set +a
 QFW_BUILD_JOBS="${QFW_BUILD_JOBS:-4}"
 QFW_REPOSITORY="${QFW_REPOSITORY:-https://github.com/openQSE/QFw.git}"
 QFW_REF="${QFW_REF:-554b0e0986a195593844e7d42001edebd9866a2b}"
-QFW_BUILD_DEFW2="${QFW_BUILD_DEFW2:-ON}"
 QFW_SLURM_REPOSITORY="${QFW_SLURM_REPOSITORY:-https://github.com/openQSE/qfw-slurm.git}"
 QFW_SLURM_REF="${QFW_SLURM_REF:-main}"
 MQT_CORE_REPOSITORY="${MQT_CORE_REPOSITORY:-https://github.com/munich-quantum-toolkit/core.git}"
@@ -180,7 +172,6 @@ echo "Building ${IMAGE_NAME}:${IMAGE_TAG} with SLURM_TAG=${SLURM_TAG}"
 echo "Building image-contained QFw with QFW_BUILD_JOBS=${QFW_BUILD_JOBS}"
 echo "Using QFw ${QFW_REF} from ${QFW_REPOSITORY}"
 echo "Resolved QFw revision ${QFW_SOURCE_REVISION}"
-echo "Building DEFw v2 into QFw: ${QFW_BUILD_DEFW2}"
 echo "Using qfw-slurm ${QFW_SLURM_REF} from ${QFW_SLURM_REPOSITORY}"
 echo "Resolved qfw-slurm revision ${QFW_SLURM_SOURCE_REVISION}"
 echo "Using MQT Core ${MQT_CORE_REF} from ${MQT_CORE_REPOSITORY}"
@@ -198,7 +189,6 @@ if ${NO_CACHE}; then
         --build-arg "QFW_REPOSITORY=${QFW_REPOSITORY}" \
         --build-arg "QFW_REF=${QFW_REF}" \
         --build-arg "QFW_SOURCE_REVISION=${QFW_SOURCE_REVISION}" \
-        --build-arg "QFW_BUILD_DEFW2=${QFW_BUILD_DEFW2}" \
         --build-arg "QFW_SLURM_REPOSITORY=${QFW_SLURM_REPOSITORY}" \
         --build-arg "QFW_SLURM_REF=${QFW_SLURM_REF}" \
         --build-arg "QFW_SLURM_SOURCE_REVISION=${QFW_SLURM_SOURCE_REVISION}" \
@@ -220,7 +210,6 @@ else
         --build-arg "QFW_REPOSITORY=${QFW_REPOSITORY}" \
         --build-arg "QFW_REF=${QFW_REF}" \
         --build-arg "QFW_SOURCE_REVISION=${QFW_SOURCE_REVISION}" \
-        --build-arg "QFW_BUILD_DEFW2=${QFW_BUILD_DEFW2}" \
         --build-arg "QFW_SLURM_REPOSITORY=${QFW_SLURM_REPOSITORY}" \
         --build-arg "QFW_SLURM_REF=${QFW_SLURM_REF}" \
         --build-arg "QFW_SLURM_SOURCE_REVISION=${QFW_SLURM_SOURCE_REVISION}" \
