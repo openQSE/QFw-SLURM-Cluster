@@ -4,9 +4,14 @@ This recipe runs an installed QFw example with its QPM served on the DEFw v2
 prototype, under Slurm, beside the v1 service plane. It is the prototype's W7
 check. The v1 plane keeps running, and v1 runs are unaffected.
 
-Only the directory, the NWQSim QPM and the fake IQM QPM run on v2. The
-qfw-slurm gateway is a DEFw v1 client, so a v2 run reserves its QPM from the
-example's own driver rather than through `salloc --qpu`.
+The v2 plane has the directory and the QPMs of the default plane: NWQSim, IQM,
+the shim, IBM, AWS and the fake IQM. It has no gateway, because the qfw-slurm
+gateway is a DEFw v1 client, so a v2 run reserves its QPM from the example's
+own driver rather than through `salloc --qpu`. The opt-in QPMs have not been
+tried on v2.
+
+This recipe runs the two simulated QPMs. The other four start and answer
+device queries on v2. No circuit has been run through them there.
 
 ## Prerequisites
 
@@ -36,16 +41,20 @@ QFw site services: UP
 
 Directory: UP
 NWQSim: UP
+IQM: UP
+Shim: UP
+IBM: UP
+AWS: UP
 Fake IQM: UP
 ```
 
 `QFW_DEFW_VERSION=2` selects the v2 plane. It reads
 `/etc/openqse/qfw/site-defw2.yaml` and keeps its state under
-`/var/lib/qfw-site-services-defw2`. Its directory listens on port 8190 and its
-QPMs on 8494 for NWQSim and 8594 for the fake IQM, clear of v1's 8090, 8490
-and 8590. It publishes its directory in
+`/var/lib/qfw-site-services-defw2`. Its directory listens on port 8190, clear
+of v1's 8090, and each QPM listens four ports above its v1 port: 8494 for
+NWQSim against v1's 8490, for example. It publishes its directory in
 `${QFW_SHARED_ROOT}/qfw-site-services-defw2/directory-service.json`. Its `all`
-target is those three, and it rejects the other targets.
+target is those seven, and it rejects the gateway and the opt-in targets.
 
 Run `qfw-site-services` from a fresh login shell, as above. It reads
 `QFW_SITE_CONFIG` from the environment, and `qfw-activate` exports one, so in a
@@ -98,8 +107,7 @@ docker exec -e QFW_DEFW_VERSION=2 \
   slurmctld /bin/bash -lc 'qfw-site-services stop'
 ```
 
-It stops the fake IQM QPM, the NWQSim QPM and then the directory. The v1 plane
-is untouched.
+It stops the QPMs and then the directory. The v1 plane is untouched.
 
 ## Use a Developer Override
 

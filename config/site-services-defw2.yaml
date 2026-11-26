@@ -1,6 +1,6 @@
-# The QPMs the DEFw v2 prototype's site plane serves: NWQ-Sim, and the fake
-# IQM QPM. They are the v1 plane's entries in site-services.yaml with ports
-# of their own, so both planes can run at once.
+# The QPMs the DEFw v2 prototype's site plane serves. They are the v1 plane's
+# entries in site-services.yaml with ports of their own, four above v1's, so
+# both planes can run at once.
 services:
   - name: nwqsim
     credential-mode: no-secret
@@ -33,3 +33,47 @@ services:
     telnet-port: 8595
     provider-launch:
       type: internal
+
+  - name: iqm-ornl-20q
+    credential-mode: required
+    module: svc_iqm_qpm
+    load-modules: svc_iqm_qpm,api_launcher
+    agent-prefix: qpm_iqm
+    device-id: ornl-iqm-20q
+    listen-port: 8294
+    telnet-port: 8295
+    provider-launch:
+      type: remote-api
+
+  - name: shim-ornl-20q
+    credential-mode: required
+    module: svc_lib_qpm
+    load-modules: svc_lib_qpm,api_launcher
+    agent-prefix: qpm_shim
+    device-id: ornl-iqm-20q
+    listen-port: 8394
+    telnet-port: 8395
+    provider-launch:
+      type: qrmi-qdmi
+
+  - name: shim-ibm-156-nh
+    credential-mode: required
+    module: svc_lib_qpm
+    load-modules: svc_lib_qpm,api_launcher
+    agent-prefix: qpm_shim_ibm
+    device-id: ibm-156-nh
+    listen-port: 8694
+    telnet-port: 8695
+    provider-launch:
+      type: qrmi-qdmi
+
+  - name: shim-aws-qpm
+    credential-mode: required
+    module: svc_lib_qpm
+    load-modules: svc_lib_qpm,api_launcher
+    agent-prefix: qpm_shim_aws
+    device-id: aws
+    listen-port: 8794
+    telnet-port: 8795
+    provider-launch:
+      type: qrmi-qdmi
