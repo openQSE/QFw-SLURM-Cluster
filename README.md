@@ -614,14 +614,7 @@ module use /etc/modulefiles
 module load rocm
 ```
 
-Run an MPI sanity check through [Slurm]:
-
-```bash
-srun --account=root -N2 -n2 \
-  /opt/qfw/osu-micro-benchmarks/libexec/osu-micro-benchmarks/mpi/pt2pt/osu_latency
-```
-
-Run a direct `mpirun` sanity check:
+Run a direct `mpirun` sanity check inside a container shell:
 
 ```bash
 export OMPI_ALLOW_RUN_AS_ROOT=1
@@ -631,8 +624,20 @@ mpirun -np 2 \
   /opt/qfw/osu-micro-benchmarks/libexec/osu-micro-benchmarks/mpi/pt2pt/osu_latency
 ```
 
-Use `srun` when [Slurm] should control placement. Use `mpirun` for direct MPI
-sanity checks inside a container shell.
+Run the same check across two nodes of a [Slurm] allocation. As root it needs
+the two variables above:
+
+```bash
+salloc --account=root -N2 -n2 \
+  mpirun -np 2 --map-by ppr:1:node --bind-to none \
+  /opt/qfw/osu-micro-benchmarks/libexec/osu-micro-benchmarks/mpi/pt2pt/osu_latency
+```
+
+`mpirun` starts its own daemons on the allocated nodes. `srun` cannot start
+[OpenMPI] ranks itself here: this [Slurm] has no PMIx plugin, so each rank
+would start alone. `--bind-to none` matters because the nodes are containers
+that share the host's cores, and the default binding puts both ranks on one
+core.
 
 </details>
 
