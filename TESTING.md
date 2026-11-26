@@ -312,11 +312,13 @@ To test on a Slurm application node, submit from inside `slurmctld`:
 
 ```bash
 cd /workspace/qfw-container-base
-sbatch --wait mqt-cc-smoke-test.sbatch
+sbatch --account=root --wait mqt-cc-smoke-test.sbatch
 ```
 
-The job uses the `normal` partition and needs no QPU allocation. Success ends
-with `MQT-CC QIR SMOKE TEST: PASS`.
+The job uses the `normal` partition and needs no QPU allocation. It names
+root's account, because qfw-slurm rejects a job that names none. As a test
+user, pass `--account=qfw-test`. Success ends with
+`MQT-CC QIR SMOKE TEST: PASS`.
 
 ## What to capture
 
