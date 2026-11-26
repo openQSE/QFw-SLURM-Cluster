@@ -62,7 +62,7 @@ From the Docker host:
 Inside `slurmctld`:
 
 ```bash
-salloc --partition=normal --nodes=1 --ntasks=1 --time=00:10:00
+salloc --account=qfw-test --partition=normal --nodes=1 --ntasks=1 --time=00:10:00
 ```
 
 Inside the granted allocation:
