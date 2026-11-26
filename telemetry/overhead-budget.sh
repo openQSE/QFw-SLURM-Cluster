@@ -74,7 +74,7 @@ state_env() {
 	esac
 	echo "-e QFW_TELEMETRY=${t} -e QFW_TELEMETRY_SAMPLE=${s} -e QFW_TELEMETRY_TRANSPORT=${x} -e QFW_TELEMETRY_LOGS=${l}"
 }
-qpm_pid() { docker exec "${QPM_NODE}" pgrep -f "defwp -d -x" | head -1; }
+qpm_pid() { docker exec "${QPM_NODE}" pgrep -f "defw2.compat --serve" | head -1; }
 qpm_cpu_s() { docker exec "${QPM_NODE}" awk '{print ($14+$15)/100.0}' "/proc/$1/stat"; }
 qpm_env() { docker exec "${QPM_NODE}" bash -c "tr '\0' '\n' < /proc/$1/environ | grep -E '^QFW_TELEMETRY(_SAMPLE|_TRANSPORT|_LOGS)?=' | sort | tr '\n' ' '"; }
 
@@ -84,7 +84,7 @@ run_stream() {
 	local result="$1"
 	shift
 	docker exec "$@" -e QFW_EXAMPLE_RESULT_FILE="${result}" slurmctld bash -c '
-		unset QFW_SITE_CONFIG _QFW_ACTIVE QFW_DEFW_VERSION
+		unset QFW_SITE_CONFIG _QFW_ACTIVE
 		export QFW_PREFIX='"${QFW_PREFIX}"'
 		source "${QFW_PREFIX}/bin/qfw-activate" --venv '"${QFW_VENV}"' >/dev/null 2>&1
 		export QFW_SHARED_ROOT=/workspace/qfw-container-base
