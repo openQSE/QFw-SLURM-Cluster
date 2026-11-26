@@ -10,8 +10,9 @@ gateway is a DEFw v1 client, so a v2 run reserves its QPM from the example's
 own driver rather than through `salloc --qpu`. The opt-in QPMs have not been
 tried on v2.
 
-This recipe runs the two simulated QPMs. The other four start and answer
-device queries on v2. No circuit has been run through them there.
+This recipe runs the two simulated QPMs. The IQM QPM and the shim QPM have
+each run a circuit on the ORNL device through v2. The IBM and AWS QPMs start
+and answer device queries there, and no circuit has been run through them.
 
 ## Prerequisites
 
