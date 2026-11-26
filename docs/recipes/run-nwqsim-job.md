@@ -24,7 +24,8 @@ cd /path/to/QFw-SLURM-Cluster
 Inside `slurmctld`, request the QPM and bounded workload at allocation time:
 
 ```bash
-salloc --partition=normal \
+salloc --account=qfw-test \
+  --partition=normal \
   --nodes=1 \
   --ntasks=1 \
   --time=00:10:00 \
@@ -38,6 +39,9 @@ salloc --partition=normal \
 
 Run `man 7 qfw-slurm` for allocator options. Do not pass these options to
 `srun`; QPM reservation occurs before Slurm grants the allocation.
+
+Every job must name an account. qfw-slurm rejects one that does not, even
+when the user has a default account. The test users are in `qfw-test`.
 
 ## Run the Application
 
