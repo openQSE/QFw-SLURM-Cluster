@@ -73,6 +73,10 @@ MQT Core sources installed into the image come from the refs passed to
 `do_configure.sh`. Release builds should pass matching QFw and qfw-slurm
 release tags explicitly.
 
+QFw runs on DEFw v2 only, and so does this cluster. A QFw ref that still
+chooses between DEFw v1 and v2, or has no v2, stops the image build with a
+message.
+
 If `--prefix` is omitted, `do_configure.sh` creates and uses:
 
 ```text
@@ -243,7 +247,8 @@ processes: [Deploy the telemetry stack on bare metal](docs/recipes/deploy-teleme
 <summary>Use the official image installation</summary>
 
 Every cluster image contains QFw, DEFw, the QFw Python environment, NWQ-Sim,
-TNQVM, libfabric, and their environment modulefiles. Enter `slurmctld`,
+TNQVM, libfabric, the Mochi RPC stack that DEFw v2 runs on, and their
+environment modulefiles. QFw runs on DEFw v2. Enter `slurmctld`,
 activate QFw, and run a test without any separate build step:
 
 ```bash
@@ -274,7 +279,14 @@ module unload nwqsim libfabric
 module load libfabric tnqvm
 command -v circuit_runner.tnqvm
 module unload tnqvm libfabric
+
+module load libfabric mochi
+margo-info
+module unload mochi libfabric
 ```
+
+`margo-info` lists the Mercury transports that initialize in the container.
+Expect `ofi+tcp` and `na+sm` to work there.
 
 </details>
 
@@ -349,7 +361,7 @@ explicit operation described by QFw's `tools/dependencies/README.md`.
 The environment has three important layers:
 
 - Host workspace: scripts and optional mounted QFw development artifacts.
-- Docker image: [Slurm], [OpenMPI], [libfabric], modules, and image-contained [QFw].
+- Docker image: [Slurm], [OpenMPI], [libfabric], [Mochi], modules, and image-contained [QFw].
 - Compose cluster: [Slurm] services and compute nodes using the image and mount.
 
 ```mermaid
@@ -360,7 +372,7 @@ flowchart TB
         slurm["Slurm runtime"]
         mpi["libfabric + OpenMPI/PRRTE"]
         image_qfw["/opt/openqse/qfw\nQFw + DEFw"]
-        modules["libfabric, NWQ-Sim, TNQVM\nenvironment modules"]
+        modules["libfabric, Mochi, NWQ-Sim, TNQVM\nenvironment modules"]
     end
 
     subgraph cluster["Docker Compose cluster"]
@@ -432,7 +444,11 @@ The image builds and installs:
 - [libfabric]
 - [OpenMPI] with the bundled [PRRTE] checkout
 - OSU Micro-Benchmarks
-- [QFw] and [DEFw] under `/opt/openqse/qfw`
+- [Mochi] RPC stack for DEFw v2 under `/opt/qfw/mochi`: Argobots,
+  Mercury with its `hg_rate`, `hg_bw_read` and `hg_bw_write` benchmarks, and
+  Margo, loaded with `module load libfabric mochi`
+- [QFw] and [DEFw] under `/opt/openqse/qfw`. QFw runs on DEFw v2, through
+  `defw2-python`, `defw2-dirsvc` and the `defw2` Python package
 - [QFw] Python venv under `/opt/openqse/qfw-venv`
 - [NWQ-Sim] under `/opt/openqse/nwqsim`
 - [TNQVM], XACC, and ExaTN under `/opt/openqse/tnqvm`
@@ -457,9 +473,9 @@ The image-level runtime environment includes:
 /opt/qfw/qrmi/lib
 ```
 
-QFw activation adds the official QFw paths. Simulator and libfabric paths are
-added only to managed services by the service definition's environment module
-contract, or interactively with `module load`.
+QFw activation adds the official QFw paths. Simulator, libfabric and Mochi paths
+are added only to managed services by the service definition's environment
+module contract, or interactively with `module load`.
 
 `qfw-activate` is still explicit. The image entrypoint does not globally source
 it because activation rewires the Python environment.
@@ -886,6 +902,7 @@ failure to a relabel that happened days earlier.
 
 [DEFw]: https://github.com/openQSE/DEFw
 [libfabric]: https://github.com/ofiwg/libfabric
+[Mochi]: https://mochi.readthedocs.io/
 [NWQ-Sim]: https://github.com/pnnl/NWQ-Sim
 [OpenMPI]: https://github.com/open-mpi/ompi
 [PRRTE]: https://github.com/openpmix/prrte

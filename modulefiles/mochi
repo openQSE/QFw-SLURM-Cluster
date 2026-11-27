@@ -1,0 +1,21 @@
+#%Module1.0
+##
+## Mochi RPC stack (Argobots, Mercury, Margo) for the DEFw v2 prototype.
+## Load it together with libfabric, which Mercury's OFI plugin links.
+##
+
+proc ModulesHelp { } {
+    puts stderr "Adds the image Mochi stack (Argobots, Mercury, Margo) to the environment."
+}
+
+module-whatis "Mochi RPC stack for the DEFw v2 prototype"
+
+set root /opt/qfw/mochi
+
+prepend-path PATH              $root/bin
+prepend-path LD_LIBRARY_PATH   $root/lib
+prepend-path LIBRARY_PATH      $root/lib
+prepend-path CPATH             $root/include
+prepend-path PKG_CONFIG_PATH   $root/lib/pkgconfig
+prepend-path CMAKE_PREFIX_PATH $root
+setenv MOCHI_ROOT              $root

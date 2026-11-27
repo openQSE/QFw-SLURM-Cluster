@@ -25,7 +25,8 @@ sed -n '/^QFW_BASE=/,/^REMOTE$/p' "${repo_dir}/do_qfw_build.sh" |
 uv() { printf '<%s>' "$@" >>"${UV_LOG}"; printf '\n' >>"${UV_LOG}"; }
 cmake() { :; }
 ldd() { echo libfabric; }
-export -f uv cmake ldd
+python() { :; }
+export -f uv cmake ldd python
 
 for qrmi in pinned fallback unpinned; do
     export QRMI_VERSION="" QFW_VERSION_FALLBACK=""
@@ -80,4 +81,15 @@ fi
 grep -Fq "No QDMI requirements at ${QFW_BASE}/QFw/setup/qdmi-requirements.txt" "${temporary}/output"
 [ ! -s "${UV_LOG}" ]
 
-echo "QFw dependency install passed: pinned, fallback, unpinned, Pulser, missing file, paths with spaces"
+touch "${QFW_BASE}/QFw/setup/qdmi-requirements.txt"
+# QFw runs on DEFw v2, so a build must stop when the v2 Python binding it
+# installed does not import.
+python() { return 1; }
+export -f python
+if bash -euo pipefail "${temporary}/remote.sh" >"${temporary}/output" 2>&1; then
+    echo "A DEFw v2 Python binding that does not import did not stop the build" >&2
+    exit 1
+fi
+grep -Fq "The DEFw v2 Python binding in ${QFW_BASE}/qfw-install does not import." "${temporary}/output"
+
+echo "QFw dependency install passed: pinned, fallback, unpinned, Pulser, missing file, paths with spaces, missing v2 binding"

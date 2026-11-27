@@ -221,12 +221,103 @@ RUN set -ex \
     && yum clean all \
     && rm -rf /var/cache/yum
 
+# ----------------------------------------------------------------------
+# Mochi RPC stack for DEFw v2
+#
+# DEFw v2 (docs/design_v2.md in openQSE/DEFw) is built on Mercury and Margo
+# from Argonne's Mochi project. The versions match that document's Appendix B.
+# Spack marks Mercury 2.4.0 and older as conflicting with libfabric 2.x, so
+# 2.4.1 is the oldest release that works with the libfabric built above.
+#
+# The design pins json-c 0.19. Margo accepts any json-c, so the image uses the
+# distribution's json-c-devel, which Slurm's JSON serializer already links.
+# That keeps a single libjson-c in the image.
+#
+# Mercury is configured like Spack's default mercury package: the OFI and
+# shared-memory plugins, its bundled Boost preprocessor headers, and its
+# performance tests (hg_rate, hg_bw_read, hg_bw_write). The DEFw v2 success
+# criteria use those tests as the bulk-transfer reference. Checksum support is
+# compiled in, but Mercury leaves it off unless a caller enables it at init.
+# Argobots gets --enable-perf-opt, also Spack's default. Its 1.2 release still
+# reports version 1.2rc1, because upstream never bumped version.m4 for it, so
+# the build checks Argobots by checksum rather than by pkg-config version.
+#
+# The libraries and tools carry an RPATH, so they run without LD_LIBRARY_PATH.
+# `module load libfabric mochi` adds the stack to PATH, pkg-config and CMake.
+# ----------------------------------------------------------------------
+ARG ARGOBOTS_VERSION=1.2
+ARG ARGOBOTS_SHA256=1c056429d9c0a27c041d4734f6318b801fc2ec671854e42c35251c4c7d0d43e1
+ARG MERCURY_VERSION=2.4.1
+ARG MERCURY_SHA256=8a372416f3fca28d402ac7f7b73f0a7dd5d4b88785281ad9e6076e105e4840b9
+ARG MARGO_VERSION=0.24.4
+ARG MARGO_SHA256=2dcf456b6aa4ee65f30a08a1bfa6d59602657e555074b91760fef893d7afbcf1
+ARG MOCHI_PREFIX=/opt/qfw/mochi
+RUN set -ex \
+    && export PKG_CONFIG_PATH="${MOCHI_PREFIX}/lib/pkgconfig:${LIBFABRIC_PREFIX}/lib/pkgconfig" \
+    && mkdir -p /tmp/mochi \
+    && cd /tmp/mochi \
+    && curl -fsSL -o argobots.tar.gz \
+        "https://github.com/pmodels/argobots/releases/download/v${ARGOBOTS_VERSION}/argobots-${ARGOBOTS_VERSION}.tar.gz" \
+    && curl -fsSL -o mercury.tar.bz2 \
+        "https://github.com/mercury-hpc/mercury/releases/download/v${MERCURY_VERSION}/mercury-${MERCURY_VERSION}.tar.bz2" \
+    && curl -fsSL -o margo.tar.gz \
+        "https://github.com/mochi-hpc/mochi-margo/archive/refs/tags/v${MARGO_VERSION}.tar.gz" \
+    && printf '%s  %s\n' \
+        "${ARGOBOTS_SHA256}" argobots.tar.gz \
+        "${MERCURY_SHA256}" mercury.tar.bz2 \
+        "${MARGO_SHA256}" margo.tar.gz \
+        | sha256sum -c - \
+    && mkdir argobots mercury margo \
+    && tar --no-same-owner -xzf argobots.tar.gz -C argobots --strip-components=1 \
+    && tar --no-same-owner -xjf mercury.tar.bz2 -C mercury --strip-components=1 \
+    && tar --no-same-owner -xzf margo.tar.gz -C margo --strip-components=1 \
+    && cd /tmp/mochi/argobots \
+    && ./configure --prefix="${MOCHI_PREFIX}" \
+        --enable-perf-opt --disable-debug --disable-valgrind \
+    && make -j"$(nproc)" \
+    && make install \
+    && cd /tmp/mochi \
+    && cmake -S mercury -B mercury-build \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX="${MOCHI_PREFIX}" \
+        -DCMAKE_INSTALL_RPATH="${MOCHI_PREFIX}/lib" \
+        -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_TESTING=ON \
+        -DBUILD_TESTING_UNIT=OFF \
+        -DBUILD_TESTING_PERF=ON \
+        -DMERCURY_USE_BOOST_PP=ON \
+        -DMERCURY_USE_SYSTEM_BOOST=OFF \
+        -DMERCURY_USE_CHECKSUMS=ON \
+        -DMERCURY_USE_SYSTEM_MCHECKSUM=OFF \
+        -DMERCURY_USE_XDR=OFF \
+        -DNA_USE_OFI=ON \
+        -DNA_USE_SM=ON \
+    && cmake --build mercury-build --parallel "$(nproc)" \
+    && cmake --install mercury-build \
+    && cmake -S margo -B margo-build \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX="${MOCHI_PREFIX}" \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_INSTALL_RPATH="${MOCHI_PREFIX}/lib" \
+        -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
+        -DCMAKE_PREFIX_PATH="${MOCHI_PREFIX}" \
+    && cmake --build margo-build --parallel "$(nproc)" \
+    && cmake --install margo-build \
+    && pkg-config --exists argobots \
+    && test "$(pkg-config --modversion mercury)" = "${MERCURY_VERSION}" \
+    && test "$(pkg-config --modversion margo)" = "${MARGO_VERSION}" \
+    && test -x "${MOCHI_PREFIX}/bin/margo-info" \
+    && test -x "${MOCHI_PREFIX}/bin/hg_bw_read" \
+    && cd / \
+    && rm -rf /tmp/mochi
+
 ARG QFW_BUILD_JOBS=4
 
 # The image contains a complete release installation. A checkout mounted under
 # QFW_BASE remains an optional developer override built by do_qfw_build.sh.
 ARG QFW_REPOSITORY=https://github.com/openQSE/QFw.git
-ARG QFW_REF=7d3ef6c01376fd086b84062fde9da8a1522338e7
+ARG QFW_REF=208d3aa68dc4fb8199606287ef63233c59510065
 ARG QFW_DEFW_REPOSITORY=
 ARG QFW_SLURM_REPOSITORY=https://github.com/openQSE/qfw-slurm.git
 ARG QFW_SLURM_REF=main
@@ -241,8 +332,8 @@ ARG NWQSIM_PREFIX=/opt/openqse/nwqsim
 ARG TNQVM_PREFIX=/opt/openqse/tnqvm
 ARG SIMULATOR_WORK_ROOT=/tmp/qfw-simulator-build
 ARG MQT_CORE_REPOSITORY=https://github.com/munich-quantum-toolkit/core.git
-# MQT Core v4.2.0, pinned to its immutable release commit.
-ARG MQT_CORE_REF=d76be496512c8707f165e18f152bd5f11b8a5665
+# MQT Core v4.2.1, pinned to its immutable release commit.
+ARG MQT_CORE_REF=020cb98c2acb4d62a15193f09e1ec6774460c867
 ARG MQT_CORE_SOURCE=/tmp/mqt-core-source
 
 ENV QFW_BASE=/workspace/qfw-container-base \
@@ -396,6 +487,9 @@ RUN set -ex \
 # Obtain QFw solely as the versioned source for the independent simulator
 # builders and the official QFw installation. QFw's CMake install does not
 # invoke either simulator builder.
+# QFw runs on DEFw v2 only, and so does this cluster. A QFW_REF that still
+# chooses between DEFw v1 and v2, or has no v2, stops the build here, before
+# the simulators, rather than at the end of the QFw build.
 ARG QFW_SOURCE_REVISION
 RUN set -ex \
     && git -c url.https://github.com/.insteadOf=git@github.com: \
@@ -410,7 +504,13 @@ RUN set -ex \
        fi \
     && git -C "${QFW_IMAGE_SOURCE}" \
         -c url.https://github.com/.insteadOf=git@github.com: \
-        submodule update --init --recursive
+        submodule update --init --recursive \
+    && if ! grep -q DEFW_BUILD_V2 "${QFW_IMAGE_SOURCE}/CMakeLists.txt" \
+        || grep -q QFW_BUILD_DEFW2 "${QFW_IMAGE_SOURCE}/CMakeLists.txt"; then \
+        echo "QFW_REF ${QFW_REF} does not run on DEFw v2 only." \
+            "Use a QFW_REF that does." >&2; \
+        exit 1; \
+       fi
 
 RUN set -ex \
     && "${QFW_IMAGE_SOURCE}/tools/dependencies/nwqsim/build.sh" \
@@ -436,6 +536,9 @@ RUN set -ex \
 # DEFw finds libfabric through pkg-config. Without libfabric's .pc file on the
 # search path it still builds, as a TCP-only transport, so the last check makes
 # sure the installed library links libfabric.
+# DEFw v2 finds Margo through pkg-config too. Its Python binding needs cffi,
+# which QFw's build requirements bring, and the last checks make sure the
+# binding was built and imports.
 RUN set -ex \
     && uv venv --python python3 "${QFW_IMAGE_VENV}" \
     && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
@@ -451,7 +554,7 @@ RUN set -ex \
         -r "${QFW_IMAGE_SOURCE}/setup/qdmi-requirements.txt" \
         ${pulser_requirements} \
         --override "${QFW_IMAGE_SOURCE}/setup/overrides.txt" \
-    && export PKG_CONFIG_PATH="${LIBFABRIC_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
+    && export PKG_CONFIG_PATH="${MOCHI_PREFIX}/lib/pkgconfig:${LIBFABRIC_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
     && PATH="${QFW_IMAGE_VENV}/bin:${PATH}" cmake \
         -S "${QFW_IMAGE_SOURCE}" \
         -B "${QFW_IMAGE_BUILD}" \
@@ -463,6 +566,10 @@ RUN set -ex \
     && cmake --install "${QFW_IMAGE_BUILD}" \
     && test -x "${QFW_IMAGE_PREFIX}/bin/qfw-activate" \
     && ldd "${QFW_IMAGE_PREFIX}/lib/libdefw.so" | grep -q libfabric \
+    && test -x "${QFW_IMAGE_PREFIX}/bin/defw2-python" \
+    && test -x "${QFW_IMAGE_PREFIX}/bin/defw2-dirsvc" \
+    && PYTHONPATH="$(echo "${QFW_IMAGE_PREFIX}"/lib/python3*/site-packages)" \
+        "${QFW_IMAGE_VENV}/bin/python" -c 'import defw2' \
     && rm -rf "${QFW_IMAGE_SOURCE}" "${QFW_IMAGE_BUILD}" \
         "${SIMULATOR_WORK_ROOT}"
 
@@ -555,6 +662,7 @@ ENV QFW_IMAGE_PREFIX=${QFW_IMAGE_PREFIX} \
     TNQVM_PREFIX=${TNQVM_PREFIX} \
     QRMI_PREFIX=${QRMI_PREFIX} \
     QRMI_VERSION=${QRMI_VERSION} \
+    MOCHI_PREFIX=${MOCHI_PREFIX} \
     MODULEPATH=/etc/modulefiles:/usr/share/Modules/modulefiles:/usr/share/modulefiles \
     LD_LIBRARY_PATH=${OMPI_PREFIX}/lib:${OMPI_PREFIX}/lib64:${QRMI_PREFIX}/lib:${LD_LIBRARY_PATH}
 
@@ -569,6 +677,21 @@ RUN set -ex \
     && command -v pterm \
     && command -v circuit_runner.nwqsim \
     && rm -f /tmp/qfw-simulator-environment.sh
+
+# The Mochi module must resolve Margo through pkg-config, and the installed
+# tools must find their libraries through RPATH alone.
+RUN set -ex \
+    && env -i PATH=/usr/share/Modules/bin:/usr/bin:/bin \
+        MODULEPATH=/etc/modulefiles:/usr/share/Modules/modulefiles \
+        modulecmd sh load libfabric mochi \
+        >/tmp/qfw-mochi-environment.sh \
+    && . /tmp/qfw-mochi-environment.sh \
+    && command -v margo-info \
+    && command -v hg_bw_read \
+    && pkg-config --cflags --libs margo \
+    && rm -f /tmp/qfw-mochi-environment.sh \
+    && ! env -u LD_LIBRARY_PATH ldd "${MOCHI_PREFIX}/bin/margo-info" \
+        "${MOCHI_PREFIX}/bin/hg_bw_read" | grep 'not found'
 
 # TJN: Add a basic cgroup.conf b/c appears to be needed now
 COPY cgroup.conf /etc/slurm/cgroup.conf
