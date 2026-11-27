@@ -159,33 +159,4 @@ assert site["service"]["manifest"] == \
     "/etc/openqse/qfw/services/site-services.yaml"
 PY
 
-# The v2 plane's manifest is the v1 manifest's entries for the QPMs that
-# plane starts, with ports four above v1's and nothing else changed.
-python3 - "${service_config}" "${repo_dir}/config/site-services-defw2.yaml" \
-	"${repo_dir}/config/site-defw2.yaml" <<'PY'
-import sys
-
-import yaml
-
-with open(sys.argv[1], encoding="utf-8") as stream:
-    v1 = {service["name"]: service
-          for service in yaml.safe_load(stream)["services"]}
-with open(sys.argv[2], encoding="utf-8") as stream:
-    v2 = yaml.safe_load(stream)["services"]
-assert [service["name"] for service in v2] == [
-    "nwqsim", "fake-iqm", "iqm-ornl-20q", "shim-ornl-20q",
-    "shim-ibm-156-nh", "shim-aws-qpm",
-]
-for service in v2:
-    expected = dict(v1[service["name"]])
-    expected["listen-port"] += 4
-    expected["telnet-port"] += 4
-    assert service == expected, service["name"]
-
-with open(sys.argv[3], encoding="utf-8") as stream:
-    site = yaml.safe_load(stream)
-assert site["service"]["manifest"] == \
-    "/etc/openqse/qfw/services/site-services-defw2.yaml"
-PY
-
 echo "QFw service topology configuration passed"

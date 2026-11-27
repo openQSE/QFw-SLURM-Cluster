@@ -222,7 +222,7 @@ RUN set -ex \
     && rm -rf /var/cache/yum
 
 # ----------------------------------------------------------------------
-# Mochi RPC stack for the DEFw v2 prototype
+# Mochi RPC stack for DEFw v2
 #
 # DEFw v2 (docs/design_v2.md in openQSE/DEFw) is built on Mercury and Margo
 # from Argonne's Mochi project. The versions match that document's Appendix B.
@@ -317,10 +317,10 @@ ARG QFW_BUILD_JOBS=4
 # The image contains a complete release installation. A checkout mounted under
 # QFW_BASE remains an optional developer override built by do_qfw_build.sh.
 ARG QFW_REPOSITORY=https://github.com/openQSE/QFw.git
-ARG QFW_REF=554b0e0986a195593844e7d42001edebd9866a2b
+ARG QFW_REF=a14ef97947aeada81f6949da55205cb2ae31ea45
 ARG QFW_DEFW_REPOSITORY=
 ARG QFW_SLURM_REPOSITORY=https://github.com/openQSE/qfw-slurm.git
-ARG QFW_SLURM_REF=main
+ARG QFW_SLURM_REF=defw2-prototype
 ARG QFW_IMAGE_SOURCE=/tmp/qfw-source
 ARG QFW_IMAGE_BUILD=/tmp/qfw-build
 ARG QFW_IMAGE_PREFIX=/opt/openqse/qfw
@@ -487,12 +487,10 @@ RUN set -ex \
 # Obtain QFw solely as the versioned source for the independent simulator
 # builders and the official QFw installation. QFw's CMake install does not
 # invoke either simulator builder.
-# QFW_BUILD_DEFW2=ON, the default, also builds DEFw v2 into the install, for
-# QFW_DEFW_VERSION=2. It needs a QFW_REF that has v2, as the default one
-# does. OFF is for a QFW_REF without it. A ref without v2 stops the build
-# here, before the simulators, rather than at the end of the QFw build.
+# QFw runs on DEFw v2 only, and so does this cluster. A QFW_REF that still
+# chooses between DEFw v1 and v2, or has no v2, stops the build here, before
+# the simulators, rather than at the end of the QFw build.
 ARG QFW_SOURCE_REVISION
-ARG QFW_BUILD_DEFW2=ON
 RUN set -ex \
     && git -c url.https://github.com/.insteadOf=git@github.com: \
         clone "${QFW_REPOSITORY}" "${QFW_IMAGE_SOURCE}" \
@@ -507,10 +505,10 @@ RUN set -ex \
     && git -C "${QFW_IMAGE_SOURCE}" \
         -c url.https://github.com/.insteadOf=git@github.com: \
         submodule update --init --recursive \
-    && if [ "${QFW_BUILD_DEFW2}" = ON ] \
-        && ! grep -q QFW_BUILD_DEFW2 "${QFW_IMAGE_SOURCE}/CMakeLists.txt"; then \
-        echo "QFW_REF ${QFW_REF} has no DEFw v2 to build." \
-            "Use a QFW_REF that has it, or set QFW_BUILD_DEFW2=OFF." >&2; \
+    && if ! grep -q DEFW_BUILD_V2 "${QFW_IMAGE_SOURCE}/CMakeLists.txt" \
+        || grep -q QFW_BUILD_DEFW2 "${QFW_IMAGE_SOURCE}/CMakeLists.txt"; then \
+        echo "QFW_REF ${QFW_REF} does not run on DEFw v2 only." \
+            "Use a QFW_REF that does." >&2; \
         exit 1; \
        fi
 
@@ -538,9 +536,9 @@ RUN set -ex \
 # DEFw finds libfabric through pkg-config. Without libfabric's .pc file on the
 # search path it still builds, as a TCP-only transport, so the last check makes
 # sure the installed library links libfabric.
-# With QFW_BUILD_DEFW2=ON, v2 finds Margo through pkg-config too, and builds
-# its Python binding only when cffi is there to build it, so a v2 image
-# checks that the binding imports.
+# DEFw v2 finds Margo through pkg-config too. Its Python binding needs cffi,
+# which QFw's build requirements bring, and the last checks make sure the
+# binding was built and imports.
 RUN set -ex \
     && uv venv --python python3 "${QFW_IMAGE_VENV}" \
     && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
@@ -556,9 +554,6 @@ RUN set -ex \
         -r "${QFW_IMAGE_SOURCE}/setup/qdmi-requirements.txt" \
         ${pulser_requirements} \
         --override "${QFW_IMAGE_SOURCE}/setup/overrides.txt" \
-    && if [ "${QFW_BUILD_DEFW2}" = ON ]; then \
-        uv pip install --python "${QFW_IMAGE_VENV}" cffi; \
-       fi \
     && export PKG_CONFIG_PATH="${MOCHI_PREFIX}/lib/pkgconfig:${LIBFABRIC_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
     && PATH="${QFW_IMAGE_VENV}/bin:${PATH}" cmake \
         -S "${QFW_IMAGE_SOURCE}" \
@@ -566,18 +561,15 @@ RUN set -ex \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DCMAKE_INSTALL_PREFIX="${QFW_IMAGE_PREFIX}" \
         -DQFW_BUILD_BUNDLED_DEFW=ON \
-        -DQFW_BUILD_DEFW2="${QFW_BUILD_DEFW2}" \
     && cmake --build "${QFW_IMAGE_BUILD}" \
         --parallel "${QFW_BUILD_JOBS}" \
     && cmake --install "${QFW_IMAGE_BUILD}" \
     && test -x "${QFW_IMAGE_PREFIX}/bin/qfw-activate" \
     && ldd "${QFW_IMAGE_PREFIX}/lib/libdefw.so" | grep -q libfabric \
-    && if [ "${QFW_BUILD_DEFW2}" = ON ]; then \
-        test -x "${QFW_IMAGE_PREFIX}/bin/defw2-python" \
-        && test -x "${QFW_IMAGE_PREFIX}/bin/defw2-dirsvc" \
-        && PYTHONPATH="$(echo "${QFW_IMAGE_PREFIX}"/lib/python3*/site-packages)" \
-            "${QFW_IMAGE_VENV}/bin/python" -c 'import defw2'; \
-       fi \
+    && test -x "${QFW_IMAGE_PREFIX}/bin/defw2-python" \
+    && test -x "${QFW_IMAGE_PREFIX}/bin/defw2-dirsvc" \
+    && PYTHONPATH="$(echo "${QFW_IMAGE_PREFIX}"/lib/python3*/site-packages)" \
+        "${QFW_IMAGE_VENV}/bin/python" -c 'import defw2' \
     && rm -rf "${QFW_IMAGE_SOURCE}" "${QFW_IMAGE_BUILD}" \
         "${SIMULATOR_WORK_ROOT}"
 
