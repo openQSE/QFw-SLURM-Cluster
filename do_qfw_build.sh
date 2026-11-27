@@ -103,12 +103,12 @@ QFW_CONTAINER_NAME="${QFW_CONTAINER_NAME:-slurmctld}"
 MQT_CORE_SRC="${QFW_BASE}/mqt-core"
 export MLIR_DIR="${MLIR_DIR:-/opt/llvm-23.1.1/lib/cmake/mlir}"
 
-# DEFw finds libfabric through pkg-config, and nothing in the image puts
-# libfabric's .pc file on the search path. Without it DEFw builds a TCP-only
-# transport, and a run that asks for DEFW_TRANSPORT=ofi carries on over tcp.
+# QFw's build finds libfabric through pkg-config, for the library directory
+# that qfw-activate puts on the search path, and nothing in the image puts
+# libfabric's .pc file where pkg-config looks.
 LIBFABRIC_PREFIX="${LIBFABRIC_PREFIX:-/opt/qfw/libfabric}"
 export PKG_CONFIG_PATH="${LIBFABRIC_PREFIX}/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
-# DEFw v2, which QFw runs on, finds Margo the same way.
+# DEFw, which QFw runs on, finds Margo the same way.
 MOCHI_PREFIX="${MOCHI_PREFIX:-/opt/qfw/mochi}"
 export PKG_CONFIG_PATH="${MOCHI_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}"
 
@@ -245,14 +245,6 @@ cmake --build "${QFW_BUILD}" -j "${jobs}"
 
 echo "== cmake install"
 cmake --install "${QFW_BUILD}"
-
-# A DEFw without libfabric still builds and runs, and says so in a single
-# configure line, so check the library that was installed.
-if ! ldd "${QFW_PREFIX}/lib/libdefw.so" 2>/dev/null | grep -q libfabric; then
-    echo "${QFW_PREFIX}/lib/libdefw.so is missing or does not link libfabric." >&2
-    echo "DEFw looks for ${LIBFABRIC_PREFIX}/lib/pkgconfig/libfabric.pc." >&2
-    exit 1
-fi
 
 # QFw runs on DEFw v2, through v2's Python binding. A checkout that predates
 # that, or a venv without cffi, leaves an install with no binding, so check

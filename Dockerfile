@@ -505,7 +505,8 @@ RUN set -ex \
     && git -C "${QFW_IMAGE_SOURCE}" \
         -c url.https://github.com/.insteadOf=git@github.com: \
         submodule update --init --recursive \
-    && if ! grep -q DEFW_BUILD_V2 "${QFW_IMAGE_SOURCE}/CMakeLists.txt" \
+    && if ! grep -q defw2-dirsvc \
+            "${QFW_IMAGE_SOURCE}/setup/qfw_runtime/_process_launcher.py" \
         || grep -q QFW_BUILD_DEFW2 "${QFW_IMAGE_SOURCE}/CMakeLists.txt"; then \
         echo "QFW_REF ${QFW_REF} does not run on DEFw v2 only." \
             "Use a QFW_REF that does." >&2; \
@@ -533,12 +534,10 @@ RUN set -ex \
 
 # Share QFw's QDMI package pins with developer installs, and resolve the Pulser
 # frontend's requirements with them when the QFw ref has them.
-# DEFw finds libfabric through pkg-config. Without libfabric's .pc file on the
-# search path it still builds, as a TCP-only transport, so the last check makes
-# sure the installed library links libfabric.
-# DEFw v2 finds Margo through pkg-config too. Its Python binding needs cffi,
-# which QFw's build requirements bring, and the last checks make sure the
-# binding was built and imports.
+# DEFw finds Margo through pkg-config. Its Python binding needs cffi, which
+# QFw's build requirements bring, and the last checks make sure the binding
+# was built and imports. QFw finds libfabric through pkg-config too, for the
+# library directory that qfw-activate puts on the search path.
 RUN set -ex \
     && uv venv --python python3 "${QFW_IMAGE_VENV}" \
     && uv pip install --python "${QFW_IMAGE_VENV}" --upgrade \
@@ -565,7 +564,6 @@ RUN set -ex \
         --parallel "${QFW_BUILD_JOBS}" \
     && cmake --install "${QFW_IMAGE_BUILD}" \
     && test -x "${QFW_IMAGE_PREFIX}/bin/qfw-activate" \
-    && ldd "${QFW_IMAGE_PREFIX}/lib/libdefw.so" | grep -q libfabric \
     && test -x "${QFW_IMAGE_PREFIX}/bin/defw2-python" \
     && test -x "${QFW_IMAGE_PREFIX}/bin/defw2-dirsvc" \
     && PYTHONPATH="$(echo "${QFW_IMAGE_PREFIX}"/lib/python3*/site-packages)" \
