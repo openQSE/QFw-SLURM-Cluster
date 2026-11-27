@@ -24,9 +24,8 @@ sed -n '/^QFW_BASE=/,/^REMOTE$/p' "${repo_dir}/do_qfw_build.sh" |
 
 uv() { printf '<%s>' "$@" >>"${UV_LOG}"; printf '\n' >>"${UV_LOG}"; }
 cmake() { :; }
-ldd() { echo libfabric; }
 python() { :; }
-export -f uv cmake ldd python
+export -f uv cmake python
 
 for qrmi in pinned fallback unpinned; do
     export QRMI_VERSION="" QFW_VERSION_FALLBACK=""
