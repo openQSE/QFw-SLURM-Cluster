@@ -11,7 +11,7 @@ DEFAULT_QFW_BUILD_JOBS="4"
 DEFAULT_QFW_REPOSITORY="https://github.com/openQSE/QFw.git"
 DEFAULT_QFW_REF="a14ef97947aeada81f6949da55205cb2ae31ea45"
 DEFAULT_QFW_SLURM_REPOSITORY="https://github.com/openQSE/qfw-slurm.git"
-DEFAULT_QFW_SLURM_REF="defw2-prototype"
+DEFAULT_QFW_SLURM_REF="main"
 DEFAULT_MQT_CORE_REPOSITORY="https://github.com/munich-quantum-toolkit/core.git"
 # MQT Core v4.2.1, pinned to its immutable release commit.
 DEFAULT_MQT_CORE_REF="020cb98c2acb4d62a15193f09e1ec6774460c867"
