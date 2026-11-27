@@ -79,10 +79,7 @@ unset DEFW_LISTEN_PORT
 unset DEFW_LOG_DIR
 unset DEFW_PARENT_ADDR
 unset DEFW_PARENT_HOSTNAME
-unset DEFW_PARENT_NAME
 unset DEFW_PARENT_PORT
-unset DEFW_SHELL_TYPE
-unset DEFW_TELNET_PORT
 
 qfw_runtime_ready=0
 cleanup() {{

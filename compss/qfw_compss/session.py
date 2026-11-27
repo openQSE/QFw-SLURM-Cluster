@@ -36,7 +36,6 @@ _DROP_NAMES = frozenset({
 	"DEFW_AGENT_NAME",
 	"DEFW_LISTEN_PORT",
 	"DEFW_LOG_DIR",
-	"DEFW_TELNET_PORT",
 	"SLURMD_NODENAME",
 	"SLURM_CPUS_ON_NODE",
 	"SLURM_GTIDS",
@@ -137,7 +136,7 @@ class QFwSession:
 
 		The captured environment plus a DEFw identity of its own: a free
 		listen port on this host, a unique agent name and a private log
-		directory. The telnet port is left to defw-python's default.
+		directory.
 		"""
 		env = dict(self.environment)
 		env["DEFW_LISTEN_PORT"] = str(_free_tcp_port())
