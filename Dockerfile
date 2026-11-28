@@ -631,11 +631,18 @@ RUN set -ex \
     && test -f "${MLIR_DIR}/MLIRConfig.cmake" \
     && rm /tmp/setup-mlir.sh
 
+# MQT Core's build takes its version from git describe, and uv records its
+# tags, so fetch every commit and tag, but no files: the tree:0 filter leaves
+# them out, and switch then fetches those of MQT_CORE_REF alone.
 ARG MQT_CORE_SOURCE_REVISION
 RUN set -ex \
     && if [ "${QFW_WITH_MQT_CC}" != "1" ]; then exit 0; fi \
-    && git clone "${MQT_CORE_REPOSITORY}" "${MQT_CORE_SOURCE}" \
-    && git -C "${MQT_CORE_SOURCE}" fetch origin "${MQT_CORE_REF}" \
+    && git init --quiet "${MQT_CORE_SOURCE}" \
+    && git -C "${MQT_CORE_SOURCE}" remote add origin "${MQT_CORE_REPOSITORY}" \
+    && git -C "${MQT_CORE_SOURCE}" fetch --filter=tree:0 origin \
+        'refs/tags/*:refs/tags/*' \
+    && git -C "${MQT_CORE_SOURCE}" fetch --filter=tree:0 origin \
+        "${MQT_CORE_REF}" \
     && git -C "${MQT_CORE_SOURCE}" switch --detach FETCH_HEAD \
     && test "$(git -C "${MQT_CORE_SOURCE}" rev-parse HEAD)" = \
         "${MQT_CORE_SOURCE_REVISION}" \
